@@ -1,6 +1,6 @@
 # Batch GetOrganelle
 
-`get.py` is a batch wrapper for GetOrganelle. It automates paired-end read
+`batch_getorganelle.py` is a batch wrapper for GetOrganelle. It automates paired-end read
 detection, multi-sample assembly, resume handling, result status reporting,
 intermediate cleanup, and final `*.path_sequence.fasta` summary.
 
@@ -20,7 +20,7 @@ installed and initialized.
 
 ```bash
 cd getorganelle
-python get.py -i reads/ -o out/ -F embplant_pt \
+python batch_getorganelle.py -i reads/ -o out/ -F embplant_pt \
   --suffix_fq _R1.fq.gz _R2.fq.gz
 ```
 
@@ -35,84 +35,84 @@ assembly -> clean -> summary
 Run assembly only:
 
 ```bash
-python get.py assembly -i reads/ -o out/ -F embplant_pt
+python batch_getorganelle.py assembly -i reads/ -o out/ -F embplant_pt
 ```
 
 Clean intermediate files:
 
 ```bash
-python get.py clean -o out/
+python batch_getorganelle.py clean -o out/
 ```
 
 Summarize final path sequences:
 
 ```bash
-python get.py summary -o out/
+python batch_getorganelle.py summary -o out/
 ```
 
 Preview commands without running GetOrganelle:
 
 ```bash
-python get.py assembly -i reads/ -o out/ -F embplant_pt --dry_run
+python batch_getorganelle.py assembly -i reads/ -o out/ -F embplant_pt --dry_run
 ```
 
 Run only selected samples:
 
 ```bash
-python get.py assembly -i reads/ -o out/ -F embplant_pt \
+python batch_getorganelle.py assembly -i reads/ -o out/ -F embplant_pt \
   --sample_list samples.txt
 ```
 
 Skip samples already confirmed elsewhere:
 
 ```bash
-python get.py assembly -i reads/ -o out/ -F embplant_pt \
+python batch_getorganelle.py assembly -i reads/ -o out/ -F embplant_pt \
   --finished_samples done.txt
 ```
 
 Force rerun existing outputs, while still protecting `done.txt` samples:
 
 ```bash
-python get.py assembly -i reads/ -o out/ -F embplant_pt \
+python batch_getorganelle.py assembly -i reads/ -o out/ -F embplant_pt \
   --force --finished_samples done.txt
 ```
 
 Use reads stored in selected subdirectories:
 
 ```bash
-python get.py assembly -i reads/ -o out/ -F embplant_pt \
+python batch_getorganelle.py assembly -i reads/ -o out/ -F embplant_pt \
   --subdir_list batch1 batch2 batch3
 ```
 
 Use all reads for difficult or low-depth samples:
 
 ```bash
-python get.py assembly -i reads/ -o out/ -F embplant_pt --all_data
+python batch_getorganelle.py assembly -i reads/ -o out/ -F embplant_pt --all_data
 ```
 
 Plant mitochondrial assembly often needs more extension rounds:
 
 ```bash
-python get.py assembly -i reads/ -o out_mt/ -F embplant_mt -R 50
+python batch_getorganelle.py assembly -i reads/ -o out_mt/ -F embplant_mt -R 50
 ```
 
 Custom target mode requires both seed and label references:
 
 ```bash
-python get.py assembly -i reads/ -o out_custom/ -F anonym \
+python batch_getorganelle.py assembly -i reads/ -o out_custom/ -F anonym \
   -s seed.fasta --genes label.fasta --max_extending_len 100 -P 0
 ```
 
 Prepare seed/label files from GenBank or FASTA references:
 
 ```bash
-python get.py prep_db -o out/ --ref_files reference.gb --make_label
+python batch_getorganelle.py prep_db -o out/ --ref_files reference.gb --make_label
 ```
 
 Use a GenBank reference directly during assembly:
 
 ```bash
-python get.py assembly -i reads/ -o out/ -F embplant_pt \
+python batch_getorganelle.py assembly -i reads/ -o out/ -F embplant_pt \
   --ref_gb reference.gb
 ```
 
@@ -128,7 +128,7 @@ SampleA_2.clean.fq.gz
 For other naming patterns, set both suffixes:
 
 ```bash
-python get.py assembly -i reads/ -o out/ -F embplant_pt \
+python batch_getorganelle.py assembly -i reads/ -o out/ -F embplant_pt \
   --suffix_fq _R1.fq.gz _R2.fq.gz
 ```
 

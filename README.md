@@ -7,7 +7,7 @@ Small bioinformatics and utility scripts collected by topic.
 ```text
 Temp_scripts/
   getorganelle/
-    get.py
+    batch_getorganelle.py
     README.md
 ```
 

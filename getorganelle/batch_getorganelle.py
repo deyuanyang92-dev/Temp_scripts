@@ -822,7 +822,7 @@ def do_prep_db(args, db_dir: Path):
         logging.error("[PREP_DB] 未指定参考文件（--ref_files）。")
         return None, None
 
-    gb_files = [f for f in input_files if f.suffix.lower() in (".gb", ".gbk", ".genbank")]
+    gb_files = [f for f in input_files if f.suffix.lower() in (".gb", ".gbk", ".gbf", ".gbff", ".genbank")]
     fa_files = [f for f in input_files if f.suffix.lower() in (".fasta", ".fa", ".fna", ".fas")]
     unknown  = [f for f in input_files if f not in gb_files and f not in fa_files]
     if unknown:
@@ -1811,7 +1811,7 @@ def build_parser() -> argparse.ArgumentParser:
             help=textwrap.dedent("""\
                 seed 参考序列文件
                   .fasta/.fa/.fna  直接使用
-                  .gb/.gbk         自动转换为 fasta
+                  .gb/.gbk/.gbf/.gbff/.genbank  自动转换为 fasta
                   可提供近缘物种叶绿体全基因组以提升灵敏度"""),
         )
         seed_label.add_argument(
@@ -1979,7 +1979,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--ref_files", nargs="+", required=True,
         help=textwrap.dedent("""\
             参考文件列表（支持混合）：
-              .gb/.gbk/.genbank  → 自动转换为 fasta（需 biopython）
+              .gb/.gbk/.gbf/.gbff/.genbank  → 自动转换为 fasta（需 biopython）
               .fasta/.fa/.fna    → 直接合并"""),
     )
     pd.add_argument(
@@ -2065,7 +2065,7 @@ def _resolve_seed_label(args, output_dir: Path):
             logging.error(f"[SEED] ✗ 文件不存在: {seed_fasta}")
             sys.exit(1)
         suffix = seed_fasta.suffix.lower()
-        if suffix in (".gb", ".gbk", ".genbank"):
+        if suffix in (".gb", ".gbk", ".gbf", ".gbff", ".genbank"):
             logging.info(f"[SEED] 检测到 GB 文件（{seed_fasta.name}），自动转换为 fasta …")
             db_dir = output_dir / "db"
             db_dir.mkdir(parents=True, exist_ok=True)

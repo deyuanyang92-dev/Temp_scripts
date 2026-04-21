@@ -1,0 +1,29 @@
+# Runtime caches
+__pycache__/
+*.py[cod]
+
+# MitoFinder runtime outputs
+ann/
+mitofinder_annotate/
+mitofinder_assembly/
+mitofinder_summary/
+mitofinder_snakemake/
+assembly_only/
+_split_input_fastas/
+
+# Local biological input/output data should not be committed by default
+*.fasta
+*.fa
+*.fna
+*.fastq
+*.fq
+*.fastq.gz
+*.fq.gz
+*.gb
+*.gbk
+
+# Logs and generated command records
+*.log
+*_finished.txt
+*_scripts.sh
+

@@ -1,11 +1,11 @@
-# temp_scipts
+# Temp_scripts
 
 Small bioinformatics and utility scripts collected by topic.
 
 ## Directory Layout
 
 ```text
-temp_scipts/
+Temp_scripts/
   getorganelle/
     get.py
     README.md

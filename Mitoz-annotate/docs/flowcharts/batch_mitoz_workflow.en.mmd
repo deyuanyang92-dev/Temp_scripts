@@ -1,0 +1,14 @@
+%%{init: {"theme": "base", "flowchart": {"htmlLabels": true}, "themeVariables": {"fontFamily": "Noto Sans CJK SC, Source Han Sans SC, Microsoft YaHei, SimHei, WenQuanYi Micro Hei, PingFang SC, Arial, sans-serif"}}}%%
+flowchart TD
+    A["Input data<br/>FASTA / GenBank; optional paired FASTQ"]
+    B["Detect input and run preflight<br/>UTF-8, Biopython, MitoZ, Snakemake"]
+    C["Deduplicate and convert GenBank<br/>Keep local IDs such as B64_2 distinct from B64"]
+    D["Create internal FASTA files<br/>S00001... plus id_map.tsv"]
+    E["MitoZ annotation, phase 1<br/>Writes 01.mitoz_anno1/ and sample.log files"]
+    F["Reorient by target gene<br/>Default cox1; preserve linear / circular topology"]
+    G["Optional phase-2 re-annotation<br/>Runs when if_reannotation_2=yes"]
+    H["Build final GenBank files<br/>Rewrite IDs, restore metadata, synchronize /organism="]
+    I["Write statistics and problem lists<br/>annotation-summary.tsv and failed/mismatch files"]
+    J["Merge final outputs<br/>04.final_gb/*.gbf and all.final.gbf"]
+
+    A --> B --> C --> D --> E --> F --> G --> H --> I --> J

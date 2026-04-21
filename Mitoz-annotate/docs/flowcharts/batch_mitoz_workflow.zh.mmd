@@ -1,0 +1,14 @@
+%%{init: {"theme": "base", "flowchart": {"htmlLabels": true}, "themeVariables": {"fontFamily": "Noto Sans CJK SC, Source Han Sans SC, Microsoft YaHei, SimHei, WenQuanYi Micro Hei, PingFang SC, Arial, sans-serif"}}}%%
+flowchart TD
+    A["输入数据<br/>FASTA / GenBank；FASTQ 双端可选"]
+    B["输入识别与预检查<br/>UTF-8、Biopython、MitoZ、Snakemake"]
+    C["GenBank 去重与转换<br/>保留 B64_2 与 B64 为不同编号"]
+    D["生成内部 FASTA<br/>S00001...；记录 id_map.tsv"]
+    E["第一轮 MitoZ 注释<br/>输出 01.mitoz_anno1/ 和 sample.log"]
+    F["按目标基因重定向<br/>默认 cox1；保留 linear / circular"]
+    G["可选第二轮重注释<br/>if_reannotation_2=yes 时运行"]
+    H["最终 GenBank 生成<br/>ID 重写、metadata 恢复、/organism= 同步"]
+    I["统计与问题清单<br/>annotation-summary.tsv、failed/mismatch 列表"]
+    J["合并最终结果<br/>04.final_gb/*.gbf 与 all.final.gbf"]
+
+    A --> B --> C --> D --> E --> F --> G --> H --> I --> J

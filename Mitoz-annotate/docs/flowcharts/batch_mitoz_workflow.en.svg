@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="980" height="1156" viewBox="0 0 980 1156" role="img" aria-label="batch_mitoz.py Workflow">
+<defs>
+<style>
+text { font-family: "Noto Sans CJK SC", "Source Han Sans SC", "Microsoft YaHei", "SimHei", "WenQuanYi Micro Hei", "PingFang SC", Arial, sans-serif; fill: #17202a; }
+.title { font-weight: 700; }
+.subtitle { fill: #566573; }
+.node { fill: #f8fbff; stroke: #2f6f9f; stroke-width: 2; rx: 8; }
+.node-accent { fill: #eef7f1; stroke: #2f7d50; stroke-width: 2; rx: 8; }
+.arrow { stroke: #586069; stroke-width: 2.4; fill: none; marker-end: url(#arrowhead); }
+</style>
+<marker id="arrowhead" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+<path d="M0,0 L0,6 L9,3 z" fill="#586069" />
+</marker>
+</defs>
+<rect x="0" y="0" width="980" height="100%" fill="#ffffff" />
+<text class="title" x="490" y="42" font-size="26" text-anchor="middle">batch_mitoz.py Workflow</text>
+<text class="subtitle" x="490" y="72" font-size="15" text-anchor="middle">UTF-8 SVG with CJK-capable font stack for bilingual labels</text>
+<rect class="node-accent" x="140" y="112" width="700" height="72" />
+<text x="490" y="140" font-size="16" text-anchor="middle" dominant-baseline="middle"><tspan x="490" dy="0">Input data</tspan><tspan x="490" dy="1.35em">FASTA / GenBank; optional paired FASTQ</tspan></text>
+<path class="arrow" d="M 490 189 L 490 206" />
+<rect class="node" x="140" y="212" width="700" height="72" />
+<text x="490" y="240" font-size="16" text-anchor="middle" dominant-baseline="middle"><tspan x="490" dy="0">Detect input and run preflight</tspan><tspan x="490" dy="1.35em">UTF-8, Biopython, MitoZ, Snakemake</tspan></text>
+<path class="arrow" d="M 490 289 L 490 306" />
+<rect class="node" x="140" y="312" width="700" height="72" />
+<text x="490" y="340" font-size="16" text-anchor="middle" dominant-baseline="middle"><tspan x="490" dy="0">Deduplicate and convert GenBank</tspan><tspan x="490" dy="1.35em">Keep local IDs such as B64_2 distinct from B64</tspan></text>
+<path class="arrow" d="M 490 389 L 490 406" />
+<rect class="node" x="140" y="412" width="700" height="72" />
+<text x="490" y="440" font-size="16" text-anchor="middle" dominant-baseline="middle"><tspan x="490" dy="0">Create internal FASTA files</tspan><tspan x="490" dy="1.35em">S00001... plus id_map.tsv</tspan></text>
+<path class="arrow" d="M 490 489 L 490 506" />
+<rect class="node" x="140" y="512" width="700" height="72" />
+<text x="490" y="540" font-size="16" text-anchor="middle" dominant-baseline="middle"><tspan x="490" dy="0">MitoZ annotation, phase 1</tspan><tspan x="490" dy="1.35em">Writes 01.mitoz_anno1/ and sample.log files</tspan></text>
+<path class="arrow" d="M 490 589 L 490 606" />
+<rect class="node" x="140" y="612" width="700" height="72" />
+<text x="490" y="640" font-size="16" text-anchor="middle" dominant-baseline="middle"><tspan x="490" dy="0">Reorient by target gene</tspan><tspan x="490" dy="1.35em">Default cox1; preserve linear / circular topology</tspan></text>
+<path class="arrow" d="M 490 689 L 490 706" />
+<rect class="node" x="140" y="712" width="700" height="72" />
+<text x="490" y="740" font-size="16" text-anchor="middle" dominant-baseline="middle"><tspan x="490" dy="0">Optional phase-2 re-annotation</tspan><tspan x="490" dy="1.35em">Runs when if_reannotation_2=yes</tspan></text>
+<path class="arrow" d="M 490 789 L 490 806" />
+<rect class="node" x="140" y="812" width="700" height="72" />
+<text x="490" y="840" font-size="16" text-anchor="middle" dominant-baseline="middle"><tspan x="490" dy="0">Build final GenBank files</tspan><tspan x="490" dy="1.35em">Rewrite IDs, restore metadata, synchronize /organism=</tspan></text>
+<path class="arrow" d="M 490 889 L 490 906" />
+<rect class="node" x="140" y="912" width="700" height="72" />
+<text x="490" y="940" font-size="16" text-anchor="middle" dominant-baseline="middle"><tspan x="490" dy="0">Write statistics and problem lists</tspan><tspan x="490" dy="1.35em">annotation-summary.tsv and failed/mismatch files</tspan></text>
+<path class="arrow" d="M 490 989 L 490 1006" />
+<rect class="node-accent" x="140" y="1012" width="700" height="72" />
+<text x="490" y="1040" font-size="16" text-anchor="middle" dominant-baseline="middle"><tspan x="490" dy="0">Merge final outputs</tspan><tspan x="490" dy="1.35em">04.final_gb/*.gbf and all.final.gbf</tspan></text>
+</svg>

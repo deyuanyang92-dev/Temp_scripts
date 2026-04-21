@@ -9,6 +9,14 @@ Temp_scripts/
   getorganelle/
     batch_getorganelle.py
     README.md
+  mitofinder-batch/
+    mitofinder_pipeline_v2_7.py
+    README.md
+  Mitoz-annotate/
+    batch_mitoz.py
+    README.md
+    docs/flowcharts/
+    scripts/render_workflow_diagrams.py
 ```
 
 ## Available Scripts
@@ -33,3 +41,21 @@ Main capabilities:
 - safer status reporting for `OK`, `SKIP`, `INCOMPLETE`, and `FAILED`.
 
 See [getorganelle/README.md](getorganelle/README.md) for usage.
+
+### mitofinder-batch
+
+Batch MitoFinder pipeline for reads-to-annotation and existing-contig
+annotation workflows. It supports MitoFinder execution, summary generation,
+split handling for merged FASTA inputs, and batch-oriented output reporting.
+
+See [mitofinder-batch/README.md](mitofinder-batch/README.md) for usage.
+
+### Mitoz-annotate
+
+Batch MitoZ annotation and GenBank post-processing pipeline. It supports FASTA
+or GenBank input, internal ID mapping, optional two-pass annotation,
+gene-based reorientation, original metadata transfer, `/organism=` restoration,
+thread or Snakemake scheduling, bilingual documentation, and UTF-8 flowcharts
+with CJK font support.
+
+See [Mitoz-annotate/README.md](Mitoz-annotate/README.md) for usage.

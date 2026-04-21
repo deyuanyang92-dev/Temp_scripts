@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="980" height="1156" viewBox="0 0 980 1156" role="img" aria-label="batch_mitoz.py 工作流程">
+<defs>
+<style>
+text { font-family: "Noto Sans CJK SC", "Source Han Sans SC", "Microsoft YaHei", "SimHei", "WenQuanYi Micro Hei", "PingFang SC", Arial, sans-serif; fill: #17202a; }
+.title { font-weight: 700; }
+.subtitle { fill: #566573; }
+.node { fill: #f8fbff; stroke: #2f6f9f; stroke-width: 2; rx: 8; }
+.node-accent { fill: #eef7f1; stroke: #2f7d50; stroke-width: 2; rx: 8; }
+.arrow { stroke: #586069; stroke-width: 2.4; fill: none; marker-end: url(#arrowhead); }
+</style>
+<marker id="arrowhead" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+<path d="M0,0 L0,6 L9,3 z" fill="#586069" />
+</marker>
+</defs>
+<rect x="0" y="0" width="980" height="100%" fill="#ffffff" />
+<text class="title" x="490" y="42" font-size="26" text-anchor="middle">batch_mitoz.py 工作流程</text>
+<text class="subtitle" x="490" y="72" font-size="15" text-anchor="middle">UTF-8 避免编码乱码；CJK 字体栈降低中文缺字方块风险</text>
+<rect class="node-accent" x="140" y="112" width="700" height="72" />
+<text x="490" y="140" font-size="16" text-anchor="middle" dominant-baseline="middle"><tspan x="490" dy="0">输入数据</tspan><tspan x="490" dy="1.35em">FASTA / GenBank；FASTQ 双端可选</tspan></text>
+<path class="arrow" d="M 490 189 L 490 206" />
+<rect class="node" x="140" y="212" width="700" height="72" />
+<text x="490" y="240" font-size="16" text-anchor="middle" dominant-baseline="middle"><tspan x="490" dy="0">输入识别与预检查</tspan><tspan x="490" dy="1.35em">UTF-8、Biopython、MitoZ、Snakemake</tspan></text>
+<path class="arrow" d="M 490 289 L 490 306" />
+<rect class="node" x="140" y="312" width="700" height="72" />
+<text x="490" y="340" font-size="16" text-anchor="middle" dominant-baseline="middle"><tspan x="490" dy="0">GenBank 去重与转换</tspan><tspan x="490" dy="1.35em">保留 B64_2 与 B64 为不同编号</tspan></text>
+<path class="arrow" d="M 490 389 L 490 406" />
+<rect class="node" x="140" y="412" width="700" height="72" />
+<text x="490" y="440" font-size="16" text-anchor="middle" dominant-baseline="middle"><tspan x="490" dy="0">生成内部 FASTA</tspan><tspan x="490" dy="1.35em">S00001...；记录 id_map.tsv</tspan></text>
+<path class="arrow" d="M 490 489 L 490 506" />
+<rect class="node" x="140" y="512" width="700" height="72" />
+<text x="490" y="540" font-size="16" text-anchor="middle" dominant-baseline="middle"><tspan x="490" dy="0">第一轮 MitoZ 注释</tspan><tspan x="490" dy="1.35em">输出 01.mitoz_anno1/ 和 sample.log</tspan></text>
+<path class="arrow" d="M 490 589 L 490 606" />
+<rect class="node" x="140" y="612" width="700" height="72" />
+<text x="490" y="640" font-size="16" text-anchor="middle" dominant-baseline="middle"><tspan x="490" dy="0">按目标基因重定向</tspan><tspan x="490" dy="1.35em">默认 cox1；保留 linear / circular</tspan></text>
+<path class="arrow" d="M 490 689 L 490 706" />
+<rect class="node" x="140" y="712" width="700" height="72" />
+<text x="490" y="740" font-size="16" text-anchor="middle" dominant-baseline="middle"><tspan x="490" dy="0">可选第二轮重注释</tspan><tspan x="490" dy="1.35em">if_reannotation_2=yes 时运行</tspan></text>
+<path class="arrow" d="M 490 789 L 490 806" />
+<rect class="node" x="140" y="812" width="700" height="72" />
+<text x="490" y="840" font-size="16" text-anchor="middle" dominant-baseline="middle"><tspan x="490" dy="0">最终 GenBank 生成</tspan><tspan x="490" dy="1.35em">ID 重写、metadata 恢复、/organism= 同步</tspan></text>
+<path class="arrow" d="M 490 889 L 490 906" />
+<rect class="node" x="140" y="912" width="700" height="72" />
+<text x="490" y="940" font-size="16" text-anchor="middle" dominant-baseline="middle"><tspan x="490" dy="0">统计与问题清单</tspan><tspan x="490" dy="1.35em">annotation-summary.tsv、failed/mismatch 列表</tspan></text>
+<path class="arrow" d="M 490 989 L 490 1006" />
+<rect class="node-accent" x="140" y="1012" width="700" height="72" />
+<text x="490" y="1040" font-size="16" text-anchor="middle" dominant-baseline="middle"><tspan x="490" dy="0">合并最终结果</tspan><tspan x="490" dy="1.35em">04.final_gb/*.gbf 与 all.final.gbf</tspan></text>
+</svg>

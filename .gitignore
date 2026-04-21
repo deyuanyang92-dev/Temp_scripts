@@ -1,0 +1,15 @@
+__pycache__/
+*.py[cod]
+*.log
+getorganelle_batch.log
+
+# GetOrganelle output directories
+getorganelle_results/
+out/
+results/
+
+# Local/editor files
+.codex
+.DS_Store
+.idea/
+.vscode/

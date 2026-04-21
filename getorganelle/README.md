@@ -8,7 +8,7 @@ ribosomal regions (`embplant_nr` / `fungus_nr`).
 The goal is not to replace GetOrganelle. The goal is to make the GetOrganelle
 workflow easier to repeat across many samples: find paired reads, prepare
 seed/label references, run samples in parallel, resume safely, iterate when
-needed, clean successful runs, and summarize final `*.path_sequence.fasta`
+needed, clean intermediate files, and summarize final `*.path_sequence.fasta`
 files.
 
 Official references:
@@ -162,6 +162,60 @@ python batch_getorganelle.py assembly -i reads/ -o nr_iter_out/ \
 In iterative mode, summary only uses the highest completed `iter_N` directory
 for each sample, avoiding duplicate reporting of earlier rounds.
 
+### 7. Clean intermediate files
+
+GetOrganelle creates useful but large intermediate files, including
+`seed/`, `filtered_spades/`, `extended_spades/`, and `extended_*.fq`.
+This wrapper provides a dedicated clean step:
+
+```bash
+python batch_getorganelle.py clean -o out/
+```
+
+Default behavior is conservative:
+
+- `OK` samples can be cleaned automatically after assembly;
+- `INCOMPLETE` and `FAILED` samples keep intermediate files for debugging;
+- use `--no_clean` during assembly to keep all intermediates;
+- use `--clean_all_status` only when you intentionally want to clean every
+  status.
+
+The default full workflow already runs `clean` after assembly:
+
+```text
+assembly -> clean -> summary
+```
+
+### 8. Summary of final sequences
+
+The summary step scans GetOrganelle result directories and writes all final
+`*.path_sequence.fasta` sequences into one file:
+
+```bash
+python batch_getorganelle.py summary -o out/
+```
+
+Default output:
+
+```text
+out/summary_all.fasta
+```
+
+You can choose another path:
+
+```bash
+python batch_getorganelle.py summary -o out/ \
+  --summary_out final_mt_sequences.fasta
+```
+
+Summary is intentionally strict:
+
+- only `*.path_sequence.fasta` is summarized by default;
+- graph-only results are not treated as final sequences;
+- in iterative runs, only the highest `iter_N` directory per sample is used;
+- sequence names are rewritten from the sample/output path, with topology
+  recorded in the FASTA header when available.
+
 ## Quick Start
 
 ```bash
@@ -276,7 +330,27 @@ out/
 By default, only `OK` samples are cleaned. `INCOMPLETE` and `FAILED` outputs are
 kept for debugging.
 
-## Useful Commands
+## Workflow Modes
+
+Run the full workflow:
+
+```bash
+python batch_getorganelle.py -i reads/ -o out/ -F embplant_mt -R 50
+```
+
+This is equivalent to:
+
+```text
+assembly -> clean -> summary
+```
+
+Run steps separately when debugging or tuning parameters:
+
+```bash
+python batch_getorganelle.py assembly -i reads/ -o out/ -F embplant_mt -R 50
+python batch_getorganelle.py clean -o out/
+python batch_getorganelle.py summary -o out/
+```
 
 Clean intermediate files after assembly:
 

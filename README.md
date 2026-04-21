@@ -28,6 +28,8 @@ Main capabilities:
 - `--ref_gb` support to prepare seed and `--genes` label files using
   GetOrganelle utilities;
 - iterative mt/nr assembly with previous round results used as the next seed;
+- clean mode for GetOrganelle intermediate files;
+- summary mode for final `*.path_sequence.fasta` files;
 - safer status reporting for `OK`, `SKIP`, `INCOMPLETE`, and `FAILED`.
 
 See [getorganelle/README.md](getorganelle/README.md) for usage.

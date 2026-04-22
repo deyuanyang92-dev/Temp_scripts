@@ -3,50 +3,6 @@
 本文档说明 `batch_mitoz.py` 的用途、输入格式、各子命令、常用参数、输出文件和工作流程。
 This document explains the purpose, inputs, subcommands, key options, outputs, and workflow of `batch_mitoz.py`.
 
-## 中文与编码 / Chinese And Encoding
-
-本项目中的文档、日志、TSV、JSON 和 GenBank 文本均建议使用 UTF-8。运行前建议设置：
-
-```bash
-export LANG=C.UTF-8
-export LC_ALL=C.UTF-8
-export PYTHONUTF8=1
-```
-
-流程图文件使用 UTF-8 保存，并在 Mermaid / SVG 中配置了中文 CJK 字体栈：
-
-```text
-Noto Sans CJK SC, Source Han Sans SC, Microsoft YaHei, SimHei,
-WenQuanYi Micro Hei, PingFang SC, Arial, sans-serif
-```
-
-UTF-8 解决“编码被错误读取”导致的乱码；中文字体解决“缺字方块 / tofu”问题。
-如果导出 PNG/PDF/SVG 时中文仍显示方块，说明当前系统缺少中文字体。建议安装以下任一字体：
-
-- Linux: `Noto Sans CJK SC`, `Source Han Sans SC`, `WenQuanYi Micro Hei`
-- Windows: `Microsoft YaHei`, `SimHei`
-- macOS: `PingFang SC`
-
-Linux 常见包名：
-
-```bash
-# Debian / Ubuntu
-sudo apt-get install fonts-noto-cjk fonts-wqy-microhei
-
-# Fedora / RHEL-like
-sudo dnf install google-noto-sans-cjk-fonts wqy-microhei-fonts
-```
-
-检查字体是否可用：
-
-```bash
-fc-match "Noto Sans CJK SC"
-fc-match "Microsoft YaHei"
-fc-match "SimHei"
-```
-
-The flowchart files are UTF-8 encoded and use a CJK-capable font stack. UTF-8 prevents encoding mojibake; installed CJK fonts prevent missing-glyph boxes.
-
 ## 脚本定位 / What The Script Does
 
 `batch_mitoz.py` 是一个 MitoZ 批量线粒体注释和 GenBank 后处理管线。
@@ -674,15 +630,12 @@ Notes:
 python3 scripts/render_workflow_diagrams.py
 ```
 
-The SVG renderer script writes UTF-8 SVG files and configures a CJK font stack for Chinese labels. Mermaid previewers may ignore font configuration depending on platform policy; the generated SVG files are the more stable artifact.
-
 ### 中文流程图 / Chinese Workflow
 
 ```mermaid
-%%{init: {"theme": "base", "flowchart": {"htmlLabels": true}, "themeVariables": {"fontFamily": "Noto Sans CJK SC, Source Han Sans SC, Microsoft YaHei, SimHei, WenQuanYi Micro Hei, PingFang SC, Arial, sans-serif"}}}%%
 flowchart TD
     A["输入数据<br/>FASTA / GenBank；FASTQ 双端可选"]
-    B["输入识别与预检查<br/>UTF-8、Biopython、MitoZ、Snakemake"]
+    B["输入识别与依赖检查<br/>Biopython、MitoZ、Snakemake"]
     C["GenBank 去重与转换<br/>保留 B64_2 与 B64 为不同编号"]
     D["生成内部 FASTA<br/>S00001...；记录 id_map.tsv"]
     E["第一轮 MitoZ 注释<br/>输出 01.mitoz_anno1/ 和 sample.log"]
@@ -697,10 +650,9 @@ flowchart TD
 ### English Workflow
 
 ```mermaid
-%%{init: {"theme": "base", "flowchart": {"htmlLabels": true}, "themeVariables": {"fontFamily": "Noto Sans CJK SC, Source Han Sans SC, Microsoft YaHei, SimHei, WenQuanYi Micro Hei, PingFang SC, Arial, sans-serif"}}}%%
 flowchart TD
     A["Input data<br/>FASTA / GenBank; optional paired FASTQ"]
-    B["Detect input and run preflight<br/>UTF-8, Biopython, MitoZ, Snakemake"]
+    B["Detect input and check dependencies<br/>Biopython, MitoZ, Snakemake"]
     C["Deduplicate and convert GenBank<br/>Keep local IDs such as B64_2 distinct from B64"]
     D["Create internal FASTA files<br/>S00001... plus id_map.tsv"]
     E["MitoZ annotation, phase 1<br/>Writes 01.mitoz_anno1/ and sample.log files"]

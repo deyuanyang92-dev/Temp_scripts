@@ -2,10 +2,6 @@
 # -*- coding: utf-8 -*-
 """
 Render bilingual workflow diagrams for batch_mitoz.py.
-
-The SVG files are written as UTF-8, which prevents encoding mojibake.  They
-also include a CJK font stack so Chinese labels can use common system Chinese
-fonts without relying on matplotlib, reducing missing-glyph boxes.
 """
 
 from __future__ import annotations
@@ -18,13 +14,7 @@ from typing import Iterable, List, Sequence, Tuple
 ROOT = Path(__file__).resolve().parents[1]
 OUT_DIR = ROOT / "docs" / "flowcharts"
 
-# Chinese font support: SVG viewers will choose the first installed family.
-# UTF-8 handles encoding; this font stack handles CJK glyph coverage when any
-# common Chinese font is installed on Linux/Windows/macOS.
-CJK_FONT_STACK = (
-    '"Noto Sans CJK SC", "Source Han Sans SC", "Microsoft YaHei", '
-    '"SimHei", "WenQuanYi Micro Hei", "PingFang SC", Arial, sans-serif'
-)
+FONT_STACK = "Arial, Helvetica, sans-serif"
 
 
 Node = Tuple[str, Sequence[str]]
@@ -62,7 +52,7 @@ def render_svg(title: str, subtitle: str, nodes: Iterable[Node], out_path: Path)
         f'viewBox="0 0 {width} {height}" role="img" aria-label="{html.escape(title)}">',
         "<defs>",
         "<style>",
-        f"text {{ font-family: {CJK_FONT_STACK}; fill: #17202a; }}",
+        f"text {{ font-family: {FONT_STACK}; fill: #17202a; }}",
         ".title { font-weight: 700; }",
         ".subtitle { fill: #566573; }",
         ".node { fill: #f8fbff; stroke: #2f6f9f; stroke-width: 2; rx: 8; }",
@@ -101,7 +91,7 @@ def render_svg(title: str, subtitle: str, nodes: Iterable[Node], out_path: Path)
 def main() -> int:
     zh_nodes: List[Node] = [
         ("input", ["输入数据", "FASTA / GenBank；FASTQ 双端可选"]),
-        ("preflight", ["输入识别与预检查", "UTF-8、Biopython、MitoZ、Snakemake"]),
+        ("preflight", ["输入识别与依赖检查", "Biopython、MitoZ、Snakemake"]),
         ("gb_convert", ["GenBank 去重与转换", "保留 B64_2 与 B64 为不同编号"]),
         ("internal", ["生成内部 FASTA", "S00001...；记录 id_map.tsv"]),
         ("phase1", ["第一轮 MitoZ 注释", "输出 01.mitoz_anno1/ 和 sample.log"]),
@@ -114,7 +104,7 @@ def main() -> int:
 
     en_nodes: List[Node] = [
         ("input", ["Input data", "FASTA / GenBank; optional paired FASTQ"]),
-        ("preflight", ["Detect input and run preflight", "UTF-8, Biopython, MitoZ, Snakemake"]),
+        ("preflight", ["Detect input and check dependencies", "Biopython, MitoZ, Snakemake"]),
         ("gb_convert", ["Deduplicate and convert GenBank", "Keep local IDs such as B64_2 distinct from B64"]),
         ("internal", ["Create internal FASTA files", "S00001... plus id_map.tsv"]),
         ("phase1", ["MitoZ annotation, phase 1", "Writes 01.mitoz_anno1/ and sample.log files"]),
@@ -127,13 +117,13 @@ def main() -> int:
 
     render_svg(
         "batch_mitoz.py 工作流程",
-        "UTF-8 避免编码乱码；CJK 字体栈降低中文缺字方块风险",
+        "从输入识别到最终 GenBank 结果的主要步骤",
         zh_nodes,
         OUT_DIR / "batch_mitoz_workflow.zh.svg",
     )
     render_svg(
         "batch_mitoz.py Workflow",
-        "UTF-8 SVG with CJK-capable font stack for bilingual labels",
+        "Main steps from input detection to final GenBank outputs",
         en_nodes,
         OUT_DIR / "batch_mitoz_workflow.en.svg",
     )

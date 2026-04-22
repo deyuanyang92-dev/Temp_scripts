@@ -1,7 +1,6 @@
-%%{init: {"theme": "base", "flowchart": {"htmlLabels": true}, "themeVariables": {"fontFamily": "Noto Sans CJK SC, Source Han Sans SC, Microsoft YaHei, SimHei, WenQuanYi Micro Hei, PingFang SC, Arial, sans-serif"}}}%%
 flowchart TD
     A["输入数据<br/>FASTA / GenBank；FASTQ 双端可选"]
-    B["输入识别与预检查<br/>UTF-8、Biopython、MitoZ、Snakemake"]
+    B["输入识别与依赖检查<br/>Biopython、MitoZ、Snakemake"]
     C["GenBank 去重与转换<br/>保留 B64_2 与 B64 为不同编号"]
     D["生成内部 FASTA<br/>S00001...；记录 id_map.tsv"]
     E["第一轮 MitoZ 注释<br/>输出 01.mitoz_anno1/ 和 sample.log"]

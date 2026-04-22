@@ -1,7 +1,6 @@
-%%{init: {"theme": "base", "flowchart": {"htmlLabels": true}, "themeVariables": {"fontFamily": "Noto Sans CJK SC, Source Han Sans SC, Microsoft YaHei, SimHei, WenQuanYi Micro Hei, PingFang SC, Arial, sans-serif"}}}%%
 flowchart TD
     A["Input data<br/>FASTA / GenBank; optional paired FASTQ"]
-    B["Detect input and run preflight<br/>UTF-8, Biopython, MitoZ, Snakemake"]
+    B["Detect input and check dependencies<br/>Biopython, MitoZ, Snakemake"]
     C["Deduplicate and convert GenBank<br/>Keep local IDs such as B64_2 distinct from B64"]
     D["Create internal FASTA files<br/>S00001... plus id_map.tsv"]
     E["MitoZ annotation, phase 1<br/>Writes 01.mitoz_anno1/ and sample.log files"]

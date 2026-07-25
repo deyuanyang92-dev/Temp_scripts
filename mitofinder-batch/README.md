@@ -63,6 +63,7 @@ python3 mitofinder_pipeline_v2_7.py --help
 only_assembly       仅批量组装 reads，不做 MitoFinder 注释
 assembly2summary    reads -> MitoFinder 组装+注释 -> 汇总
 annotation2summary  已有 contig fasta -> MitoFinder 注释 -> 汇总
+summary             已有 MitoFinder 注释结果 -> 仅汇总
 snakemake           生成 Snakemake 工作流
 analyze             分析输入目录结构，给出参数建议
 ```
@@ -227,7 +228,50 @@ SE: *.fastq.gz
 --se_suffix .fastq.gz
 ```
 
-## 5. only_assembly：仅组装
+## 5. summary：已有注释结果，仅汇总
+
+MitoFinder 已经跑完注释、只想收集汇总结果时用这个子命令，不会重新注释，也不需要 `-r` 参考和 MitoFinder 环境：
+
+```bash
+python3 mitofinder_pipeline_v2_7.py summary /data/out/mitofinder_annotate -o /data/out
+```
+
+位置参数是结果根目录，要求结构为：
+
+```text
+DIR/<样本>/<样本>_Final_Results/
+```
+
+也可以直接指向流程的总输出目录，脚本会自动向下定位：
+
+```bash
+python3 mitofinder_pipeline_v2_7.py summary /data/out -o /data/out
+```
+
+自动定位顺序：
+
+```text
+DIR                        本身含 *_Final_Results 则直接用
+DIR/mitofinder_annotate    annotation2summary 的输出
+DIR/mitofinder_assembly    assembly2summary 的输出
+```
+
+都找不到时报错退出，提示目录结构要求。
+
+常用参数：
+
+```bash
+-o, --output DIR              汇总写入 DIR/mitofinder_summary
+--extract_output_dir DIR      不用 -o 时的汇总输出目录，默认 mitofinder_summary
+--suffix_subdir PATTERN       fnmatch 过滤样本子目录，如 'B1*'
+-g, --genes GENE ...          只收集指定基因；默认自动发现
+--summarize_assembly_infos    额外汇总 .infos（长度/GC/环化）
+--summarize_trna              额外汇总 tRNA 结果
+```
+
+输出内容与 `assembly2summary` / `annotation2summary` 末尾的汇总步骤完全一致，见第 8 节。
+
+## 6. only_assembly：仅组装
 
 只运行外部组装器，不做 MitoFinder 注释：
 
@@ -248,7 +292,7 @@ idba
 
 注意：当前脚本中 `idba` 自动转换交织 fasta 的流程未实现，建议优先使用 `megahit` 或 `metaspades`。
 
-## 6. 常用参数
+## 7. 常用参数
 
 MitoFinder 核心参数：
 
@@ -279,7 +323,7 @@ MitoFinder 核心参数：
 --max_workers 4 --threads 4
 ```
 
-## 7. 输出目录
+## 8. 输出目录
 
 如果指定：
 
@@ -305,7 +349,7 @@ mt_contigs/
 mitofinder_assembly_results/
 ```
 
-## 8. Dry-run 检查
+## 9. Dry-run 检查
 
 正式运行前建议先 dry-run：
 
@@ -324,7 +368,7 @@ dry-run 会：
 - 写出合并 fasta 拆分文件和 `split_manifest.tsv`；
 - 不真正运行 MitoFinder。
 
-## 9. 常见问题
+## 10. 常见问题
 
 ### 找不到 mitofinder
 

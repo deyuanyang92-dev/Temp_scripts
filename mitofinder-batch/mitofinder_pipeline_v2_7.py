@@ -1142,6 +1142,41 @@ def run_annotation2summary(args: argparse.Namespace) -> None:
     run_summary(args, annotation_dir=output_dir)
     _section("annotation2summary 完成！")
 
+
+# ── D. summary ────────────────────────────────────────────────────────────────
+
+def _locate_results_dir(base_dir: Path) -> Optional[Path]:
+    """
+    定位含 *_Final_Results 的结果目录。
+    base_dir 本身可用则直接返回；否则尝试本脚本的两个注释输出子目录。
+    不套用 --suffix_subdir 过滤，避免过滤为空时误报“目录里没有结果”。
+    """
+    for cand in (base_dir,
+                 base_dir / "mitofinder_annotate",
+                 base_dir / "mitofinder_assembly"):
+        if cand.is_dir() and next(iter_final_results_dirs(cand), None):
+            return cand
+    return None
+
+
+def run_summary_only(args: argparse.Namespace) -> None:
+    """
+    已有 MitoFinder 注释结果 → 仅提取汇总，不重新注释。
+    """
+    _section("summary：汇总已有 MitoFinder 注释结果")
+
+    results_dir    = safe_resolve(args.results_dir, must_exist=True)
+    annotation_dir = _locate_results_dir(results_dir)
+    if annotation_dir is None:
+        log.error("目录下未找到任何 *_Final_Results：%s", results_dir)
+        log.error("请确认目录结构为 DIR/<样本>/<样本>_Final_Results/")
+        return
+    if annotation_dir != results_dir:
+        log.info("自动定位注释结果目录: %s", annotation_dir)
+
+    run_summary(args, annotation_dir=annotation_dir)
+    _section("summary 完成！")
+
 # ══════════════════════════════════════════════════════════════════════════════
 # 提取 / 汇总（被三大流程共用）
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1672,6 +1707,28 @@ def _resolve_output(args: argparse.Namespace, default_subdir: str) -> Path:
 # 命令行参数
 # ══════════════════════════════════════════════════════════════════════════════
 
+def _add_summary_args(p: argparse.ArgumentParser) -> None:
+    """向子命令解析器添加汇总（提取）相关参数。"""
+    sm = p.add_argument_group("汇总参数")
+    sm.add_argument("--extract_output_dir", default="mitofinder_summary",  metavar="DIR",
+                    help="汇总输出目录（未指定 --output 时使用）")
+    sm.add_argument("--genes", "-g", nargs="*", default=None, metavar="GENE",
+                    help="指定基因名；不指定则自动发现")
+    sm.add_argument("--extension2_contigs", default=".fasta",
+                    help="mtDNA contig 扩展名，逗号分隔")
+    sm.add_argument("--summarize_assembly_infos", action="store_true")
+    sm.add_argument("--summarize_trna",           action="store_true")
+    sm.add_argument("--output2_mitofinder_assembly_result",
+                    default="mitofinder_assembly_results")
+    sm.add_argument("--output2_mitofinder_assembly_infos_result",
+                    default="mitofinder_assembly_infos_summary.tsv")
+    sm.add_argument("--output2_mitofinder_trna_result",
+                    default="mitofinder_trna_summary")
+    sm.add_argument("--suffix2_mitofinder_results", default="")
+    sm.add_argument("--if_write_basename2_summary_by_remove_suffix",
+                    default="no", choices=["yes", "no"])
+
+
 def _add_common_args(p: argparse.ArgumentParser) -> None:
     """向子命令解析器添加所有模式共用的参数。"""
     # 全局
@@ -1762,26 +1819,10 @@ def _add_common_args(p: argparse.ArgumentParser) -> None:
     an.add_argument("--which_fasta2_mitofinder", default=None, metavar="FILE")
 
     # 汇总参数
-    sm = p.add_argument_group("汇总参数")
-    sm.add_argument("--extract_input_dir",  default="mitofinder_annotate", metavar="DIR",
-                    help="提取步骤输入目录（仅 extract_only 模式使用）")
-    sm.add_argument("--extract_output_dir", default="mitofinder_summary",  metavar="DIR",
-                    help="提取步骤输出目录（仅 extract_only 模式使用）")
-    sm.add_argument("--genes", "-g", nargs="*", default=None, metavar="GENE",
-                    help="指定基因名；不指定则自动发现")
-    sm.add_argument("--extension2_contigs", default=".fasta",
-                    help="mtDNA contig 扩展名，逗号分隔")
-    sm.add_argument("--summarize_assembly_infos", action="store_true")
-    sm.add_argument("--summarize_trna",           action="store_true")
-    sm.add_argument("--output2_mitofinder_assembly_result",
-                    default="mitofinder_assembly_results")
-    sm.add_argument("--output2_mitofinder_assembly_infos_result",
-                    default="mitofinder_assembly_infos_summary.tsv")
-    sm.add_argument("--output2_mitofinder_trna_result",
-                    default="mitofinder_trna_summary")
-    sm.add_argument("--suffix2_mitofinder_results", default="")
-    sm.add_argument("--if_write_basename2_summary_by_remove_suffix",
-                    default="no", choices=["yes", "no"])
+    _add_summary_args(p)
+    ex = p.add_argument_group("汇总输入")
+    ex.add_argument("--extract_input_dir", default="mitofinder_annotate", metavar="DIR",
+                    help="提取步骤输入目录（仅在未指定 --output 且单独汇总时使用）")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -1802,6 +1843,9 @@ def build_parser() -> argparse.ArgumentParser:
 
           # 单个 fasta → 注释 → 汇总
           %(prog)s annotation2summary -i /data/contigs/sample.fasta -o /data/out -r ref.gb
+
+          # 已有 MitoFinder 注释结果 → 仅汇总
+          %(prog)s summary /data/out/mitofinder_annotate -o /data/out
 
           # 生成 Snakemake 工作流
           %(prog)s snakemake --reads_dir /data/reads -o /data/wf -r ref.gb
@@ -1836,6 +1880,21 @@ def build_parser() -> argparse.ArgumentParser:
     )
     _add_common_args(p_n2s)
 
+    # ── summary ───────────────────────────────────────────────────────────────
+    p_sum = sub.add_parser(
+        "summary",
+        help="已有 MitoFinder 注释结果 → 仅提取汇总（不重新注释）",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    p_sum.add_argument("results_dir", metavar="DIR",
+                       help="MitoFinder 结果根目录（含 <样本>/<样本>_Final_Results）")
+    p_sum.add_argument("--output", "-o", default=None, metavar="DIR",
+                       help="总输出根目录；汇总写入 DIR/mitofinder_summary")
+    p_sum.add_argument("--verbose", action="store_true", help="显示 DEBUG 日志")
+    p_sum.add_argument("--suffix_subdir", default=None,
+                       help="fnmatch 模式过滤样本子目录")
+    _add_summary_args(p_sum)
+
     # ── snakemake ─────────────────────────────────────────────────────────────
     p_snk = sub.add_parser(
         "snakemake",
@@ -1868,6 +1927,7 @@ BANNER = r"""
 ║  only_assembly      仅批量组装 reads（不做注释）                     ║
 ║  assembly2summary   reads → 组装+注释 → 汇总  全流程                ║
 ║  annotation2summary 已有 contig → 注释 → 汇总                       ║
+║  summary            已有注释结果 → 仅提取汇总                        ║
 ║  snakemake          生成 Snakemake 工作流（支持 HPC）                ║
 ║  analyze            智能分析输入目录结构                              ║
 ╚══════════════════════════════════════════════════════════════════════╝"""
@@ -1897,7 +1957,8 @@ def main() -> None:
 
     # ── 统一路径解析 ──────────────────────────────────────────────────────────
     args._input_dir_abs   = safe_resolve(getattr(args, "input_dir2_annotate", "."))
-    args._genbank_ref_abs = safe_resolve(args.genbank_ref) if args.genbank_ref else None
+    _ref = getattr(args, "genbank_ref", None)
+    args._genbank_ref_abs = safe_resolve(_ref) if _ref else None
     if args.output:
         args.output = str(safe_resolve(args.output))
 
@@ -1905,6 +1966,10 @@ def main() -> None:
     if args.subcmd in ("assembly2summary", "annotation2summary", "snakemake"):
         if not args.genbank_ref:
             parser.error(f"子命令 {args.subcmd} 需要 --genbank_ref 参数。")
+
+    if args.subcmd == "summary":
+        if not safe_resolve(args.results_dir).is_dir():
+            parser.error(f"结果目录不存在或不是目录: {args.results_dir}")
 
     if args.subcmd == "annotation2summary":
         if not args._input_dir_abs.exists():
@@ -1921,6 +1986,7 @@ def main() -> None:
         "only_assembly":      run_only_assembly,
         "assembly2summary":   run_assembly2summary,
         "annotation2summary": run_annotation2summary,
+        "summary":            run_summary_only,
         "snakemake":          run_snakemake,
     }
     dispatch[args.subcmd](args)

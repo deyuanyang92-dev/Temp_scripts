@@ -635,13 +635,27 @@ python3 mito_curate.py -i annotated_gb_dir -o curated_dir --genetic_code 5 [--rr
 
 ## tRNA 多方法注释 / tRNA (mito_trna.py)
 
-仿 GeSeq（Tillich et al. 2017, NAR 45:W6, doi:10.1093/nar/gkx391）：多个 tRNA 软件结果**全部**写进一个 GenBank（`*.review.gbf`，Geneious 里逐个比较、自己选），另出 `*.selected.gbf`（每位点一个 tRNA）和 `trna_report.tsv`。不预设 tRNA 数目（多数珊瑚 1–2 个，部分环节动物 23–24 个）。
+仿 GeSeq（Tillich et al. 2017, NAR 45:W6, doi:10.1093/nar/gkx391）：多个 tRNA 软件结果**全部**写进一个 GenBank（`review/<样本>.gbf`，Geneious 里逐个比较、自己选），另出 `selected/<样本>.gbf`（每位点一个 tRNA）和 `trna_report.tsv`。不预设 tRNA 数目（多数珊瑚 1–2 个，部分环节动物 23–24 个）。
 
 - 软件：MITOS2（只取 tRNA，refseq89m 内置后生动物 tRNA 协方差模型）、ARWEN、ARAGORN、tRNAscan-SE 2（-O）、输入 GB 已有 tRNA。
 - 证据按**独立方法家族**计：ARWEN 与 ARAGORN 同作者同算法，算一个。
 - 默认选择：MITOS2 找到的采用；MITOS2 没找到的需 ≥2 个独立家族支持。同位点不同反密码子（冲突）保留证据强者，平局都不选。边界取 MITOS2（与 NCBI 完全一致最多）。
 - MITOS2 慢的原因：runmitos 对没找到的 tRNA 模型再做灵敏搜索（cmsearch --max、E 0.1、单线程），tRNA 少的类群每条 10 分钟以上并带来假 tRNA。默认 fast 模式（`scripts/runmitos_fast.py`）跳过这一步（一条海葵 640 s → 8 s）；`--mitos_mode full` 恢复。
 - 跨原点 tRNA 写成 join。
+
+**用 MITOS2 tRNA 替换 MitoZ tRNA**（`--select mitos2`，可选，不在默认流程中）：
+
+```bash
+# 默认流程：1 batch_mitoz.py run → 3 mito_curate.py（含 4 NCBI 校验）
+# 需要 MITOS2 tRNA 时在 1 与 3 之间插入：
+python3 mito_trna.py -i mitoz_run_out/04.final_gb -o trna_mitos2 --select mitos2 --genetic_code 5 \
+  --mitos_bin MITOS_ENV/bin --mitos_refdir DIR_WITH_refseq89m
+python3 mito_curate.py -i trna_mitos2/selected -o curated --genetic_code 5
+```
+
+- 输入必须是**调整方向后的最终 GenBank**（`04.final_gb/`）：MITOS2 在该 GB 自身序列上运行，坐标与其它特征一致；FASTA、`00.*`、`01.mitoz_anno1/`（方向调整前）一律拒绝。
+- 只替换 tRNA 及其 gene 特征（命名同 MitoZ，如 `trnN(guu)`），PCG/rRNA 不动；review GB 中保留原 MitoZ tRNA 供对照。
+- 某条记录 MITOS2 运行失败 → 该记录原样保留，不会删掉 MitoZ tRNA。
 
 ```bash
 python3 mito_trna.py -i gb_or_fasta -o out --genetic_code 5 --tools mitos2,arwen,aragorn,trnascan \

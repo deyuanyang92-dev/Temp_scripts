@@ -25,14 +25,17 @@ predictions with different anticodons form separate groups flagged as a conflict
 Selection (--select mitos2_or_support, default): a group is selected when MITOS2 found it, or when
 >= --min_support (2) independent method families agree. Overlapping groups with different anticodons
 (conflict): the one with stronger evidence (MITOS2, then more families) is kept, ties drop both.
-Boundaries come from the first source in --priority (MITOS2 first: most exact boundaries vs NCBI).
+--select mitos2: the input tRNAs (e.g. MitoZ) are replaced by the MITOS2 tRNAs (tools mitos2,input;
+the input tRNAs stay visible in the review GenBank). Boundaries otherwise come from the first source
+in --priority (MITOS2 first: most exact boundaries vs NCBI).
 
 MITOS2 runs in fast mode by default (scripts/runmitos_fast.py): runmitos re-searches every tRNA
 model it did not find with a sensitive cmsearch (--max, E 0.1, single CPU): 640 s vs 8 s on one
 anthozoan (Metridium), plus spurious tRNAs; fast mode skips that pass (--mitos_mode full keeps it).
 
-Outputs per input file: <name>.review.gbf (all predictions; /note = source, score, anticodon,
-group, support), <name>.selected.gbf (selected tRNAs only), and trna_report.tsv (one row per group).
+Outputs per input file: review/<name>.gbf (all predictions; /note = source, score, anticodon,
+group, support), selected/<name>.gbf (selected tRNAs only; input for mito_curate.py -i out/selected),
+and trna_report.tsv (one row per group).
 
 Usage:
   python3 mito_trna.py -i gb_or_fasta -o out_dir --genetic_code 5 \
@@ -152,8 +155,10 @@ def mitos2(fa: Path, code: int, b: Dict[str, str], tmp: Path, a) -> List[Pred]:
            "-r", a.mitos_ref, "--refdir", a.mitos_refdir, "--prot", "0", "--rrna", "0", "--intron", "0", "--oril", "0"]
     run(cmd)
     bed = od / "result.bed"
+    if not bed.exists():                              # failed run, not "no tRNA found"
+        raise RuntimeError("MITOS2 produced no result.bed")
     out = []
-    for line in bed.read_text().splitlines() if bed.exists() else []:
+    for line in bed.read_text().splitlines():
         c = line.split("\t")
         if len(c) < 6:
             continue
@@ -276,7 +281,7 @@ def feature(p: Pred, ac: str, note: str, L: int) -> SeqFeature:
     else:
         loc = FeatureLocation(p.start - 1, p.end, strand=p.strand)
     return SeqFeature(loc, type="tRNA",
-                      qualifiers={"gene": [name + (f"({ac})" if ac else "")],
+                      qualifiers={"gene": [name + (f"({ac.replace('t', 'u')})" if ac else "")],   # MitoZ style trnN(guu)
                                   "product": [f"tRNA-{ONE2THREE[p.aa]}"], "note": [note]})
 
 
@@ -293,11 +298,14 @@ def main(argv=None) -> int:
     p.add_argument("-i", "--input", required=True, help="GenBank or FASTA file / directory")
     p.add_argument("-o", "--out", required=True)
     p.add_argument("--genetic_code", type=int, default=5)
-    p.add_argument("--tools", default="mitos2,arwen,aragorn,trnascan,input")
+    p.add_argument("--tools", default=None,
+                   help="default: mitos2,arwen,aragorn,trnascan,input; with --select mitos2: mitos2,input")
     p.add_argument("--priority", default="MITOS2,ARWEN,ARAGORN,tRNAscan-SE,input",
                    help="source whose boundaries are used for the selected tRNA of a group")
-    p.add_argument("--select", choices=["mitos2_or_support", "support"], default="mitos2_or_support",
-                   help="selected tRNAs: mitos2_or_support (default) = found by MITOS2, or supported by >= "
+    p.add_argument("--select", choices=["mitos2_or_support", "support", "mitos2"], default="mitos2_or_support",
+                   help="selected tRNAs: mitos2 = replace the input (e.g. MitoZ) tRNAs with the MITOS2 tRNAs "
+                        "(MITOS2 boundaries and anticodons; a record whose MITOS2 run fails is kept unchanged); "
+                        "mitos2_or_support (default) = found by MITOS2, or supported by >= "
                         "--min_support independent method families; support = families only. Benchmark "
                         "(39 annelid + 71 anthozoan/sponge/placozoan NCBI mitogenomes): MITOS2 alone had the "
                         "fewest false positives; ARWEN/ARAGORN alone gave hundreds in tRNA-poor genomes")
@@ -312,6 +320,8 @@ def main(argv=None) -> int:
                         "full: unmodified runmitos (much slower when tRNAs are missing, e.g. anthozoans)")
     a = p.parse_args(argv)
 
+    if a.tools is None:
+        a.tools = "mitos2,input" if a.select == "mitos2" else "mitos2,arwen,aragorn,trnascan,input"
     want = [t.strip() for t in a.tools.split(",") if t.strip()]
     found = {n: find(n, a.bin, a.mitos_bin) for n in ("arwen", "aragorn", "tRNAscan-SE", "runmitos")}
     need = {"mitos2": "runmitos", "arwen": "arwen", "aragorn": "aragorn", "trnascan": "tRNAscan-SE"}
@@ -322,10 +332,23 @@ def main(argv=None) -> int:
         if t == "mitos2" and t in want and not a.mitos_refdir:
             print("[mito_trna] mitos2: --mitos_refdir not given - skipped", file=sys.stderr)
             want.remove(t)
+    if a.select == "mitos2" and "mitos2" not in want:
+        print("[mito_trna] --select mitos2 needs MITOS2 (runmitos via --mitos_bin, and --mitos_refdir)", file=sys.stderr)
+        return 2
     b: Dict[str, str] = {k: v for k, v in found.items() if v}
     src, out = Path(a.input), Path(a.out)
     files = sorted(x for x in src.rglob("*") if x.is_file() and x.suffix.lower() in GB_EXT | {".fa", ".fasta", ".fna"}) \
         if src.is_dir() else [src]
+    if a.select == "mitos2":
+        # MITOS2 runs on the sequence of each input GenBank record, so its coordinates always match that
+        # record; the input must therefore be the final, reoriented annotation (batch_mitoz 04.final_gb),
+        # never a FASTA or the round-1 MitoZ output from before reorientation
+        bad = [x for x in files if x.suffix.lower() not in GB_EXT or any(
+            part.startswith(("00.", "01.mitoz_anno1")) for part in x.parts)]
+        if bad:
+            print(f"[mito_trna] --select mitos2 needs the final reoriented GenBank (e.g. 04.final_gb/), "
+                  f"not: {', '.join(map(str, bad[:3]))}", file=sys.stderr)
+            return 2
     out.mkdir(parents=True, exist_ok=True)
     priority = [x.strip() for x in a.priority.split(",")]
     report: List[Dict[str, str]] = []
@@ -340,11 +363,25 @@ def main(argv=None) -> int:
                 fa = tmp / "g.fa"
                 fa.write_text(f">{rec.id}\n{rec.seq}\n")
                 preds: List[Pred] = []
+                failed = []
                 for t in want:
                     if t == "input":
                         preds += from_input(rec)
-                    else:
+                        continue
+                    try:
                         preds += TOOLS[t](fa, a.genetic_code, b, tmp, a)
+                    except RuntimeError as exc:
+                        failed.append(t)
+                        print(f"[mito_trna] {rec.id}: {t} failed ({exc})", file=sys.stderr)
+            if a.select == "mitos2" and "mitos2" in failed:
+                # never drop the existing tRNAs because MITOS2 crashed: record written unchanged
+                print(f"[mito_trna] {rec.id}: MITOS2 failed - input tRNAs kept unchanged", file=sys.stderr)
+                review.append(rec)
+                selected.append(rec)
+                report.append({"file": f.name, "record": rec.id, "group": "", "tRNA": "", "anticodon": "", "strand": "",
+                               "start": "", "end": "", "boundary_source": "", "n_families": "", "sources": "",
+                               "coords_by_source": "", "conflict": "", "selected": "MITOS2 failed; input kept"})
+                continue
             L = len(rec.seq)
             global CIRC_L
             CIRC_L = L if rec.annotations.get("topology", "circular") == "circular" else 0
@@ -355,7 +392,11 @@ def main(argv=None) -> int:
                                               "ARAGORN" if "aragorn" in want else "",
                                               "tRNAscan-SE" if "trnascan" in want else "",
                                               "input" if "input" in want else "") if x})
-            others = [x for x in rec.features if x.type != "tRNA"]
+            # old tRNAs and their gene features are replaced (MitoZ writes a gene feature per tRNA)
+            trna_genes = {g for x in rec.features if x.type == "tRNA" for g in x.qualifiers.get("gene", [])}
+            others = [x for x in rec.features if x.type != "tRNA" and not (
+                x.type == "gene" and (set(x.qualifiers.get("gene", [])) & trna_genes
+                                      or x.qualifiers.get("gene", [""])[0].lower().startswith("trn")))]
             rev_feats, sel_feats = list(others), list(others)
             for gi, g in enumerate(groups, 1):
                 ac = anticodon_of(g)
@@ -371,13 +412,18 @@ def main(argv=None) -> int:
                 # a conflict removes a group only when a conflicting group has equal or stronger
                 # evidence (ARWEN-only hits overlapping a MITOS2 tRNA must not remove it)
                 beaten = any(strength(groups[j - 1], a.select) >= strength(g, a.select) for j in conf.get(gi, []))
-                if a.select == "mitos2_or_support":
+                if a.select == "mitos2":
+                    keep = "MITOS2" in srcs
+                    best = next(x for x in g if x.source == "MITOS2") if keep else best
+                elif a.select == "mitos2_or_support":
                     keep = ("MITOS2" in srcs or len(fams) >= a.min_support) and not beaten
                 else:
                     keep = len(fams) >= a.min_support and not beaten
                 if keep:
-                    sel_feats.append(feature(best, ac, f"tRNA by mito_trna.py: boundaries from {best.source}; "
-                                                       f"support {support}", L))
+                    ac_sel = (best.anticodon or ac) if a.select == "mitos2" else ac
+                    tf = feature(best, ac_sel, f"tRNA by mito_trna.py: boundaries from {best.source}; "
+                                               f"support {support}", L)
+                    sel_feats += [SeqFeature(tf.location, type="gene", qualifiers={"gene": tf.qualifiers["gene"]}), tf]
                 report.append({"file": f.name, "record": rec.id, "group": str(gi), "tRNA": trna_name(best.aa, ac),
                                "anticodon": ac, "strand": "+" if best.strand == 1 else "-",
                                "start": str(best.start), "end": str(best.end), "boundary_source": best.source,
@@ -390,8 +436,9 @@ def main(argv=None) -> int:
             r1.features, r2.features = sorted(rev_feats, key=key), sorted(sel_feats, key=key)
             review.append(r1)
             selected.append(r2)
-        SeqIO.write(review, str(out / f"{f.stem}.review.gbf"), "genbank")
-        SeqIO.write(selected, str(out / f"{f.stem}.selected.gbf"), "genbank")
+        for sub, recs_out in (("review", review), ("selected", selected)):
+            (out / sub).mkdir(exist_ok=True)
+            SeqIO.write(recs_out, str(out / sub / f"{f.stem}.gbf"), "genbank")
     cols = ["file", "record", "group", "tRNA", "anticodon", "strand", "start", "end", "boundary_source",
             "n_families", "sources", "coords_by_source", "conflict", "selected"]
     with open(out / "trna_report.tsv", "w", newline="", encoding="utf-8") as fh:
@@ -399,10 +446,11 @@ def main(argv=None) -> int:
         w.writeheader()
         w.writerows(report)
     sel = sum(r["selected"] == "yes" for r in report)
-    rule = ("found by MITOS2 or " if a.select == "mitos2_or_support" else "") + \
+    rule = "MITOS2 tRNAs replace input tRNAs" if a.select == "mitos2" else \
+        ("found by MITOS2 or " if a.select == "mitos2_or_support" else "") + \
         f">= {a.min_support} independent method families"
     print(f"[mito_trna] {len(files)} file(s); tools {', '.join(want)}; {len(report)} tRNA loci, {sel} selected "
-          f"({rule}; conflicts -> stronger evidence) -> {out}")
+          f"({rule}{'' if a.select == 'mitos2' else '; conflicts -> stronger evidence'}) -> {out}")
     return 0
 
 

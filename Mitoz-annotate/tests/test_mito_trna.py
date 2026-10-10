@@ -70,10 +70,64 @@ def test_orbicella_selected_matches_ncbi(tmp_path):
                     "-o", str(tmp_path), "--genetic_code", "4", "--tools", "mitos2,arwen,aragorn,trnascan",
                     "--bin", str(TRNA_BIN), "--mitos_bin", str(MITOS_BIN), "--mitos_refdir", MITOS_REF],
                    check=True, capture_output=True)
-    sel = SeqIO.read(str(tmp_path / "NC_007224_bare.selected.gbf"), "genbank")
+    sel = SeqIO.read(str(tmp_path / "selected" / "NC_007224_bare.gbf"), "genbank")
     assert sorted(f.qualifiers["product"][0] for f in sel.features if f.type == "tRNA") == ["tRNA-Met", "tRNA-Trp"]
-    rev = SeqIO.read(str(tmp_path / "NC_007224_bare.review.gbf"), "genbank")
+    rev = SeqIO.read(str(tmp_path / "review" / "NC_007224_bare.gbf"), "genbank")
     assert sum(f.type == "tRNA" for f in rev.features) > 2
     rows = list(csv.DictReader((tmp_path / "trna_report.tsv").open(), delimiter="\t"))
     met = next(r for r in rows if r["tRNA"] == "trnM")
     assert (met["start"], met["end"], met["boundary_source"]) == ("1", "72", "MITOS2")
+
+
+def test_mitos2_failure_keeps_input_trnas(tmp_path):
+    """--select mitos2 must never delete the MitoZ tRNAs because MITOS2 crashed (no result.bed)."""
+    fake = tmp_path / "bin"
+    fake.mkdir()
+    for n in ("runmitos", "python"):
+        (fake / n).write_text("#!/bin/sh\nexit 1\n")
+        (fake / n).chmod(0o755)
+    subprocess.run([sys.executable, "-W", "ignore", str(HERE.parent / "mito_trna.py"), "-i", str(HERE / "data" / "KY753833_mitoz.gbf"),
+                    "-o", str(tmp_path / "out"), "--select", "mitos2", "--mitos_bin", str(fake), "--mitos_refdir", str(tmp_path)],
+                   check=True, capture_output=True)
+    before = SeqIO.read(str(HERE / "data" / "KY753833_mitoz.gbf"), "genbank")
+    after = SeqIO.read(str(tmp_path / "out" / "selected" / "KY753833_mitoz.gbf"), "genbank")
+    assert [str(f.location) for f in after.features] == [str(f.location) for f in before.features]
+
+
+def test_select_mitos2_without_mitos2_refuses(tmp_path):
+    r = subprocess.run([sys.executable, "-W", "ignore", str(HERE.parent / "mito_trna.py"), "-i", str(HERE / "data" / "KY753833_mitoz.gbf"),
+                        "-o", str(tmp_path / "out"), "--select", "mitos2", "--mitos_bin", str(tmp_path)], capture_output=True)
+    assert r.returncode == 2 and not (tmp_path / "out").exists()
+
+
+@pytest.mark.skipif(not ((MITOS_BIN / "runmitos").exists() and MITOS_REF), reason="MITOS2 / MITOS_REFDIR not available")
+def test_mitos2_replaces_mitoz_trnas(tmp_path):
+    """MitoZ annotation of Aphrodita KY753833: tRNAs (and their gene features) replaced by MITOS2;
+    all PCG/rRNA features untouched."""
+    src = HERE / "data" / "KY753833_mitoz.gbf"
+    subprocess.run([sys.executable, "-W", "ignore", str(HERE.parent / "mito_trna.py"), "-i", str(src), "-o", str(tmp_path),
+                    "--select", "mitos2", "--genetic_code", "5", "--mitos_bin", str(MITOS_BIN), "--mitos_refdir", MITOS_REF],
+                   check=True, capture_output=True)
+    before = SeqIO.read(str(src), "genbank")
+    after = SeqIO.read(str(tmp_path / "selected" / "KY753833_mitoz.gbf"), "genbank")
+    trna = [f for f in after.features if f.type == "tRNA"]
+    assert len(trna) == 22 and all("boundaries from MITOS2" in f.qualifiers["note"][0] for f in trna)
+    genes = [f.qualifiers["gene"][0] for f in after.features if f.type == "gene"]
+    assert len(genes) == len(set(genes)) == sum(f.type == "gene" for f in before.features)
+    keep = lambda r: sorted(str(f.location) for f in r.features if f.type in ("CDS", "rRNA"))  # noqa: E731
+    assert keep(after) == keep(before)
+
+
+def test_select_mitos2_refuses_unoriented_input(tmp_path):
+    """Replacement must run on the final reoriented GenBank: FASTA or round-1 (01.mitoz_anno1) refused."""
+    d = tmp_path / "01.mitoz_anno1"
+    d.mkdir()
+    (d / "x.gbf").write_bytes((HERE / "data" / "KY753833_mitoz.gbf").read_bytes())
+    (tmp_path / "x.fasta").write_text(">x\nACGT\n")
+    for src in (d, tmp_path / "x.fasta"):
+        r = subprocess.run([sys.executable, "-W", "ignore", str(HERE.parent / "mito_trna.py"), "-i", str(src), "-o",
+                            str(tmp_path / "out"), "--select", "mitos2", "--mitos_bin", str(MITOS_BIN),
+                            "--mitos_refdir", str(tmp_path)], capture_output=True, text=True)
+        if not (MITOS_BIN / "runmitos").exists():
+            pytest.skip("MITOS2 not available")
+        assert r.returncode == 2 and "reoriented" in r.stderr

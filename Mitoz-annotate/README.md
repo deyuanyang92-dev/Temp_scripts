@@ -633,6 +633,32 @@ python3 mito_curate.py -i annotated_gb_dir -o curated_dir --genetic_code 5 [--rr
 
 剩余差异主要来自 tRNA 边界与 NCBI 不同（NCBI 的 T/TA 终止落在其 tRNA 前），以及 rRNA 写法惯例（NCBI 多为两侧填满；trim 模式按准则不扩展）。准则来自腹足类，此处在环节动物上验证，软体动物数据尚未测试。
 
+## tRNA 多方法注释 / tRNA (mito_trna.py)
+
+仿 GeSeq（Tillich et al. 2017, NAR 45:W6, doi:10.1093/nar/gkx391）：多个 tRNA 软件结果**全部**写进一个 GenBank（`*.review.gbf`，Geneious 里逐个比较、自己选），另出 `*.selected.gbf`（每位点一个 tRNA）和 `trna_report.tsv`。不预设 tRNA 数目（多数珊瑚 1–2 个，部分环节动物 23–24 个）。
+
+- 软件：MITOS2（只取 tRNA，refseq89m 内置后生动物 tRNA 协方差模型）、ARWEN、ARAGORN、tRNAscan-SE 2（-O）、输入 GB 已有 tRNA。
+- 证据按**独立方法家族**计：ARWEN 与 ARAGORN 同作者同算法，算一个。
+- 默认选择：MITOS2 找到的采用；MITOS2 没找到的需 ≥2 个独立家族支持。同位点不同反密码子（冲突）保留证据强者，平局都不选。边界取 MITOS2（与 NCBI 完全一致最多）。
+- MITOS2 慢的原因：runmitos 对没找到的 tRNA 模型再做灵敏搜索（cmsearch --max、E 0.1、单线程），tRNA 少的类群每条 10 分钟以上并带来假 tRNA。默认 fast 模式（`scripts/runmitos_fast.py`）跳过这一步（一条海葵 640 s → 8 s）；`--mitos_mode full` 恢复。
+- 跨原点 tRNA 写成 join。
+
+```bash
+python3 mito_trna.py -i gb_or_fasta -o out --genetic_code 5 --tools mitos2,arwen,aragorn,trnascan \
+  --bin ENV/bin --mitos_bin MITOS_ENV/bin --mitos_refdir DIR_WITH_refseq89m
+```
+
+**验证**（裸序列，对照 NCBI tRNA，氨基酸 + 反密码子 + 重叠 ≥50% 算找到；FP = 该处无 NCBI tRNA；`benchmark/eval_trna.py`）：
+
+| | 刺胞/海绵/扁盘 85 条，183 tRNA | 环节动物 23 条，506 tRNA |
+|---|---|---|
+| MITOS2 | 89.6%，FP 20 | 95.7%，FP 1 |
+| ARWEN / ARAGORN | 91.8%，FP 348 / 462 | 95.5–96.4%，FP 45 / 69 |
+| tRNAscan-SE | 61.2%，FP 1 | 44.7%，FP 0 |
+| **默认选择** | **93.4%，FP 21** | **96.0%，FP 1** |
+
+单用 ARWEN/ARAGORN 在 tRNA 少的类群假阳性极多，故只放 review 文件。刺胞的 FP 多来自 MITOS2，是否为 NCBI 漏注未确证。
+
 ## intron 注释 / Introns (mito_intron.py)
 
 **MitoZ 缺陷：MitoZ 无法注释 intron（group I / II）。** `run` / `annotate` 写完最终 GenBank 后自动调用 `mito_intron.py` 补上 intron，并整合进 MitoZ 结果（`--intron_fix auto`：找到 exonerate+blastp 时运行；`yes` 强制，`no` 关闭；`--intron_bin <env>/bin`）。

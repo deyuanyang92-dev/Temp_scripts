@@ -1,0 +1,63 @@
+>gi|123198972|gb|ABM70613.1| Cytochrome B6-F complex subunit VII [Prochlorococcus marinus str. AS9601] pt_cyano petM;
+MAKEIFSIAAVFWILIPIGLVGGALLLKFQGD
+
+
+>gi|109150042|ref|YP_654190.1| cytochrome b6-f complex subunit PetM [Prochlorococcus marinus subsp. pastoris str. CCMP1986] pt_cyano petM;
+MAKEIFSIAAVFWILIPIGLVGGALLLKFQGD
+
+
+>gi|218168802|gb|ACK67539.1| PetM of cytochrome b6f complex subunit 7 [Cyanothece sp. PCC 8801] pt_cyano petM;
+MTAESMMFNGAVLLMVLVLVGLAWGFLLLKIQGGEAE
+
+
+>gi|218174148|gb|ACK72881.1| PetM of cytochrome b6f complex subunit 7 [Cyanothece sp. PCC 7424] pt_cyano petM;
+MTAESMLFNGAILSIVLVLVGLAWGFLLLKIQGGEAE
+
+
+>gi|158309725|gb|ABW31342.1| cytochrome b6/f complex subunit VII [Acaryochloris marina MBIC11017] pt_cyano petM;
+MAGEIFTTAFLCFSLILVGIGLGYLLLKVAPD
+
+
+>gi|123200918|gb|ABM72526.1| cytochrome b6-F complex subunit VII [Prochlorococcus marinus str. MIT 9515] pt_cyano petM;
+MAKEIFSIAAVFWILIPIGLVGGALLLKFQGD
+
+
+>gi|171699158|gb|ACB52139.1| putative cytochrome b6-f complex subunit [Cyanothece sp. ATCC 51142] pt_cyano petM;
+MTAESMMFNGAVILMVLVLFGLAWGFLILKIQGGEAE
+
+
+>gi|161350031|ref|YP_397746.2| cytochrome b6-f complex subunit PetM [Prochlorococcus marinus str. MIT 9312] pt_cyano petM;
+MAKEIFSIAAVFWILIPIGLVGGALLLKFQGD
+
+
+>gi|256590515|gb|ACV01402.1| PetM of cytochrome b6f complex subunit 7 [Cyanothece sp. PCC 8802] pt_cyano petM;
+MTAESMMFNGAVLLMVLVLVGLAWGFLLLKIQGGEAE
+
+
+>gi|22295140|dbj|BAC08968.1| cytochrome b6-f complex subunit [Thermosynechococcus elongatus BP-1] pt_cyano petM;
+MAEEIFNTAVITFTLVLVGLGAGYLLLRLTPDD
+
+
+>gi|35211646|dbj|BAC89024.1| gsl1083 [Gloeobacter violaceus PCC 7421] pt_cyano petM;
+MTGEIFFVAGLVFVLTLVGMAIGFGVLKLRGEGKEA
+
+
+>gi|166087658|dbj|BAG02366.1| cytochrome b6-f complex subunit [Microcystis aeruginosa NIES-843] pt_cyano petM;
+MTAESMLFNGAIVAIVLVLVGLAWGFLLLKIQGGEAE
+
+
+>Phaeodactylum tricornutum pt petM; seq_id:10132826
+MELIKQIFPFANSEIITAAVVCFSMTLFGLSLGFGLLKVQGE
+
+>Rhodomonas salina pt petM; seq_id:10314703
+MGNEIIDAAVVSFVITLVGLALGFALLKLQGE
+
+>Cyanophora paradoxa pt petM; seq_id:9895820
+MGKQIFNTAVICFTLTLIGLSLGFVLLKIQGDE
+
+>Guillardia theta pt petM; seq_id:9900991
+MGNEFIASASISFIITLIGLTLGFALLKLQGE
+
+>Emiliania huxleyi pt petM; seq_id:9732851
+MAKEIFTVAGVMWALVLTGLSVGFGLLKIQGE
+

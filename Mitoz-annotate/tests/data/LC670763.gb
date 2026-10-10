@@ -1,0 +1,76 @@
+LOCUS       LC670763                1523 bp    DNA     linear   INV 18-MAR-2022
+DEFINITION  Travisia sp. GK623 mitochondrial COX1 gene for cytochrome c oxidase
+            subunit 1, partial cds.
+ACCESSION   LC670763
+VERSION     LC670763.1
+KEYWORDS    .
+SOURCE      mitochondrion Travisia sp. GK623
+  ORGANISM  Travisia sp. GK623
+            Eukaryota; Metazoa; Spiralia; Lophotrochozoa; Annelida; Polychaeta;
+            Sedentaria; Scolecida; Opheliidae; Travisia.
+REFERENCE   1
+  AUTHORS   Kobayashi,G., Itoh,H. and Kojima,S.
+  TITLE     Mitogenome of a stink worm (Annelida: Travisiidae) includes
+            degenerate group II intron that is also found in five congeneric
+            species
+  JOURNAL   Sci Rep 12 (1), 4449 (2022)
+   PUBMED   35292662
+  REMARK    DOI:10.1038/s41598-022-08103-5
+REFERENCE   2  (bases 1 to 1523)
+  AUTHORS   Kobayashi,G. and Itoh,H.
+  TITLE     Direct Submission
+  JOURNAL   Submitted (11-JAN-2022) Contact:Genki Kobayashi Kyoto University,
+            Seto Marine Biological Laboratory, Field Science Education and
+            Research Center; 459 Shirahama, Nishimuro, Wakayama, Nishimuro,
+            Wakayama 6492211, Japan URL
+            :http://www.seto.kyoto-u.ac.jp/smbl/e-index.html
+FEATURES             Location/Qualifiers
+     source          1..1523
+                     /organism="Travisia sp. GK623"
+                     /organelle="mitochondrion"
+                     /mol_type="genomic DNA"
+                     /isolate="GK623"
+                     /db_xref="taxon:2909602"
+                     /geo_loc_name="Japan:Miyagi, Off Onagawa"
+     gene            order(<1..235,1101..>1523)
+                     /gene="COX1"
+     CDS             join(<1..235,1101..>1523)
+                     /gene="COX1"
+                     /codon_start=2
+                     /transl_table=5
+                     /product="cytochrome c oxidase subunit 1"
+                     /protein_id="BDD95830.1"
+                     /translation="TMYFILGAWGGLLGTTMSLVIRVELGQPGAFLGSDQLYNTLVTAH
+                     AFLMIFFLVMPVFIGGFGNWLVPLMLGAPDMAFPRMNNMSFWLLPPSLTLLVTSAAVEK
+                     GVGTGWTVYPPLASNLAHAGPSVDLAIFSLHLAGVSSILGAINFITTVINMRWKGYRLE
+                     RIPLFVWSVMITAILLLLSLPVLAGAITMLLTDRNLNTAFFDPAGGGDPILYQHLF"
+     intron          236..1100
+                     /note="group II intron"
+ORIGIN
+        1 aactatatac ttcattctag gcgcttgagg aggacttcta ggaactacta taagcctggt
+       61 catccgagtt gaactaggtc aacctggcgc tttcctcgga agtgatcaac tttataatac
+      121 actagtaact gcccacgctt tcttaataat cttcttttta gtaatgcccg tttttattgg
+      181 aggattcgga aactgattag tccccttaat attaggagct ccagatatag cattcgcgcg
+      241 ctgtcgactt aattatactt tagttagaac taaaacctaa cttcatgtac ttcattccat
+      301 gaattctttc ttattctaaa atataatacc ccttatttat tttattcata gcataataaa
+      361 atcacaattt cttttcatac aaactctcat agaaaatgag caaggttaaa ctcactttaa
+      421 atttcagtat tatttaaatc aatctaatac aacttcctat ttaggaatgc aataagaaat
+      481 actattaacc cacttttaaa tccctacctc aaattaaaaa cctaaactca atttcaaagt
+      541 ataacttaaa cttcaggaaa attttagcct aaggctaatt ttcggaatgg ttatattaaa
+      601 tagactccgc attctaaaaa agaaccataa ttaataataa tttaacactt aaatcaactt
+      661 tttctaccct ctccatctca tcttaactcc ttaaattttt tgctttaaac aacttacaat
+      721 aactgtctca tttacaccct taacacattt tagtaatact tttaaccctt caatgcaaat
+      781 tttaataaat cactatttat ttttatacct tccccatttt ataaaatctt atttatttta
+      841 ctgtctattt ccaaaatttt ttaaaaaaaa tttaattatt atatcttgat ttattccaca
+      901 attgcccacc cttaattatt atttaccaaa acctataaac attaaaataa accttattat
+      961 ataaaaattt ctttattaag aaacttttcc tttttgattt taattataat ttaatcttta
+     1021 ctaaatctat taacaaagag cctcatgata aaaaattatc acgtgtggtt cgggaaaaag
+     1081 agtatctact cttaattcac cctcgtataa acaatataag tttctgactt cttcctccat
+     1141 ctttaaccct ccttgttacc tcagctgcag tagaaaaagg agtaggaact ggttgaacag
+     1201 tttacccccc ccttgccagt aatttagcac acgcaggtcc ctctgtagat ctagcaattt
+     1261 tttctcttca tttagcagga gtatcctcaa ttcttggtgc tattaacttc attaccactg
+     1321 taattaatat acgatgaaaa ggttaccgat tagagcgaat ccctttattt gtttgatcag
+     1381 ttataatcac tgctattctt ctccttctat ctcttccagt tctagccgga gctattacca
+     1441 tgctacttac tgatcgaaat ttaaacacag ctttttttga ccctgctggt ggaggtgacc
+     1501 caattcttta ccaacattta ttt
+//

@@ -479,6 +479,26 @@ def _gb_version_int(rec: "SeqRecord") -> int:
     return int(m.group(1)) if m else 0
 
 
+REFSEQ_ACC_RE = re.compile(r"^[A-Z]{2}_\d")
+REFSEQ_SOURCE_RE = re.compile(
+    r"(?:identical to|derived from)\s+((?:[A-Z]{1,6}\d{5,9}(?:\.\d+)?(?:\s*,\s*|\s+and\s+)?)+)", re.I)
+
+
+def is_refseq_acc(acc: str) -> bool:
+    """RefSeq accessions have a two-letter prefix and an underscore (NC_, NR_, ...)."""
+    return bool(REFSEQ_ACC_RE.match(acc or ""))
+
+
+def refseq_source_accessions(rec: "SeqRecord") -> List[str]:
+    """INSDC accessions a RefSeq record was made from, read from its COMMENT
+    ('The reference sequence is identical to MN123456' / 'was derived from ...')."""
+    comment = " ".join(str(rec.annotations.get("comment", "")).split())
+    out: List[str] = []
+    for m in REFSEQ_SOURCE_RE.finditer(comment):
+        out += [a.split(".")[0] for a in re.findall(r"[A-Z]{1,6}\d{5,9}(?:\.\d+)?", m.group(1))]
+    return out
+
+
 def dedup_gb_records(
     gb_files: List[Path],
     dedup_report_path: Optional[Path] = None,
@@ -487,9 +507,9 @@ def dedup_gb_records(
 
     stats: Dict = {
         "total_in": 0, "kept": 0,
-        "dup_exact": 0, "dup_version": 0, "dup_seq": 0,
+        "dup_exact": 0, "dup_version": 0, "dup_seq": 0, "dup_refseq": 0,
         "parse_errors": 0, "no_sequence": 0,
-        "dup_exact_list": [], "dup_version_list": [], "dup_seq_list": [],
+        "dup_exact_list": [], "dup_version_list": [], "dup_seq_list": [], "dup_refseq_list": [],
         "no_sequence_list": [],
     }
 
@@ -551,9 +571,23 @@ def dedup_gb_records(
                 stats["dup_exact_list"].append(
                     f"{meta.acc_versioned} (dup of {prev.acc_versioned})")
 
+    # RefSeq (NC_...) records are curated copies of INSDC submissions: keep the RefSeq
+    # record and drop the submission it was made from (named in its COMMENT).
+    superseded: Dict[str, str] = {}
+    for meta in by_acc.values():
+        if is_refseq_acc(meta.acc_base):
+            for src in refseq_source_accessions(meta.record):
+                superseded.setdefault(src, meta.acc_versioned)
+    for key in [k for k in by_acc if k in superseded]:
+        stats["dup_refseq"] += 1
+        stats["dup_refseq_list"].append(
+            f"{by_acc[key].acc_versioned} superseded by RefSeq {superseded[key]} (derived from it)")
+        del by_acc[key]
+
     seq_hash_to_acc: Dict[str, str] = {}
     kept_records: List[GbRecordMeta] = []
-    for meta in by_acc.values():
+    # RefSeq first, so that among sequence-identical records the curated one is kept
+    for meta in sorted(by_acc.values(), key=lambda m: not is_refseq_acc(m.acc_base)):
         if meta.seq_hash in seq_hash_to_acc:
             stats["dup_seq"] += 1
             stats["dup_seq_list"].append(
@@ -561,7 +595,7 @@ def dedup_gb_records(
                 f"len={meta.seq_len}, dropped)")
             logging.warning(
                 f"[DEDUP_SEQ] '{meta.acc_versioned}' has identical sequence to "
-                f"'{seq_hash_to_acc[meta.seq_hash]}' (len={meta.seq_len}). Keeping only first.")
+                f"'{seq_hash_to_acc[meta.seq_hash]}' (len={meta.seq_len}). Keeping only first (RefSeq preferred).")
         else:
             seq_hash_to_acc[meta.seq_hash] = meta.acc_versioned
             kept_records.append(meta)
@@ -574,7 +608,7 @@ def dedup_gb_records(
             "# GB deduplication report\n",
             f"# total_in={stats['total_in']}  with_seq={stats['kept']}  "
             f"no_seq(metadata_only)={stats['no_sequence']}  "
-            f"dropped_dup={stats['dup_exact'] + stats['dup_version'] + stats['dup_seq']}  "
+            f"dropped_dup={stats['dup_exact'] + stats['dup_version'] + stats['dup_seq'] + stats['dup_refseq']}  "
             f"parse_errors={stats['parse_errors']}\n",
             "accession\tstatus\tsource_file\tseq_len\ttopology\n",
         ]
@@ -582,6 +616,8 @@ def dedup_gb_records(
             lines.append(
                 f"{meta.acc_versioned}\tkept\t{meta.source_file.name}\t"
                 f"{meta.seq_len}\t{meta.topology}\n")
+        for msg in stats["dup_refseq_list"]:
+            lines.append(f"\t\tdup_refseq: {msg}\n")
         for msg in stats["dup_seq_list"]:
             lines.append(f"\t\tdup_seq: {msg}\n")
         dedup_report_path.write_text("".join(lines), encoding="utf-8")
@@ -610,7 +646,7 @@ def convert_gb_to_fasta_for_annotation(
         f"[GB_DEDUP] total={n_total}  with_seq={n_kept}  "
         f"no_seq(metadata_only)={n_no_seq}  dropped_dup={n_dup}  "
         f"(dup_exact={stats['dup_exact']}, dup_version={stats['dup_version']}, "
-        f"dup_seq={stats['dup_seq']}, parse_errors={stats['parse_errors']})"
+        f"dup_seq={stats['dup_seq']}, dup_refseq={stats['dup_refseq']}, parse_errors={stats['parse_errors']})"
     )
     if n_no_seq > 0:
         logging.info(
@@ -1016,12 +1052,50 @@ def normalize_gene_key(name: str) -> str:
     return re.sub(r"[^a-z0-9]+", "", (name or "").strip().lower())
 
 
+_GENE_ALIAS_GROUPS = [
+    ["cox1", "coi", "coxi", "co1", "cytochromecoxidasesubuniti", "cytochromecoxidasesubunit1"],
+    ["cox2", "coii", "coxii", "co2", "cytochromecoxidasesubunitii", "cytochromecoxidasesubunit2"],
+    ["cox3", "coiii", "coxiii", "co3", "cytochromecoxidasesubunitiii", "cytochromecoxidasesubunit3"],
+    ["cob", "cytb", "cyb", "cytochromeb"],
+    ["nad1", "nd1", "nadh1", "nadhdehydrogenasesubunit1"],
+    ["atp6", "atpase6", "atpsynthasef0subunit6", "atpsynthasesubunit6"],
+]
+
+
 def gene_aliases(gene: str) -> List[str]:
     g = normalize_gene_key(gene)
-    if g in ("cox1", "coi", "coxi"):
-        return ["cox1", "coi", "coxi",
-                "cytochromecoxidasesubuniti", "cytochromecoxidasesubunit1"]
+    for group in _GENE_ALIAS_GROUPS:
+        if g in group:
+            return list(group)
     return [g]
+
+
+# Records oriented by a fallback gene because the first gene was absent: {record id: gene}
+ORIENTATION_FALLBACK: Dict[str, str] = {}
+
+
+def orientation_genes(args: argparse.Namespace) -> str:
+    """'cox1' plus --fallback_genes, as the comma list reorient_one_gb tries in order."""
+    fb = [g.strip() for g in (getattr(args, "fallback_genes", "") or "").split(",")
+          if g.strip() and g.strip().lower() != "none"]
+    return ",".join([args.which_gene_first] + [g for g in fb if g != args.which_gene_first])
+
+
+def find_orientation_feature(record: "SeqRecord", genes: str) -> Tuple[Optional["SeqFeature"], str]:
+    """First gene of the comma list present in the record; when the gene is annotated in
+    several pieces (e.g. exons around an intron), the 5'-most piece in its own orientation."""
+    for gene in [g.strip() for g in genes.split(",") if g.strip()]:
+        aliases = set(gene_aliases(gene))
+        hits = [f for f in record.features if f.type in {"gene", "CDS", "tRNA", "rRNA"}
+                and any(normalize_gene_key(n) in aliases for n in feature_gene_names(f))]
+        if not hits:
+            continue
+        strand = hits[0].location.strand
+        same = [f for f in hits if f.location.strand == strand]
+        if strand == -1:
+            return max(same, key=lambda f: int(f.location.end)), gene
+        return min(same, key=lambda f: int(f.location.start)), gene
+    return None, ""
 
 
 def feature_gene_names(feature: "SeqFeature") -> List[str]:
@@ -1171,13 +1245,18 @@ def reorient_one_gb(
     no_gene_ids: List[str] = []
     for rec in recs:
         try:
-            feat = find_gene_feature(rec, which_gene_first)
+            feat, used = find_orientation_feature(rec, which_gene_first)
             if feat is None:
                 no_gene.append(rec); no_gene_ids.append(rec.id); continue
+            first = which_gene_first.split(",")[0].strip()
+            if used != first:
+                ORIENTATION_FALLBACK[rec.id] = used
+                logging.info(f"[REORIENT_FALLBACK] record={rec.id}: '{first}' not found, "
+                             f"sequence starts at '{used}'")
             work_rec = rec
             if force_forward and feat.location.strand == -1:
                 work_rec = reverse_complement_record(rec)
-                feat = find_gene_feature(work_rec, which_gene_first)
+                feat, _ = find_orientation_feature(work_rec, used)
                 if feat is None:
                     no_gene.append(rec); no_gene_ids.append(rec.id); continue
             ok.append(rotate_record(work_rec, feature_start_pos(feat)))
@@ -2519,7 +2598,7 @@ def workflow_annotate(args: argparse.Namespace) -> int:
             pcg, trna, rrna, mode, orient_ok = finalize_genbank_output(
                 sample_name=si.sample_name, body_src_gb=best_gb,
                 metadata_src_gb=si.orig_gb_path, dest_gb=dest,
-                which_gene_first=args.which_gene_first,
+                which_gene_first=orientation_genes(args),
                 force_forward=args.force_forward,
                 preserve_metadata=(args.preserve_phase1_metadata == "yes")
                     if hasattr(args, "preserve_phase1_metadata") else False,
@@ -2542,6 +2621,7 @@ def workflow_annotate(args: argparse.Namespace) -> int:
     # no_{gene}_gene/ subdirectory records are also included in the merged
     # archive.  Use final_dir.glob("*.gbf") if you want only the top-level
     # (successfully-oriented) records.
+    run_intron_fix(args, in_path, final_dir, out_root)
     all_final_gbs = sorted(
         p for p in final_dir.rglob("*.gbf")
         if p.is_file() and p.stat().st_size > 0)
@@ -2550,6 +2630,12 @@ def workflow_annotate(args: argparse.Namespace) -> int:
     (out_root / "run_params.json").write_text(
         json.dumps(vars(args), indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     summary.log()
+    logging.warning("[KNOWN_LIMITATION] MitoZ cannot annotate introns (group I/II); they are added "
+                    "afterwards by mito_intron.py (MFannot method, --intron_fix) when exonerate is "
+                    "available - check intron_report.tsv.")
+    write_orientation_fallback(out_root, samples)
+    if args.keep_intermediate == "no":
+        cleanup_intermediates(out_root, samples, summary.all_problem_samples())
     logging.info("[DONE]")
     return 0
 
@@ -2580,7 +2666,7 @@ def workflow_reorient(args: argparse.Namespace) -> int:
         gb_no_gene = no_gene_dir / f"{sample}.gbf"
         try:
             n_ok, n_no, no_gene_ids = reorient_one_gb(
-                gb_in, gb_out, gb_no_gene, args.which_gene_first, args.force_forward)
+                gb_in, gb_out, gb_no_gene, orientation_genes(args), args.force_forward)
             if n_no > 0:
                 logging.warning(f"[NO_TARGET_GENE] '{sample}': "
                                  f"{n_no} record(s) missing '{args.which_gene_first}'")
@@ -2609,6 +2695,82 @@ def workflow_reorient(args: argparse.Namespace) -> int:
                          summary_rows)
     summary.log(); logging.info("[DONE]")
     return 0
+
+
+def write_orientation_fallback(out_root: Path, samples: List["SampleInfo"]) -> None:
+    """oriented_by_fallback.txt: samples whose first gene was absent and that start at a fallback gene."""
+    names = {si.internal_id: si.sample_name for si in samples}
+    rows = sorted({f"{names.get(k.split('.')[0], k)}\t{g}" for k, g in ORIENTATION_FALLBACK.items()})
+    write_nonempty_table(out_root / "oriented_by_fallback.txt", "sample_name\tstart_gene", rows)
+
+
+def run_intron_fix(args: argparse.Namespace, in_path: Path, final_dir: Path, out_root: Path) -> None:
+    """Add introns to final GenBank files in place with mito_intron.py (MitoZ cannot).
+    in_path is kept for the call signature; the protein library is MFannot's (--intron_lib)."""
+    if args.intron_fix == "no":
+        return
+    script = Path(__file__).resolve().with_name("mito_intron.py")
+    exe = (str(Path(args.intron_bin) / "exonerate") if args.intron_bin else shutil.which("exonerate")) or ""
+    if args.intron_bin and not (Path(args.intron_bin) / "blastp").exists():
+        exe = ""
+    if not script.exists() or not Path(exe).exists():
+        msg = "[INTRON_FIX] skipped: exonerate or mito_intron.py not found (use --intron_bin)"
+        logging.error(msg) if args.intron_fix == "yes" else logging.info(msg)
+        return
+    cmd = [sys.executable, str(script), "-i", str(final_dir), "-o", str(final_dir),
+           "--genetic_code", str(int(args.genetic_code)), "--threads", str(int(args.threads)),
+           "--jobs", str(int(getattr(args, "max_tasks", 1) or 1))]
+    for lib in args.intron_lib:
+        cmd += ["--lib", lib]
+    for ref in args.intron_ref_gb:
+        cmd += ["--ref_gb", ref]
+    if args.intron_bin:
+        cmd += ["--bin", args.intron_bin]
+    proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
+    (out_root / "intron_fix.log").write_text(proc.stdout + proc.stderr, encoding="utf-8")
+    report = final_dir / "intron_report.tsv"
+    if report.exists():
+        shutil.move(str(report), str(out_root / "intron_report.tsv"))
+    last = (proc.stdout.strip().splitlines() or [f"failed (exit {proc.returncode}), see intron_fix.log"])[-1]
+    logging.info(f"[INTRON_FIX] {last}")
+
+
+INTERMEDIATE_DIRS = (
+    "00.internal_fasta", "00.gb_converted_fasta", "00.reoriented_fasta_internal",
+    "01.mitoz_anno1", "03.mitoz_anno2_reoriented", "04.final_body_merged",
+)
+
+
+def cleanup_intermediates(out_root: Path, samples: List[SampleInfo],
+                          problem_samples: List[str]) -> None:
+    """Delete internal-ID intermediates once final output is written.
+
+    Kept: 04.final_gb/, all.final.gbf, *.tsv / *.txt reports, pipeline.log,
+    run_params.json.  dedup_report.tsv is moved to out_root; MitoZ logs of
+    problem samples are copied to failed_logs/ before deletion.
+    """
+    dedup = out_root / "00.gb_converted_fasta" / "dedup_report.tsv"
+    if dedup.is_file():
+        shutil.move(str(dedup), str(out_root / "dedup_report.tsv"))
+    problems = set(problem_samples)
+    for si in samples:
+        if si.sample_name not in problems:
+            continue
+        for phase in ("01.mitoz_anno1", "03.mitoz_anno2_reoriented"):
+            wd = out_root / phase / si.internal_id
+            for log in [wd / "sample.log", *sorted((wd / "logs").glob("*.log"))]:
+                if log.is_file():
+                    dst = out_root / "failed_logs" / f"{si.sample_name}.{phase}.{log.name}"
+                    dst.parent.mkdir(exist_ok=True)
+                    shutil.copy2(log, dst)
+    freed = 0
+    for name in INTERMEDIATE_DIRS:
+        d = out_root / name
+        if d.is_dir():
+            freed += sum(p.stat().st_size for p in d.rglob("*") if p.is_file())
+            shutil.rmtree(d, ignore_errors=True)
+    logging.info(f"[CLEANUP] intermediates removed, {freed / 1e6:.1f} MB freed "
+                 f"(use --keep_intermediate yes to keep them)")
 
 
 def workflow_run(args: argparse.Namespace) -> int:
@@ -2662,7 +2824,7 @@ def workflow_run(args: argparse.Namespace) -> int:
         gb_no_gene = reor_dir / f"{si.internal_id}.no_{args.which_gene_first}.gbf"
         try:
             n_ok, n_no, no_gene_ids = reorient_one_gb(
-                best_gb, gb_reor, gb_no_gene, args.which_gene_first, args.force_forward)
+                best_gb, gb_reor, gb_no_gene, orientation_genes(args), args.force_forward)
             if n_ok == 0 and n_no > 0:
                 logging.warning(
                     f"[NO_TARGET_GENE] '{si.sample_name}' ({si.internal_id}): "
@@ -2774,7 +2936,7 @@ def workflow_run(args: argparse.Namespace) -> int:
                 body_src_gb=body_for_final,
                 metadata_src_gb=metadata_src,
                 dest_gb=dest,
-                which_gene_first=args.which_gene_first,
+                which_gene_first=orientation_genes(args),
                 force_forward=args.force_forward,
                 preserve_metadata=(args.preserve_phase1_metadata == "yes"),
                 smart_metadata=(args.smart_metadata == "yes"),
@@ -2835,6 +2997,7 @@ def workflow_run(args: argparse.Namespace) -> int:
 
     # Merge all final GBs including no_{gene}_gene/ subdirectory.
     # Use final_dir.glob("*.gbf") if you want only successfully-oriented records.
+    run_intron_fix(args, in_path, final_dir, out_root)
     all_final_gbs = sorted(
         p for p in final_dir.rglob("*.gbf")
         if p.is_file() and p.stat().st_size > 0
@@ -2850,6 +3013,12 @@ def workflow_run(args: argparse.Namespace) -> int:
     logging.info(f"[OUTPUT_COUNT] {n_ok}/{total}")
     logging.info(f"[METADATA_MODE] preserve={args.preserve_phase1_metadata}")
     summary.log()
+    logging.warning("[KNOWN_LIMITATION] MitoZ cannot annotate introns (group I/II); they are added "
+                    "afterwards by mito_intron.py (MFannot method, --intron_fix) when exonerate is "
+                    "available - check intron_report.tsv.")
+    write_orientation_fallback(out_root, samples)
+    if args.keep_intermediate == "no":
+        cleanup_intermediates(out_root, samples, summary.all_problem_samples())
     logging.info("[DONE]")
     return 0
 
@@ -3046,6 +3215,12 @@ def build_parser() -> argparse.ArgumentParser:
             "  DEFINITION, REFERENCE …) AND have the /organism= qualifier\n"
             "  inside FEATURES source restored from the original file.\n"
             "  MitoZ placeholder strings (e.g. 'Test sp.') are eliminated.\n\n"
+            "KNOWN LIMITATION (to be upgraded):\n"
+            "  MitoZ cannot annotate introns (group I/II). After annotation,\n"
+            "  mito_intron.py (Python port of MFannot's intron method: Exonerate\n"
+            "  protein2genome + MFannot boundary rules + Rfam intron type) adds them\n"
+            "  when exonerate is available (--intron_fix auto|yes|no, --intron_bin).\n"
+            "  Results: intron_report.tsv. Intron models need expert review.\n\n"
             "Citation:\n"
             "  MitoZ:      Meng et al. (2019) NAR doi:10.1093/nar/gkz173\n"
             "  Snakemake:  Mölder et al. (2021) F1000Res doi:10.12688/f1000research.29032.2\n"
@@ -3068,6 +3243,10 @@ def build_parser() -> argparse.ArgumentParser:
                         help="Max length of internal sample IDs (default: 15).")
         sp.add_argument("--which_gene_first", default="cox1",
                         help="Gene used as sequence start (default: cox1).")
+        sp.add_argument("--fallback_genes", default="cox2,cox3,cob,nad1",
+                        help="Genes tried in order when --which_gene_first is absent "
+                             "(default: cox2,cox3,cob,nad1; 'none' = leave such records unrotated). "
+                             "Records oriented this way are listed in oriented_by_fallback.txt.")
         sp.add_argument("--force_forward", action="store_true", default=True,
                         help="RC the sequence when target gene is on minus strand (default: on).")
         sp.add_argument("--no_force_forward", action="store_false", dest="force_forward")
@@ -3079,6 +3258,23 @@ def build_parser() -> argparse.ArgumentParser:
                        help="Conda env containing MitoZ (e.g. mitoz3.6).")
         g.add_argument("--mitoz_path",      default=None,
                        help="Path to MitoZ executable or directory.")
+        g.add_argument("--intron_fix", choices=["auto", "yes", "no"], default="auto",
+                       help="Add introns MitoZ misses with mito_intron.py (MFannot method: Exonerate "
+                            "protein2genome + MFannot boundary rules + Rfam intron type). "
+                            "auto = run when exonerate is found (default).")
+        g.add_argument("--intron_bin", default=None,
+                       help="Directory containing exonerate and cmsearch (e.g. a conda env bin).")
+        g.add_argument("--intron_lib", action="append", default=[],
+                       help="Protein library for intron models in MFannot header format "
+                            "('>Species mt cox1; ...'), repeatable. Default: MFannot's curated "
+                            "collections bundled in models/mfannot_proteins.")
+        g.add_argument("--intron_ref_gb", action="append", default=[],
+                       help="GenBank file/dir of close relatives used as extra homologs for intron models "
+                            "(repeatable).")
+        g.add_argument("--keep_intermediate", choices=["yes", "no"], default="no",
+                       help="Keep internal-ID intermediates (00.*/01.*/03.* dirs, id_map.tsv). "
+                            "Default no: deleted after final output to save space; "
+                            "MitoZ logs of problem samples are kept in failed_logs/.")
         # BUG-V0.29-E: old parser accepted zero/negative values and passed
         # invalid thread counts to MitoZ or ThreadPoolExecutor.
         # g.add_argument("--threads",      type=int, default=16,
@@ -3188,7 +3384,31 @@ def build_parser() -> argparse.ArgumentParser:
     ro.add_argument("--overwrite_new_body", choices=["yes", "no"], default="no",
                     help="Overwrite the input files in-place (default: no).")
 
+    # ── dedup ─────────────────────────────────────────────────────────────
+    dd = sub.add_parser(
+        "dedup",
+        help="Deduplicate GenBank records (same accession / older version / RefSeq copy of an "
+             "INSDC submission / identical sequence; RefSeq NC_ kept) and write GenBank + FASTA.")
+    dd.add_argument("-i", "--input", required=True, help="GenBank file or directory.")
+    dd.add_argument("-o", "--out_root", default="dedup_out", help="Output directory (default: dedup_out).")
+
     return p
+
+
+def workflow_dedup(args: argparse.Namespace) -> int:
+    """Standalone deduplication: dedup.gb, dedup.fasta, dedup_report.tsv."""
+    out_root = Path(args.out_root).resolve()
+    out_root.mkdir(parents=True, exist_ok=True)
+    setup_root_logger(out_root / "dedup.log")
+    files = collect_genbank_files(Path(args.input).resolve())
+    kept, _, stats = dedup_gb_records(files, dedup_report_path=out_root / "dedup_report.tsv")
+    recs = [m.record for m in kept]
+    SeqIO.write(recs, str(out_root / "dedup.gb"), "genbank")
+    SeqIO.write(recs, str(out_root / "dedup.fasta"), "fasta")
+    logging.info(f"[DEDUP] in={stats['total_in']} kept={stats['kept']} no_seq={stats['no_sequence']} "
+                 f"dup_exact={stats['dup_exact']} dup_version={stats['dup_version']} "
+                 f"dup_refseq={stats['dup_refseq']} dup_seq={stats['dup_seq']} -> {out_root}")
+    return 0
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -3229,6 +3449,7 @@ def main() -> int:
         "run":               workflow_run,
         "transfer_metadata": workflow_transfer_metadata,
         "replace_organism":  workflow_replace_organism,
+        "dedup":             workflow_dedup,
     }
     fn = dispatch.get(args.cmd)
     if fn is None:

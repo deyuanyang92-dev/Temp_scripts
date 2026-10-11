@@ -153,6 +153,125 @@ NT_META_COLS: List[str] = [
 NUMERIC_FLOAT_COLS = {"pident", "evalue", "qcovs", "bitscore"}
 NUMERIC_INT_COLS   = {"length", "mismatch", "gapopen", "qstart", "qend", "sstart", "send"}
 
+# 修改 (2026-10-11): 表头功能。BLAST 有 50 个列代码，用户记不住各格式的列含义；
+# 这里内置官方列表，用于 --header_style 和 --mode add-header。
+# BLAST+ tabular field specifiers (outfmt 6/7/10): code -> (outfmt 7 '# Fields' label, description).
+# Generated from `blastn -help` and a real outfmt 7 run, BLAST 2.17.0+ (2026-10-11).
+BLAST_FIELDS: Dict[str, Tuple[str, str]] = {
+    'qseqid': ('query id', 'Query Seq-id'),
+    'qgi': ('query gi', 'Query GI'),
+    'qacc': ('query acc.', 'Query accession'),
+    'qaccver': ('query acc.ver', 'Query accession.version'),
+    'qlen': ('query length', 'Query sequence length'),
+    'sseqid': ('subject id', 'Subject Seq-id'),
+    'sallseqid': ('subject ids', "All subject Seq-id(s), separated by a ';'"),
+    'sgi': ('subject gi', 'Subject GI'),
+    'sallgi': ('subject gis', 'All subject GIs'),
+    'sacc': ('subject acc.', 'Subject accession'),
+    'saccver': ('subject acc.ver', 'Subject accession.version'),
+    'sallacc': ('subject accs.', 'All subject accessions'),
+    'slen': ('subject length', 'Subject sequence length'),
+    'qstart': ('q. start', 'Start of alignment in query'),
+    'qend': ('q. end', 'End of alignment in query'),
+    'sstart': ('s. start', 'Start of alignment in subject'),
+    'send': ('s. end', 'End of alignment in subject'),
+    'qseq': ('query seq', 'Aligned part of query sequence'),
+    'sseq': ('subject seq', 'Aligned part of subject sequence'),
+    'evalue': ('evalue', 'Expect value'),
+    'bitscore': ('bit score', 'Bit score'),
+    'score': ('score', 'Raw score'),
+    'length': ('alignment length', 'Alignment length'),
+    'pident': ('% identity', 'Percentage of identical matches'),
+    'nident': ('identical', 'Number of identical matches'),
+    'mismatch': ('mismatches', 'Number of mismatches'),
+    'positive': ('positives', 'Number of positive-scoring matches'),
+    'gapopen': ('gap opens', 'Number of gap openings'),
+    'gaps': ('gaps', 'Total number of gaps'),
+    'ppos': ('% positives', 'Percentage of positive-scoring matches'),
+    'frames': ('query/sbjct frames', "Query and subject frames separated by a '/'"),
+    'qframe': ('query frame', 'Query frame'),
+    'sframe': ('sbjct frame', 'Subject frame'),
+    'btop': ('BTOP', 'Blast traceback operations (BTOP)'),
+    'staxid': ('subject tax id', 'Subject Taxonomy ID'),
+    'ssciname': ('subject sci name', 'Subject Scientific Name'),
+    'scomname': ('subject com names', 'Subject Common Name'),
+    'sblastname': ('subject blast name', 'Subject Blast Name'),
+    'sskingdom': ('subject super kingdom', 'Subject Super Kingdom'),
+    'staxids': ('subject tax ids', "unique Subject Taxonomy ID(s), separated by a ';' (in numerical order)"),
+    'sscinames': ('subject sci names', "unique Subject Scientific Name(s), separated by a ';'"),
+    'scomnames': ('subject com names', "unique Subject Common Name(s), separated by a ';'"),
+    'sblastnames': ('subject blast names', "unique Subject Blast Name(s), separated by a ';' (in alphabetical order)"),
+    'sskingdoms': ('subject super kingdoms', "unique Subject Super Kingdom(s), separated by a ';' (in alphabetical order)"),
+    'stitle': ('subject title', 'Subject Title'),
+    'salltitles': ('subject titles', "All Subject Title(s), separated by a '<>'"),
+    'sstrand': ('subject strand', 'Subject Strand'),
+    'qcovs': ('% query coverage per subject', 'Query Coverage Per Subject'),
+    'qcovhsp': ('% query coverage per hsp', 'Query Coverage Per HSP'),
+    'qcovus': ('% query coverage per uniq subject', 'Query Coverage Per Unique Subject (blastn only)'),
+}
+BLAST_STD_FIELDS: List[str] = "qaccver saccver pident length mismatch gapopen qstart qend sstart send evalue bitscore".split()
+
+_BLAST_LABEL_TO_CODE: Dict[str, str] = {lab: code for code, (lab, _d) in BLAST_FIELDS.items()}
+
+# Non-BLAST columns this script adds (Entrez / GenBank metadata).
+OUTPUT_FIELD_DESC: Dict[str, str] = {
+    "accession": "GenBank accession",
+    "version": "GenBank accession.version",
+    "locus": "GenBank LOCUS name",
+    "metadata_length": "Subject sequence length in GenBank",
+    "definition": "GenBank DEFINITION line",
+    "molecule_type": "Molecule type",
+    "topology": "Topology (linear/circular)",
+    "division": "GenBank division",
+    "update_date": "GenBank update date",
+    "create_date": "GenBank create date",
+    "organism": "Organism",
+    "taxonomy": "Taxonomic lineage",
+    "reference_titles": "Reference titles",
+    "reference_authors": "Reference authors",
+    "reference_journals": "Reference journals",
+    "comment": "GenBank COMMENT",
+}
+
+
+def column_label(code: str, style: str, metadata_table: bool = False) -> str:
+    """Header text for one column: style code | label | both.
+
+    In metadata-only tables 'length' is the GenBank sequence length, not the alignment length.
+    """
+    if metadata_table and code == "length":
+        desc = OUTPUT_FIELD_DESC["metadata_length"]
+    else:
+        desc = BLAST_FIELDS[code][1] if code in BLAST_FIELDS else OUTPUT_FIELD_DESC.get(code, "")
+    if style == "code" or not desc:
+        return code
+    return desc if style == "label" else f"{code} ({desc})"
+
+
+def expand_outfmt_fields(tokens: Sequence[str]) -> List[str]:
+    """Expand the BLAST keyword 'std' and drop 'delim=' tokens."""
+    out: List[str] = []
+    for t in tokens:
+        if t == "std":
+            out.extend(BLAST_STD_FIELDS)
+        elif not t.startswith("delim="):
+            out.append(t)
+    return out
+
+
+def columns_from_outfmt(spec: str) -> Optional[List[str]]:
+    """'6 qseqid sseqid ...' / '10 std staxids' -> column codes; None if no explicit column list."""
+    toks = (spec or "").split()
+    if not toks or toks[0] not in {"6", "7", "10", "20"}:
+        return None
+    fields = expand_outfmt_fields(toks[1:])
+    if not fields:
+        return None
+    unknown = [f for f in fields if f not in BLAST_FIELDS]
+    if unknown:
+        raise SystemExit(f"ERROR: unknown BLAST outfmt field(s): {unknown}. Known: {', '.join(BLAST_FIELDS)}")
+    return fields
+
 # Codex 修改: 增加集中式扩展名、模式和 accession DB 识别常量。
 # 理由: 修复 metadata-only/topN-only 输入发现不完整，以及 Entrez 蛋白/核酸库误判问题。
 FASTA_EXTENSIONS_FALLBACK = [".fasta", ".fas", ".faa", ".fa", ".fna"]
@@ -310,7 +429,10 @@ def run_cmd(
         last = (p.returncode, p.stdout or "", p.stderr or "")
         if p.returncode == 0:
             return last
-        logger.warning(f"[CMD_FAIL] attempt {attempt}/{retries} rc={p.returncode}")
+        # 修改 (2026-10-10): 每次失败都记 stderr 末尾。理由: 原代码只记 rc，blastn -remote rc=255
+        # 时看不到原因（实测为代理下 "Connection stream is in bad state"）。
+        err_tail = (p.stderr or "").strip()[-500:]
+        logger.warning(f"[CMD_FAIL] attempt {attempt}/{retries} rc={p.returncode} {err_tail}")
         if attempt < retries:
             time.sleep(sleep)
             sleep = int(sleep * 1.8)
@@ -338,7 +460,8 @@ def build_outfmt_string(outfmt_value: str) -> Tuple[str, List[str]]:
 
     toks = s.split()
     if toks and toks[0] in {"6", "7"}:
-        fields = toks[1:]
+        fields = expand_outfmt_fields(toks[1:])
+        s = " ".join([toks[0], *fields])
         if not fields:
             # "6" or "7" with no columns → use defaults
             fmt_str = toks[0] + " " + " ".join(BLAST_HEADERS)
@@ -688,6 +811,22 @@ def _parse_outfmt6_line(
     return r
 
 
+def header_columns(line: str) -> Optional[List[str]]:
+    """Column codes if *line* is a header: outfmt 7 '# Fields:' or a row of field codes."""
+    s = line.strip().lstrip("\ufeff")
+    if s.startswith("# Fields:"):
+        labels = [x.strip() for x in s[len("# Fields:"):].split(",")]
+        codes = [_BLAST_LABEL_TO_CODE.get(x) for x in labels]
+        return None if None in codes else [c for c in codes if c]
+    if not s or s.startswith("#"):
+        return None
+    toks = [t.strip() for t in re.split(r"[\t,]", s)]
+    known = set(BLAST_FIELDS) | set(OUTPUT_FIELD_DESC) | {"metadata_length"}
+    if len(toks) >= 2 and all(t in known for t in toks):
+        return toks
+    return None
+
+
 def parse_blast_results_py(
     blast_output: Union[str, Path],
     col_names: Optional[List[str]] = None,
@@ -699,8 +838,15 @@ def parse_blast_results_py(
     if not p.exists() or p.stat().st_size == 0:
         return []
     rows: List[Dict[str, object]] = []
-    with open(p, "r", encoding="utf-8", errors="ignore") as f:
+    with open(p, "r", encoding="utf-8-sig", errors="ignore") as f:
         for line in f:
+            # 修改 (2026-10-11): 识别表头行和 outfmt 7 的 "# Fields:" 行，按其列名解析。
+            # 理由: 合并表现在带表头；--resume 读回 TopN TSV 时原代码把表头当成一条数据。
+            fields = header_columns(line)
+            if fields:
+                if not rows:
+                    col_names = fields
+                continue
             if not line.strip() or line.startswith("#"):
                 continue
             parts = line.rstrip("\n").split("\t")
@@ -722,9 +868,14 @@ def rows_to_df(
     return pd.DataFrame(rows)
 
 
-def merge_blast_tsv_text(blast_files: Sequence[Union[str, Path]], merged_out: Path) -> None:
+def merge_blast_tsv_text(
+    blast_files: Sequence[Union[str, Path]], merged_out: Path, header: Optional[Sequence[str]] = None
+) -> None:
     ensure_dir(merged_out.parent)
-    with open(merged_out, "w", encoding="utf-8") as out:
+    part = merged_out.with_name(merged_out.name + ".part")
+    with open(part, "w", encoding="utf-8") as out:
+        if header:
+            out.write("\t".join(header) + "\n")
         for fp in blast_files:
             p = Path(fp)
             if not p.exists() or p.stat().st_size == 0:
@@ -734,6 +885,7 @@ def merge_blast_tsv_text(blast_files: Sequence[Union[str, Path]], merged_out: Pa
                     if not line.strip() or line.startswith("#"):
                         continue
                     out.write(line)
+    os.replace(part, merged_out)
 
 
 # ─────────────────────────────────────────────
@@ -765,21 +917,39 @@ def get_topN_hits_py(
         return (str(r.get("qseqid", "")), -fnum(r.get("qcovs"), -1e9),
                 -fnum(r.get("pident"), -1e9), fnum(r.get("evalue"), 1e9))
 
+    def key_bitscore(r):
+        return (str(r.get("qseqid", "")), -fnum(r.get("bitscore"), -1e9),
+                fnum(r.get("evalue"), 1e9), -fnum(r.get("pident"), -1e9))
+
     if sort_by == "evalue":
         sorted_rows = sorted(rows, key=key_evalue)
     elif sort_by == "coverage":
         sorted_rows = sorted(rows, key=key_cov)
-    else:
+    elif sort_by == "identity":
         sorted_rows = sorted(rows, key=key_identity)
+    else:
+        sorted_rows = sorted(rows, key=key_bitscore)
 
+    # 修改 (2026-10-10): TopN 按 subject 计数，每个 query-subject 只保留排序最优的一个 HSP。
+    # 理由: outfmt 6 每行是一个 HSP；原代码按行计数，跨环形起点或含内含子的命中会拆成多个 HSP，
+    #       top N 被同一 subject 占满（实测 LC670763 COX1 top3 中同一 subject 出现两次）。
+    # 原代码:
+    #   for r in sorted_rows:
+    #       q = str(r.get("qseqid", "")); c = seen.get(q, 0)
+    #       if c < topN: out.append(r); seen[q] = c + 1
     out: List[Dict[str, object]] = []
     seen: Dict[str, int] = {}
+    seen_pairs: set = set()
     for r in sorted_rows:
         q = str(r.get("qseqid", ""))
+        pair = (q, accession_base(parse_accession_from_sseqid(str(r.get("sseqid", "")))))
+        if pair in seen_pairs:
+            continue
         c = seen.get(q, 0)
         if c < topN:
             out.append(r)
             seen[q] = c + 1
+            seen_pairs.add(pair)
     return out
 
 
@@ -866,6 +1036,9 @@ def run_local_blast_one_batch(
 ) -> Tuple[str, bool, Path, List[str]]:
     blast_dir = ensure_dir(blast_dir)
     out_file  = blast_dir / f"{batch.batch_id}_blast.tsv"
+    # 修改 (2026-10-10): BLAST 先写 .part，成功后改名。理由: is_file_complete 只看大小>0，
+    # 中途被杀留下的半截 TSV 会被 --resume 当成已完成。
+    part_file = out_file.with_name(out_file.name + ".part")
     if args.resume and is_file_complete(out_file):
         return (batch.batch_id, True, out_file, col_names)
 
@@ -888,7 +1061,7 @@ def run_local_blast_one_batch(
         "-query", str(batch.fasta_path),
         "-db",    str(db),
         "-outfmt", outfmt_str,
-        "-out",   str(out_file),
+        "-out",   str(part_file),
         "-evalue", str(args.evalue),
         "-max_target_seqs", str(args.max_target_seqs),
         "-num_threads", str(max(1, int(threads_per_job))),
@@ -900,6 +1073,8 @@ def run_local_blast_one_batch(
     if rc != 0:
         logger.error(f"[LOCAL_BLAST_FAIL] {batch.batch_id}\n{se[-2000:]}")
         return (batch.batch_id, False, out_file, col_names)
+    part_file.touch()  # BLAST+ may skip -out when there are no hits
+    os.replace(part_file, out_file)
     return (batch.batch_id, True, out_file, col_names)
 
 
@@ -912,6 +1087,9 @@ def run_remote_blast_one_batch(
 ) -> Tuple[str, bool, Path, List[str]]:
     blast_dir = ensure_dir(blast_dir)
     out_file  = blast_dir / f"{batch.batch_id}_blast.tsv"
+    # 修改 (2026-10-10): BLAST 先写 .part，成功后改名。理由: is_file_complete 只看大小>0，
+    # 中途被杀留下的半截 TSV 会被 --resume 当成已完成。
+    part_file = out_file.with_name(out_file.name + ".part")
     if args.resume and is_file_complete(out_file):
         return (batch.batch_id, True, out_file, col_names)
 
@@ -936,7 +1114,7 @@ def run_remote_blast_one_batch(
         "-query", str(batch.fasta_path),
         "-db",    str(db),
         "-outfmt", outfmt_str,
-        "-out",   str(out_file),
+        "-out",   str(part_file),
         "-evalue", str(args.evalue),
         "-max_target_seqs", str(args.max_target_seqs),
     ]
@@ -949,6 +1127,8 @@ def run_remote_blast_one_batch(
     if rc != 0:
         logger.error(f"[REMOTE_BLAST_FAIL] {batch.batch_id}\n{se[-2000:]}")
         return (batch.batch_id, False, out_file, col_names)
+    part_file.touch()
+    os.replace(part_file, out_file)
 
     if args.online_delay_sec > 0:
         time.sleep(float(args.online_delay_sec))
@@ -984,6 +1164,31 @@ def entrez_setup(args: argparse.Namespace) -> None:
         Entrez.tool = args.entrez_tool
 
 
+def _count_gap_opens(aligned: str) -> int:
+    return len(re.findall(r"-+", aligned or ""))
+
+
+def _qcovs_from_hsps(hsps: Sequence[object], qlen: int) -> int:
+    """BLAST+ qcovs: % of query covered by the union of all HSPs to one subject."""
+    spans = sorted(
+        (min(h.query_start, h.query_end), max(h.query_start, h.query_end))  # type: ignore[attr-defined]
+        for h in hsps
+    )
+    covered, cur_s, cur_e = 0, None, None
+    for a, b in spans:
+        if cur_e is None or a > cur_e + 1:
+            if cur_e is not None:
+                covered += cur_e - cur_s + 1
+            cur_s, cur_e = a, b
+        else:
+            cur_e = max(cur_e, b)
+    if cur_e is not None:
+        covered += cur_e - cur_s + 1
+    # BLAST+ rounds half up but reports 100 only for full coverage (checked against blastn 2.17).
+    pct = int(covered / max(1, qlen) * 100 + 0.5)
+    return 99 if pct == 100 and covered < qlen else pct
+
+
 def run_biopython_qblast_one_batch(
     batch: BatchInfo,
     seq_type: str,
@@ -1002,13 +1207,14 @@ def run_biopython_qblast_one_batch(
             "Remove it and use --outfmt_blast instead."
         )
 
+    part_file = out_file.with_name(out_file.name + ".part")
     entrez_setup(args)
     qblast_program = get_blast_program(seq_type)
     db    = get_blast_db(seq_type, args)
     extra = _parse_extra_params_for_qblast(args.extra_para2_blast)
 
     seqs = list(SeqIO.parse(str(batch.fasta_path), "fasta"))
-    with open(out_file, "w", encoding="utf-8") as out:
+    with open(part_file, "w", encoding="utf-8") as out:
         for idx, rec in enumerate(seqs, start=1):
             qseq = str(rec.seq)
             qid  = rec.id
@@ -1037,20 +1243,26 @@ def run_biopython_qblast_one_batch(
                     finally:
                         handle.close()
 
+                    # 修改 (2026-10-10): 列含义对齐 BLAST+ outfmt 6。
+                    # 理由: 原代码 bitscore 写 hsp.score（原始分），gapopen 写总 gap 数，
+                    #       qcovs 写单个 HSP 覆盖度；与本地 BLAST 结果不可比。
+                    # 原代码:
+                    #   qcov = (hsp.query_end - hsp.query_start + 1) / qlen * 100
+                    #   ... f"{gaps}" ... f"{hsp.score}" ...
                     for br in blast_records:
                         for aln in br.alignments:
+                            subj_id = getattr(aln, "accession", "") or getattr(aln, "hit_id", "")
+                            title   = getattr(aln, "title", "") or ""
+                            qcovs   = _qcovs_from_hsps(aln.hsps, qlen)
                             for hsp in aln.hsps:
-                                qcov   = (hsp.query_end - hsp.query_start + 1) / max(1, qlen) * 100.0
-                                subj_id = getattr(aln, "accession", "") or getattr(aln, "hit_id", "")
-                                title   = getattr(aln, "title", "") or ""
                                 pid     = (hsp.identities / max(1, hsp.align_length)) * 100.0
-                                mism    = hsp.align_length - hsp.identities
-                                gaps    = getattr(hsp, "gaps", 0) or 0
+                                mism    = hsp.align_length - hsp.identities - (getattr(hsp, "gaps", 0) or 0)
+                                gapopen = _count_gap_opens(hsp.query) + _count_gap_opens(hsp.sbjct)
                                 out.write(
-                                    f"{qid}\t{subj_id}\t{title}\t{pid:.2f}\t{hsp.align_length}\t"
-                                    f"{mism}\t{gaps}\t{hsp.query_start}\t{hsp.query_end}\t"
+                                    f"{qid}\t{subj_id}\t{title}\t{pid:.3f}\t{hsp.align_length}\t"
+                                    f"{mism}\t{gapopen}\t{hsp.query_start}\t{hsp.query_end}\t"
                                     f"{hsp.sbjct_start}\t{hsp.sbjct_end}\t"
-                                    f"{hsp.expect}\t{hsp.score}\t{qcov:.2f}\n"
+                                    f"{hsp.expect}\t{hsp.bits}\t{qcovs}\n"
                                 )
                     ok = True
                     break
@@ -1061,11 +1273,13 @@ def run_biopython_qblast_one_batch(
                         delay = int(delay * 1.8)
 
             if not ok:
+                part_file.unlink(missing_ok=True)
                 return (batch.batch_id, False, out_file, col_names)
 
             if args.online_delay_sec > 0:
                 time.sleep(float(args.online_delay_sec))
 
+    os.replace(part_file, out_file)
     return (batch.batch_id, True, out_file, col_names)
 
 
@@ -1451,14 +1665,29 @@ def rows_to_delimited(
     rows: List[Dict[str, object]],
     delimiter: str,
     default_headers: Optional[Sequence[str]] = None,
+    header_style: str = "code",
+    encoding: str = "utf-8",
 ) -> None:
     ensure_dir(path.parent)
     ordered = _ordered_row_keys(rows, default_headers=default_headers)
-    with open(path, "w", encoding="utf-8", newline="") as f:
-        w = csv.DictWriter(f, fieldnames=ordered, delimiter=delimiter, extrasaction="ignore")
-        w.writeheader()
+    with open(path, "w", encoding=encoding, newline="") as f:
+        w = csv.writer(f, delimiter=delimiter)
+        meta_table = list(default_headers or []) == NT_META_COLS
+        w.writerow([column_label(k, header_style, meta_table) for k in ordered])
         for r in rows:
-            w.writerow({k: ("" if r.get(k) is None else r.get(k)) for k in ordered})
+            w.writerow(["" if r.get(k) is None else r.get(k) for k in ordered])
+
+
+def write_results_csv(
+    path: Path,
+    rows: List[Dict[str, object]],
+    args: argparse.Namespace,
+    default_headers: Optional[Sequence[str]] = None,
+) -> None:
+    """Final *_results.csv. 修改 (2026-10-11): 统一写出并按 --header_style 生成表头；
+    utf-8-sig 让 Excel 直接双击打开时正确识别编码。原代码 5 处分别用 pandas.to_csv / rows_to_csv。"""
+    rows_to_delimited(path, rows, ",", default_headers=default_headers,
+                      header_style=getattr(args, "header_style", "code"), encoding="utf-8-sig")
 
 
 def rows_to_tsv(
@@ -1513,6 +1742,16 @@ def find_input_files(
             for ext in ACCESSION_LIST_EXTENSIONS:
                 files.extend(p.glob(f"*{ext}"))
             return [str(x) for x in sorted(set(files))]
+        return []
+
+    if mode == "add-header":
+        if p.is_file():
+            return [str(p)]
+        if p.is_dir():
+            found: List[Path] = []
+            for ext in ADD_HEADER_EXTENSIONS:
+                found.extend(x for x in p.glob(f"*{ext}") if not x.stem.endswith("_with_header"))
+            return [str(x) for x in sorted(set(found))]
         return []
 
     if mode == "topN-only":
@@ -1771,6 +2010,14 @@ def process_one_fasta(
                     f"delay={args.online_delay_sec}s"
                 )
                 if args.online_engine == "blast_remote":
+                    # 修改 (2026-10-10): 代理环境提示。实测 (blastn 2.17, HTTP 代理): -remote 直接 rc=255
+                    # "Connection stream is in bad state"；设 CONN_HTTP_PROXY_HOST/PORT 后 20 分钟无结果；
+                    # 同 query 用 biopython 引擎 <1 分钟完成。
+                    if any(os.environ.get(k) for k in ("https_proxy", "HTTPS_PROXY", "http_proxy", "HTTP_PROXY")):
+                        logger.warning(
+                            "[ONLINE] HTTP proxy detected: blastn -remote often fails or hangs behind a proxy; "
+                            "if it does, use --online_engine biopython"
+                        )
                     def runner(b: BatchInfo) -> Tuple[str, bool, Path, List[str]]:
                         return run_remote_blast_one_batch(
                             b, seq_type, args, dirs["blast"] / file_stem, col_names
@@ -1792,20 +2039,29 @@ def process_one_fasta(
                     else:
                         logger.error(f"[BLAST_FAIL] batch={bid}")
 
-            if not blast_files:
-                logger.error(f"[BLAST] no successful batches for {fasta_file}")
+            # 修改 (2026-10-10): 任一批次失败即判本文件失败，不合并、不写完成标记。
+            # 理由: 原代码只 log 后合并成功批次并返回成功；缺失 query 无提示，且合并文件存在后
+            #       --resume 不会重跑失败批次。成功批次结果保留，--resume 只重跑失败批次。
+            # 原代码:
+            #   if not blast_files:
+            #       logger.error(...); return False
+            n_failed = len(batches) - len(blast_files)
+            if n_failed:
+                logger.error(
+                    f"[BLAST] {n_failed}/{len(batches)} batches failed for {fasta_file}; "
+                    "rerun with --resume to retry only the failed batches"
+                )
                 return False
 
-            merge_blast_tsv_text(blast_files, blast_output_merged)
+            merge_blast_tsv_text(
+                blast_files, blast_output_merged, None if args.no_blast_header else col_names
+            )
             logger.info(f"[BLAST] merged -> {blast_output_merged}")
 
         # Fix-H.1: blast-only mode must write csv_output
         if args.mode == "blast-only":
             merged_rows = parse_blast_results_py(blast_output_merged, col_names)
-            if HAVE_PANDAS and pd is not None:
-                rows_to_df(merged_rows, default_headers=col_names).to_csv(csv_output, index=False)
-            else:
-                rows_to_csv(csv_output, merged_rows, default_headers=col_names)
+            write_results_csv(csv_output, merged_rows, args, default_headers=col_names)
             logger.info(f"[CSV] wrote -> {csv_output}")
             _write_completion(completion_marker, args, seq_type)
             return True
@@ -1849,10 +2105,7 @@ def process_one_fasta(
 
         # Fix-H.2: topN-only mode must write csv_output directly
         if args.mode == "topN-only":
-            if HAVE_PANDAS and pd is not None:
-                rows_to_df(top_rows or [], default_headers=col_names).to_csv(csv_output, index=False)
-            else:
-                rows_to_csv(csv_output, top_rows or [], default_headers=col_names)
+            write_results_csv(csv_output, top_rows or [], args, default_headers=col_names)
             logger.info(f"[CSV] wrote -> {csv_output}")
             _write_completion(completion_marker, args, seq_type)
             return True
@@ -1860,10 +2113,7 @@ def process_one_fasta(
         if args.mode == "blast2topN":
             # Codex 修改: blast2topN 也写最终 *_results.csv。
             # 理由: 原代码只写 topN_results/*.tsv，Snakemake rule all 和 --resume 期待 CSV 哨兵。
-            if HAVE_PANDAS and pd is not None:
-                rows_to_df(top_rows or [], default_headers=col_names).to_csv(csv_output, index=False)
-            else:
-                rows_to_csv(csv_output, top_rows or [], default_headers=col_names)
+            write_results_csv(csv_output, top_rows or [], args, default_headers=col_names)
             logger.info(f"[CSV] wrote -> {csv_output}")
             _write_completion(completion_marker, args, seq_type)
             return True
@@ -1942,10 +2192,7 @@ def process_one_fasta(
 
         # Fix-H.3: metadata-only mode must write csv_output directly
         if args.mode == "metadata-only":
-            if HAVE_PANDAS and pd is not None:
-                rows_to_df(list(metadata_dict.values()), default_headers=NT_META_COLS).to_csv(csv_output, index=False)
-            else:
-                rows_to_csv(csv_output, list(metadata_dict.values()), default_headers=NT_META_COLS)
+            write_results_csv(csv_output, list(metadata_dict.values()), args, default_headers=NT_META_COLS)
             logger.info(f"[CSV] wrote -> {csv_output}")
             _write_completion(completion_marker, args, seq_type)
             return True
@@ -1955,10 +2202,7 @@ def process_one_fasta(
 
         rows_to_tsv(summary_output, merged)
         # Fix-H.4: blast2*/no-pandas fallback must write csv_output directly
-        if HAVE_PANDAS and pd is not None:
-            rows_to_df(merged).to_csv(csv_output, index=False)
-        else:
-            rows_to_csv(csv_output, merged)
+        write_results_csv(csv_output, merged, args)
 
         logger.info(f"[SUMMARY] wrote -> {summary_output}")
         logger.info(f"[CSV] wrote -> {csv_output}")
@@ -1966,6 +2210,104 @@ def process_one_fasta(
     _write_completion(completion_marker, args, seq_type)
     return True
 
+
+
+# ─────────────────────────────────────────────
+# add-header mode (2026-10-11)
+# ─────────────────────────────────────────────
+_INT_FIELDS = {"qlen", "slen", "qstart", "qend", "sstart", "send", "length", "nident",
+               "mismatch", "positive", "gapopen", "gaps", "score", "qframe", "sframe"}
+_FLOAT_FIELDS = {"evalue", "bitscore", "pident", "ppos", "qcovs", "qcovhsp", "qcovus"}
+ADD_HEADER_EXTENSIONS = BLAST_TABLE_EXTENSIONS + [".out", ".m8", ".blast", ".outfmt6", ".outfmt7", ".blastn", ".blastp"]
+
+
+def _check_column_types(rows: List[List[str]], cols: List[str]) -> Optional[str]:
+    """Return a message if values do not fit the column types, else None."""
+    for row in rows[:200]:
+        for code, v in zip(cols, row):
+            v = v.strip()
+            if code in _INT_FIELDS or code in _FLOAT_FIELDS:
+                try:
+                    x = float(v)
+                except ValueError:
+                    return f"column '{code}' has non-numeric value {v!r}"
+                if code in _INT_FIELDS and not x.is_integer():
+                    return f"column '{code}' should be an integer, got {v!r}"
+                if code in {"pident", "ppos", "qcovs", "qcovhsp", "qcovus"} and not 0 <= x <= 100:
+                    return f"column '{code}' should be 0-100, got {v!r}"
+    return None
+
+
+def add_header_to_table(table: Path, args: argparse.Namespace, out_dir: Path) -> bool:
+    """Write <stem>_with_header.csv with a header row for an existing BLAST tabular file.
+
+    Column source, in order: outfmt 7 '# Fields:' line or an existing header row in the file;
+    --outfmt_blast with an explicit column list (e.g. "6 std staxids"); otherwise guessed from
+    the column count (12 = BLAST default 'std', 14 = this script's default) and type-checked.
+    """
+    cols: Optional[List[str]] = None
+    source = ""
+    data_lines: List[str] = []
+    with open(table, "r", encoding="utf-8-sig", errors="replace") as f:
+        for line in f:
+            fields = header_columns(line)
+            if fields:
+                if cols is None:
+                    cols, source = fields, "header line in file"
+                continue
+            if line.strip() and not line.startswith("#"):
+                data_lines.append(line.rstrip("\r\n"))
+    if not data_lines:
+        logger.warning(f"[ADD_HEADER] no data rows: {table}")
+    delim = "\t" if not data_lines or "\t" in data_lines[0] else ","
+    rows = [r for r in csv.reader(data_lines, delimiter=delim)] if delim == "," else [x.split("\t") for x in data_lines]
+
+    explicit = (args.outfmt_blast or "").strip() not in {"", "6", "7"}
+    if cols is None and explicit:
+        cols, source = columns_from_outfmt(args.outfmt_blast), f"--outfmt_blast '{args.outfmt_blast}'"
+        if cols is None:
+            logger.error(f"[ADD_HEADER] --outfmt_blast needs a column list, e.g. '6 std staxids': {args.outfmt_blast}")
+            return False
+    guessed = False
+    if cols is None:
+        n = len(rows[0]) if rows else 0
+        guess = {12: BLAST_STD_FIELDS, 14: BLAST_HEADERS}.get(n)
+        if guess is None:
+            logger.error(
+                f"[ADD_HEADER] {table.name}: {n} columns and no header/'# Fields:' line; cannot know the "
+                "columns. Pass the -outfmt you used, e.g. --outfmt_blast \"6 qseqid sseqid pident evalue\""
+            )
+            return False
+        cols, guessed = list(guess), True
+        source = "BLAST default 'std' (12 columns)" if n == 12 else "blast2_metadata default (14 columns)"
+
+    width = len(cols)
+    fixed: List[List[str]] = []
+    for r in rows:
+        if len(r) == width:
+            fixed.append(r)
+        elif len(r) > width and "stitle" in cols:
+            i = cols.index("stitle")
+            tail = width - i - 1
+            fixed.append(r[:i] + [delim.join(r[i:len(r) - tail])] + (r[len(r) - tail:] if tail else []))
+        else:
+            logger.error(f"[ADD_HEADER] {table.name}: row has {len(r)} columns, expected {width} ({source}): {r[:4]}")
+            return False
+    problem = _check_column_types(fixed, cols)
+    if problem:
+        hint = " The guess is wrong; pass the -outfmt you used via --outfmt_blast." if guessed else ""
+        logger.error(f"[ADD_HEADER] {table.name}: {problem} ({source}).{hint}")
+        return False
+    if guessed:
+        logger.warning(f"[ADD_HEADER] {table.name}: no header in file; assumed {source}. "
+                       "If you ran BLAST with a custom -outfmt, pass it via --outfmt_blast.")
+
+    out = out_dir / f"{strip_blast_suffix(table.stem)}_with_header.csv"
+    dict_rows: List[Dict[str, object]] = [dict(zip(cols, r)) for r in fixed]
+    rows_to_delimited(out, dict_rows, ",", default_headers=cols,
+                      header_style=args.header_style, encoding="utf-8-sig")
+    logger.info(f"[ADD_HEADER] {table.name}: {len(fixed)} rows, columns from {source} -> {out}")
+    return True
 
 
 # ─────────────────────────────────────────────
@@ -2473,6 +2815,10 @@ def short_help_text(script_name: str) -> str:
   # 已有 BLAST TSV，只做 TopN
   python {script_name} -i blast.tsv -o OUT --mode topN-only --topN 10
 
+  # 给已有 BLAST 表加表头（Excel 查看）；列不是默认格式时用 --outfmt_blast 写明当时的 -outfmt
+  python {script_name} -i blast.tsv -o OUT --mode add-header --header_style both
+  python {script_name} -i blast.tsv -o OUT --mode add-header --outfmt_blast "6 std staxids"
+
 核心参数:
   -i, --input FILE/DIR        输入 FASTA / BLAST TSV / accession list
   -o, --output DIR            输出目录，默认 BLAST_results
@@ -2482,6 +2828,7 @@ def short_help_text(script_name: str) -> str:
   --blast_db_nt DB            本地核酸库
   --blast_db_nr DB            本地蛋白库
   --topN N                    每个 query 保留前 N 个 hit，默认 10
+  --header_style STYLE        表头: code(pident) / label(英文说明) / both，默认 code
   --resume                    断点续跑
   --no_smk                    不用 Snakemake
   --email EMAIL               NCBI metadata/qblast 邮箱
@@ -2555,9 +2902,10 @@ def parse_arguments(argv: Optional[List[str]] = None) -> argparse.Namespace:
     p.add_argument(
         "--mode",
         choices=["blast-only", "blast2topN", "blast2meta", "blast2topN2metadata",
-                 "metadata-only", "topN-only"],
+                 "metadata-only", "topN-only", "add-header"],
         default="blast2topN2metadata",
-        help="Operation mode",
+        help="Operation mode. add-header: add a header row to existing BLAST tabular file(s) "
+             "(outfmt 6/7/10/20) and write OUT/<name>_with_header.csv",
     )
 
     p.add_argument("--extension_fasta", default=".fasta,.fas,.faa,.fa,.fna",
@@ -2582,7 +2930,15 @@ def parse_arguments(argv: Optional[List[str]] = None) -> argparse.Namespace:
     p.add_argument("--max_target_seqs",  default=100,   type=int,   help="Max target seqs per query")
     p.add_argument("--outfmt_blast",     default="6",
                    help='Output format: "6" or "7" uses built-in 14 columns; '
-                        'custom: "6 qseqid sseqid …" must include all 14 standard fields')
+                        'custom: "6 qseqid sseqid …" must include all 14 standard fields '
+                        '(keyword "std" is expanded). In add-header mode: the -outfmt you ran BLAST with, '
+                        'e.g. "6 std staxids"')
+    p.add_argument("--header_style", choices=["code", "label", "both"], default="code",
+                   help='Header text of *_results.csv / *_with_header.csv: code = "pident"; '
+                        'label = "Percentage of identical matches"; both = "pident (Percentage of '
+                        'identical matches)" (default: code)')
+    p.add_argument("--no_blast_header", action="store_true",
+                   help="Do not write a header row in blast_results/<name>_blast.tsv")
     p.add_argument("-epb", "--extra_para2_blast", default="",
                    help="Extra parameters appended to BLAST command (do NOT include -outfmt)")
 
@@ -2607,8 +2963,10 @@ def parse_arguments(argv: Optional[List[str]] = None) -> argparse.Namespace:
     # TopN
     p.add_argument("--topN",    default=10, type=int,
                    help="Top N hits per query (default: 10)")
-    p.add_argument("--sort_by", choices=["identity", "evalue", "coverage"], default="identity",
-                   help="TopN sorting criterion (default: identity)")
+    # 修改 (2026-10-10): 默认 identity -> bitscore。理由: identity 优先会让 30 bp/100% 的短命中
+    # 排在全长 99% 命中之前；bitscore 同时反映长度和相似度。
+    p.add_argument("--sort_by", choices=["bitscore", "identity", "evalue", "coverage"], default="bitscore",
+                   help="TopN sorting criterion (default: bitscore)")
 
     # Entrez
     p.add_argument("--email",       default="you@example.com",
@@ -2743,6 +3101,26 @@ def parse_arguments(argv: Optional[List[str]] = None) -> argparse.Namespace:
 # ─────────────────────────────────────────────
 # main (Fix-G: split ENTREZ_LIMITER and BLAST_LIMITER)
 # ─────────────────────────────────────────────
+def _absolutize_local_paths(args: argparse.Namespace) -> None:
+    """Make local DB/metadata/exe paths absolute before any child process changes cwd.
+
+    修改 (2026-10-10): Snakemake 子进程 cwd 为 OUT/_snakemake_workflow，原代码传相对路径
+    （如 --blast_db_nt ../db/mito）时子任务报 "No alias or index file found"。
+    远程库名（nt/nr、BLASTDB 中的库名）不含路径分隔符且当前目录无同名文件，保持原样。
+    """
+    for attr in ("blast_db", "blast_db_nt", "blast_db_nr"):
+        v = str(getattr(args, attr, "") or "")
+        if not v or v == "auto":
+            continue
+        local = os.sep in v or any(Path(v + ext).exists() for ext in (".nal", ".pal", ".ndb", ".pdb", ".nin", ".pin"))
+        if local:
+            setattr(args, attr, str(Path(v).expanduser().resolve()))
+    if getattr(args, "local_meta_tsv", ""):
+        args.local_meta_tsv = str(Path(args.local_meta_tsv).expanduser().resolve())
+    if os.sep in str(getattr(args, "blast_exe", "")):
+        args.blast_exe = str(Path(args.blast_exe).expanduser().resolve())
+
+
 def main() -> int:
     args = parse_arguments()
 
@@ -2769,6 +3147,7 @@ def main() -> int:
         # Child jobs never recurse into Snakemake
         args.use_snakemake = False
 
+    _absolutize_local_paths(args)
     args.threads = resolve_total_threads(args)
     out_dir = ensure_dir(Path(args.output).resolve())
 
@@ -2799,6 +3178,10 @@ def main() -> int:
     if not files:
         logger.error("No input files found.")
         return 1
+
+    if args.mode == "add-header":
+        bad = sum(not add_header_to_table(Path(fp), args, out_dir) for fp in files)
+        return 1 if bad else 0
 
     preflight_checks(args, files, out_dir)
 

@@ -215,6 +215,7 @@ _BLAST_LABEL_TO_CODE: Dict[str, str] = {lab: code for code, (lab, _d) in BLAST_F
 
 # Non-BLAST columns this script adds (Entrez / GenBank metadata).
 OUTPUT_FIELD_DESC: Dict[str, str] = {
+    "pident_x_qcovs": "pident x qcovs / 100 (% of query identical to subject)",
     "accession": "GenBank accession",
     "version": "GenBank accession.version",
     "locus": "GenBank LOCUS name",
@@ -891,11 +892,56 @@ def merge_blast_tsv_text(
 # ─────────────────────────────────────────────
 # TopN
 # ─────────────────────────────────────────────
+# 修改 (2026-10-11): TopN 排序可配置。--sort_by 接受预设名或逗号分隔的列（按顺序作主次排序键），
+# 方向自动：evalue/mismatch/gapopen/gaps 越小越好，其余越大越好。
+# 预设与原 4 种排序逐键一致（identity/evalue/coverage/bitscore）。
+SORT_PRESETS: Dict[str, str] = {
+    "bitscore": "bitscore,evalue,pident",
+    "identity": "pident,qcovs,evalue",
+    "coverage": "qcovs,pident,evalue",
+    "evalue":   "evalue,pident,qcovs",
+    "pident_x_qcovs": "pident_x_qcovs,bitscore,evalue",
+}
+SORT_ALIASES: Dict[str, str] = {"identity": "pident", "coverage": "qcovs"}
+SORT_ASCENDING = {"evalue", "mismatch", "gapopen", "gaps"}
+# pident_x_qcovs = pident * qcovs / 100: % of the query that is identical to the subject
+# (identity and coverage in one number). Exact for single-HSP hits; for multi-HSP hits it
+# uses the best HSP's pident with the per-subject coverage.
+DERIVED_SORT_COLS = {"pident_x_qcovs"}
+
+
+def parse_sort_spec(spec: str) -> List[str]:
+    """'qcovs,pident' / preset name -> list of sort columns. Raises ValueError on unknown columns."""
+    spec = (spec or "").strip()
+    spec = SORT_PRESETS.get(spec, spec)
+    cols = [SORT_ALIASES.get(c.strip(), c.strip()) for c in spec.split(",") if c.strip()]
+    if not cols:
+        raise ValueError("empty --sort_by")
+    known = set(BLAST_FIELDS) | DERIVED_SORT_COLS
+    bad = [c for c in cols if c not in known]
+    if bad:
+        raise ValueError(
+            f"unknown --sort_by column(s) {bad}; use a preset ({', '.join(SORT_PRESETS)}) "
+            "or BLAST columns, e.g. qcovs,pident"
+        )
+    return cols
+
+
+def _sort_spec_arg(spec: str) -> str:
+    try:
+        parse_sort_spec(spec)
+    except ValueError as e:
+        raise argparse.ArgumentTypeError(str(e))
+    return spec
+
+
 def get_topN_hits_py(
-    rows: List[Dict[str, object]], topN: int, sort_by: str
+    rows: List[Dict[str, object]], topN: int, sort_by: str,
+    min_pident: float = 0.0, min_qcovs: float = 0.0,
 ) -> List[Dict[str, object]]:
     if not rows:
         return rows
+    cols = parse_sort_spec(sort_by)
 
     def fnum(v, default: float) -> float:
         if v is None:
@@ -905,30 +951,25 @@ def get_topN_hits_py(
         except Exception:
             return default
 
-    def key_identity(r):
-        return (str(r.get("qseqid", "")), -fnum(r.get("pident"), -1e9),
-                -fnum(r.get("qcovs"), -1e9), fnum(r.get("evalue"), 1e9))
+    if min_pident > 0 or min_qcovs > 0:
+        rows = [r for r in rows
+                if fnum(r.get("pident"), -1) >= min_pident and fnum(r.get("qcovs"), -1) >= min_qcovs]
+    if "pident_x_qcovs" in cols:
+        rows = [dict(r) for r in rows]
+        for r in rows:
+            pid, cov = fnum(r.get("pident"), -1), fnum(r.get("qcovs"), -1)
+            r["pident_x_qcovs"] = round(pid * cov / 100, 3) if pid >= 0 and cov >= 0 else None
 
-    def key_evalue(r):
-        return (str(r.get("qseqid", "")), fnum(r.get("evalue"), 1e9),
-                -fnum(r.get("pident"), -1e9), -fnum(r.get("qcovs"), -1e9))
+    # missing values sort last whatever the direction
+    def sort_key(r):
+        k: List[object] = [str(r.get("qseqid", ""))]
+        for c in cols:
+            v = fnum(r.get(c), float("nan"))
+            missing = v != v
+            k += [missing, 0.0 if missing else (v if c in SORT_ASCENDING else -v)]
+        return tuple(k)
 
-    def key_cov(r):
-        return (str(r.get("qseqid", "")), -fnum(r.get("qcovs"), -1e9),
-                -fnum(r.get("pident"), -1e9), fnum(r.get("evalue"), 1e9))
-
-    def key_bitscore(r):
-        return (str(r.get("qseqid", "")), -fnum(r.get("bitscore"), -1e9),
-                fnum(r.get("evalue"), 1e9), -fnum(r.get("pident"), -1e9))
-
-    if sort_by == "evalue":
-        sorted_rows = sorted(rows, key=key_evalue)
-    elif sort_by == "coverage":
-        sorted_rows = sorted(rows, key=key_cov)
-    elif sort_by == "identity":
-        sorted_rows = sorted(rows, key=key_identity)
-    else:
-        sorted_rows = sorted(rows, key=key_bitscore)
+    sorted_rows = sorted(rows, key=sort_key)
 
     # 修改 (2026-10-10): TopN 按 subject 计数，每个 query-subject 只保留排序最优的一个 HSP。
     # 理由: outfmt 6 每行是一个 HSP；原代码按行计数，跨环形起点或含内含子的命中会拆成多个 HSP，
@@ -2099,7 +2140,10 @@ def process_one_fasta(
                 logger.warning(f"[TOPN] no hits for {fasta_file}")
                 top_rows = []
             else:
-                top_rows = get_topN_hits_py(merged_rows, int(args.topN), args.sort_by)
+                top_rows = get_topN_hits_py(
+                    merged_rows, int(args.topN), args.sort_by,
+                    min_pident=float(args.min_pident), min_qcovs=float(args.min_qcovs),
+                )
             rows_to_tsv(topn_output, top_rows or [], default_headers=col_names)
             logger.info(f"[TOPN] wrote -> {topn_output}")
 
@@ -2828,6 +2872,9 @@ def short_help_text(script_name: str) -> str:
   --blast_db_nt DB            本地核酸库
   --blast_db_nr DB            本地蛋白库
   --topN N                    每个 query 保留前 N 个 hit，默认 10
+  --sort_by SPEC              排序: bitscore(默认)/identity/coverage/evalue/pident_x_qcovs，
+                              或自定义列顺序如 qcovs,pident
+  --min_pident X / --min_qcovs X   TopN 前先过滤低相似度/低覆盖度命中
   --header_style STYLE        表头: code(pident) / label(英文说明) / both，默认 code
   --resume                    断点续跑
   --no_smk                    不用 Snakemake
@@ -2965,8 +3012,16 @@ def parse_arguments(argv: Optional[List[str]] = None) -> argparse.Namespace:
                    help="Top N hits per query (default: 10)")
     # 修改 (2026-10-10): 默认 identity -> bitscore。理由: identity 优先会让 30 bp/100% 的短命中
     # 排在全长 99% 命中之前；bitscore 同时反映长度和相似度。
-    p.add_argument("--sort_by", choices=["bitscore", "identity", "evalue", "coverage"], default="bitscore",
-                   help="TopN sorting criterion (default: bitscore)")
+    # 修改 (2026-10-11): 可用预设或自定义多列排序，并加阈值过滤。
+    p.add_argument("--sort_by", type=_sort_spec_arg, default="bitscore",
+                   help="TopN ranking. Preset: bitscore (default), identity, coverage, evalue, "
+                        "pident_x_qcovs (= pident*qcovs/100, %% of query identical to subject); "
+                        "or comma-separated columns ranked in order, e.g. 'qcovs,pident' "
+                        "(evalue/mismatch/gapopen/gaps: smaller is better; others: larger is better)")
+    p.add_argument("--min_pident", type=float, default=0.0,
+                   help="Drop hits with pident below this before TopN (default: 0 = off)")
+    p.add_argument("--min_qcovs", type=float, default=0.0,
+                   help="Drop hits with qcovs below this before TopN (default: 0 = off)")
 
     # Entrez
     p.add_argument("--email",       default="you@example.com",

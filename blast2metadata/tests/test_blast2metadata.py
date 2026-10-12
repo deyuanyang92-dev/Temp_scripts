@@ -304,3 +304,55 @@ def test_pipeline_headers_and_topn_resume(db, tmp_path):
     rows = read_csv_sig(out / "query_results.csv")
     assert all(row["qseqid"] != "qseqid" for row in rows)
     assert len({row["qseqid"] for row in rows}) == (DATA / "query.fasta").read_text().count(">")
+
+
+# ── TopN ranking options ─────────────────────────────────────────────────
+
+HITS = [  # one query; values chosen so each criterion picks a different winner
+    {"qseqid": "q", "sseqid": "short_perfect", "pident": 100.0, "qcovs": 20, "evalue": 1e-30, "bitscore": 200.0},
+    {"qseqid": "q", "sseqid": "full_99",       "pident": 99.0,  "qcovs": 100, "evalue": 0.0,  "bitscore": 1090.0},
+    {"qseqid": "q", "sseqid": "full_cov_low",  "pident": 90.0,  "qcovs": 100, "evalue": 0.0,  "bitscore": 1100.0},
+    {"qseqid": "q", "sseqid": "mid",           "pident": 98.0,  "qcovs": 95,  "evalue": 0.0,  "bitscore": 1000.0},
+]
+
+
+def ranked(m, spec, **kw):
+    return [r["sseqid"] for r in m.get_topN_hits_py(HITS, 10, spec, **kw)]
+
+
+def test_sort_presets_and_custom_columns():
+    m = load_module()
+    assert ranked(m, "bitscore") == ["full_cov_low", "full_99", "mid", "short_perfect"]
+    assert ranked(m, "identity") == ["short_perfect", "full_99", "mid", "full_cov_low"]
+    assert ranked(m, "coverage") == ["full_99", "full_cov_low", "mid", "short_perfect"]
+    # combined: % of query identical = pident*qcovs/100 -> 99, 93.1, 90, 20
+    assert ranked(m, "pident_x_qcovs") == ["full_99", "mid", "full_cov_low", "short_perfect"]
+    top = m.get_topN_hits_py(HITS, 1, "pident_x_qcovs")[0]
+    assert top["pident_x_qcovs"] == 99.0
+    # custom order; aliases; evalue ascending
+    assert ranked(m, "qcovs,pident") == ranked(m, "coverage,identity") == ["full_99", "full_cov_low", "mid", "short_perfect"]
+    assert ranked(m, "evalue,bitscore")[:3] == ["full_cov_low", "full_99", "mid"]
+
+
+def test_sort_filters():
+    m = load_module()
+    assert ranked(m, "identity", min_qcovs=90) == ["full_99", "mid", "full_cov_low"]
+    assert ranked(m, "bitscore", min_pident=97, min_qcovs=96) == ["full_99"]
+
+
+def test_sort_spec_rejects_unknown_column(tmp_path):
+    r = run(["-i", "x.fasta", "--no_smk", "--sort_by", "pident,foo"], tmp_path)
+    assert r.returncode == 2 and "unknown --sort_by column" in r.stderr
+
+
+def test_custom_sort_end_to_end(db, tmp_path):
+    out = tmp_path / "o"
+    r = run(local_args(DATA / "query.fasta", out, db, "--no_smk", "--mode", "blast2topN",
+                       "--sort_by", "pident_x_qcovs", "--min_qcovs", "50", "--topN", "2"), tmp_path)
+    assert r.returncode == 0, r.stdout[-2000:]
+    rows = read_csv(out / "query_results.csv")
+    assert rows and all(float(x["qcovs"]) >= 50 for x in rows)
+    scores = {}
+    for x in rows:
+        scores.setdefault(x["qseqid"], []).append(float(x["pident_x_qcovs"]))
+    assert all(v == sorted(v, reverse=True) for v in scores.values())

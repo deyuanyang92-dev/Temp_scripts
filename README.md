@@ -31,6 +31,13 @@ query -> GenBank metadata via Entrez -> merged CSV. Python or Snakemake
 scheduling, `--resume`.
 
 - TopN counts subjects (best HSP per query-subject), default sort `bitscore`.
+  `--sort_by` takes a preset (`bitscore`, `identity`, `coverage`, `evalue`,
+  `pident_x_qcovs` = pident*qcovs/100) or columns in order, e.g. `qcovs,pident`;
+  `--min_pident` / `--min_qcovs` filter before TopN. For species ID e.g.
+  `--min_qcovs 80 --sort_by pident_x_qcovs`.
+- Pick best hits by ranking afterwards, not with `-max_target_seqs 1`: that
+  limit is applied early in the search and need not return the best hit
+  (Shah et al. 2018/2019, Bioinformatics; NCBI reply by Madden et al.).
 - A failed BLAST batch fails the file (non-zero exit, no completion marker);
   `--resume` reruns only the failed batches.
 - `--mode add-header` adds a header row to any existing BLAST tabular file

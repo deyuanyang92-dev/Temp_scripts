@@ -14,6 +14,8 @@ HEADINGS = ["## Version checked", "## What it does", "## Algorithm & key source 
 
 
 def page(sections, tmp_path, name="tool.md"):
+    tmp_path = tmp_path / "tools"
+    tmp_path.mkdir(exist_ok=True)
     text = "# Tool\n\n" + "\n\n".join(f"{h}\n{sections.get(h, '')}" for h in HEADINGS if h not in sections.get("_drop", []))
     p = tmp_path / name
     p.write_text(text + "\n", encoding="utf-8")
@@ -56,3 +58,13 @@ def test_index_exempt(tmp_path):
     p = tmp_path / "INDEX.md"
     p.write_text("# Index\n\n- mitoz.md: MitoZ\n", encoding="utf-8")
     assert ck.check_file(p) == []
+
+
+def test_topic_file_needs_sources_not_tool_headings(tmp_path):
+    d = tmp_path / "topics"
+    d.mkdir()
+    p = d / "genetic_codes.md"
+    p.write_text("# Genetic codes\n\n## Start codons\n- ATT starts nad genes in code 5 (doi:10.1/x)\n", encoding="utf-8")
+    assert ck.check_file(p) == []
+    p.write_text("# Genetic codes\n\n## Start codons\n- ATT starts nad genes in code 5\n", encoding="utf-8")
+    assert any("unsourced" in x for x in ck.check_file(p))

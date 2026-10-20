@@ -2,7 +2,8 @@
 
 A bullet is sourced when it contains (path/file.py:123), (doi:...), (https://...), or is marked 未确证.
 Bullets under "What it does" and "Relevance to our pipeline" need no source. INDEX.md and
-benchmark_findings.md are free-form. "Version checked" must say "checked YYYY-MM-DD".
+benchmark_findings.md are free-form. Template headings apply to tools/*.md only ("Version checked" must say
+"checked YYYY-MM-DD"); topics/*.md may use any headings but every bullet still needs a source.
 
 Usage: python3 check_knowledge.py <knowledge_dir_or_file> ...   (exit 1 on any problem)
 """
@@ -35,6 +36,8 @@ def check_file(path: Path) -> List[str]:
             sections[section].append(line)
         if line.lstrip().startswith("- ") and section and section not in NO_SOURCE and not SOURCE.search(line):
             out.append(f"{path.name}:{n}: unsourced bullet in {section}: {line.strip()[:80]}")
+    if path.parent.name != "tools":                  # topics/: free headings, sources still required
+        return out
     for h in HEADINGS:
         if h not in sections:
             out.append(f"missing heading: {h}")

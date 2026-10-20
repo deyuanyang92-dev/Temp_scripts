@@ -210,3 +210,28 @@ def test_recollect_reuses_tool_output(tmp_path, monkeypatch):
     assert st["status"] == "ok" and st["seconds"] == 5.0
     genes = [f.qualifiers["gene"][0] for f in SeqIO.read(str(out / "final.gbf"), "genbank").features if f.type == "CDS"]
     assert genes == ["nad5"]
+
+
+def test_recollect_retries_collect_failures(tmp_path, monkeypatch):
+    """2026-10-20 dev run: 10 MITOS2 records failed in collect/lift under the old parser (start > end).
+    --recollect must rebuild them too, not only 'ok' runs."""
+    out = tmp_path / "runs" / "mitos2" / "NC_1.1"
+    (out / "mitos").mkdir(parents=True)
+    (out / "mitos" / "result.bed").write_text("X\t2900\t100\tcox1\t1\t+\n")
+    mr.write_status(out, {"tool": "mitos2", "accession": "NC_1.1", "status": "failed", "seconds": 5.0,
+                          "step_seconds": {}, "error": "collect/lift: End location (100) must be greater"})
+    (tmp_path / "gb").mkdir()
+    from Bio import SeqIO
+    SeqIO.write(rec(NCBI, []), str(tmp_path / "gb" / "NC_1.1.gb"), "genbank")
+    monkeypatch.setattr(mr, "run_steps", lambda *a, **k: pytest.fail("tool must not run"))
+    st = mr.run_one("mitos2", ROW, tmp_path, 1, 30, recollect=True)
+    assert st["status"] == "ok" and st["error"] == "" and st["seconds"] == 5.0
+
+
+def test_recollect_keeps_tool_failures(tmp_path):
+    """A tool that itself failed has no output to recollect: status stays failed."""
+    out = tmp_path / "runs" / "mitos2" / "NC_1.1"
+    out.mkdir(parents=True)
+    mr.write_status(out, {"tool": "mitos2", "accession": "NC_1.1", "status": "failed", "seconds": 5.0,
+                          "step_seconds": {}, "error": "runmitos: boom"})
+    assert mr.run_one("mitos2", ROW, tmp_path, 1, 30, recollect=True)["error"] == "runmitos: boom"

@@ -240,16 +240,18 @@ def collect(tool: str, out: Path, ncbi: SeqRecord) -> SeqRecord:
 
 def run_one(tool: str, row: dict, root: Path, threads: int, timeout: int, recollect: bool = False) -> dict:
     """Run one tool on one record (skipped when status.json exists). recollect: rebuild final.gbf from the
-    kept tool output of an 'ok' run without running the tool again (after a parser fix)."""
+    kept tool output of an 'ok' run, or of a run that failed only in collect/lift, without running the tool
+    again (after a parser fix)."""
     acc = row["accession"]
     out = root / "runs" / tool / acc
     old = json.loads((out / "status.json").read_text()) if (out / "status.json").exists() else None
-    if old and not (recollect and old["status"] == "ok"):
+    reusable = old and (old["status"] == "ok" or old["error"].startswith("collect/lift:"))
+    if old and not (recollect and reusable):
         return old
     ncbi = SeqIO.read(str(root / "gb" / f"{acc}.gb"), "genbank")
     out.mkdir(parents=True, exist_ok=True)
     if old:
-        st = {k: old[k] for k in ("status", "seconds", "step_seconds", "error")}
+        st = {"status": "ok", "seconds": old["seconds"], "step_seconds": old["step_seconds"], "error": ""}
     else:
         (out / "in.fa").write_text(f">{acc}\n{ncbi.seq}\n")
         cmds = build_cmd(tool, row, root / "bare" / acc, out, threads)

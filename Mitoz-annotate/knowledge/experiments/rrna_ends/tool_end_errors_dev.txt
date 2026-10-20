@@ -1,0 +1,13 @@
+Counter({('mitos2', 'gt3'): 125, ('mitoz', 'gt3'): 62, ('ours', 'gt3'): 44, ('mitos2', 'missed'): 26, ('ours', 'exact'): 22, ('mitos2', 'fp'): 21, ('mitos2', 'exact'): 18, ('mitos2', 'le3'): 17, ('ours', 'le3'): 15, ('mitoz', 'exact'): 10, ('mitoz', 'le3'): 9, ('ours', 'missed'): 9, ('mitoz', 'missed'): 9, ('ours', 'fp'): 2, ('mitoz', 'fp'): 2})
+('mitos2', 'rrnL', 'ok') n 75 5exact 8 3exact 13 both 5 |5| <=3: 15 3: 16 |<=10: 20 21 median d5/d3 -3 12
+('mitos2', 'rrnL', 'unparsed') 30
+('mitos2', 'rrnS', 'ok') n 85 5exact 25 3exact 26 both 13 |5| <=3: 46 3: 46 |<=10: 57 74 median d5/d3 0 0
+('mitos2', 'rrnS', 'unparsed') 17
+('mitoz', 'rrnL', 'ok') n 40 5exact 4 3exact 5 both 2 |5| <=3: 7 3: 9 |<=10: 10 12 median d5/d3 22.5 20.5
+('mitoz', 'rrnL', 'unparsed') 6
+('mitoz', 'rrnS', 'ok') n 41 5exact 14 3exact 14 both 8 |5| <=3: 25 3: 24 |<=10: 28 39 median d5/d3 1 0
+('mitoz', 'rrnS', 'unparsed') 5
+('ours', 'rrnL', 'ok') n 40 5exact 16 3exact 20 both 11 |5| <=3: 20 3: 23 |<=10: 22 25 median d5/d3 0.0 0.0
+('ours', 'rrnL', 'unparsed') 6
+('ours', 'rrnS', 'ok') n 41 5exact 19 3exact 23 both 11 |5| <=3: 29 3: 30 |<=10: 32 35 median d5/d3 0 0
+('ours', 'rrnS', 'unparsed') 5

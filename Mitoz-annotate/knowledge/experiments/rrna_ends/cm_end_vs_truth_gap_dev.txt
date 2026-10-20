@@ -1,0 +1,12 @@
+mode g (g=glocal, l=local) MITOS2 models; truth gap = distance truth end to nearest annotated feature
+  truth gap ov    : n= 34  CM end within3= 19 (0.56) exact=16
+  truth gap 0     : n=212  CM end within3= 67 (0.32) exact=28
+  truth gap 1-10  : n= 20  CM end within3= 11 (0.55) exact=8
+  truth gap 11-50 : n= 25  CM end within3=  7 (0.28) exact=6
+  truth gap >50   : n= 45  CM end within3= 14 (0.31) exact=13
+mode l (g=glocal, l=local) MITOS2 models; truth gap = distance truth end to nearest annotated feature
+  truth gap ov    : n= 34  CM end within3= 18 (0.53) exact=15
+  truth gap 0     : n=212  CM end within3= 69 (0.33) exact=29
+  truth gap 1-10  : n= 20  CM end within3= 11 (0.55) exact=8
+  truth gap 11-50 : n= 26  CM end within3=  8 (0.31) exact=6
+  truth gap >50   : n= 50  CM end within3= 14 (0.28) exact=13

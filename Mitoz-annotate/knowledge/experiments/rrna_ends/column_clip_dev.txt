@@ -1,0 +1,15 @@
+{('rrnS', 'Arthropoda'): (1, 894), ('rrnS', 'Chordata'): (1, 894), ('rrnS', 'Mollusca'): (2, 894), ('rrnS', 'Annelida'): (1, 891), ('rrnS', 'Nematoda'): (78, 892), ('rrnS', 'Platyhelminthes'): (1, 894), ('rrnS', 'Echinodermata'): (1, 894), ('rrnS', 'Cnidaria'): (3, 887), ('rrnL', 'Arthropoda'): (9, 1500), ('rrnL', 'Chordata'): (1, 1537), ('rrnL', 'Mollusca'): (26, 1522), ('rrnL', 'Annelida'): (17, 1537), ('rrnL', 'Nematoda'): (363, 1493), ('rrnL', 'Platyhelminthes'): (126, 1461), ('rrnL', 'Echinodermata'): (19, 1532), ('rrnL', 'Cnidaria'): (4, 1537)}
+('rrnL', 'clip') {'n': 45, 'both': 2, 'both3': 9, 'L': 5, 'R': 5}
+('rrnL', 'clip+snap30') {'n': 45, 'both': 18, 'both3': 23, 'L': 27, 'R': 22}
+('rrnL', 'clip+snap300') {'n': 45, 'both': 23, 'both3': 27, 'L': 29, 'R': 27}
+('rrnL', 'miss') {'n': 2}
+('rrnL', 'univ+snap30') {'n': 45, 'both': 26, 'both3': 30, 'L': 30, 'R': 29}
+('rrnL', 'univ+snap300') {'n': 45, 'both': 25, 'both3': 29, 'L': 30, 'R': 30}
+('rrnL', 'universal') {'n': 45, 'both': 4, 'both3': 9, 'L': 7, 'R': 10}
+('rrnS', 'clip') {'n': 44, 'both': 6, 'both3': 16, 'L': 14, 'R': 12}
+('rrnS', 'clip+snap30') {'n': 44, 'both': 21, 'both3': 30, 'L': 30, 'R': 29}
+('rrnS', 'clip+snap300') {'n': 44, 'both': 23, 'both3': 31, 'L': 31, 'R': 28}
+('rrnS', 'miss') {'n': 3}
+('rrnS', 'univ+snap30') {'n': 44, 'both': 22, 'both3': 30, 'L': 30, 'R': 27}
+('rrnS', 'univ+snap300') {'n': 44, 'both': 24, 'both3': 31, 'L': 31, 'R': 27}
+('rrnS', 'universal') {'n': 44, 'both': 9, 'both3': 15, 'L': 15, 'R': 15}

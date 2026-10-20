@@ -1,0 +1,10 @@
+143
+with pmcid 135
+### 2023 10.3390/genes14010162 Complete Mitochondrial Genome of Scolytoplatypodini Species (Coleoptera: Curculionidae: Sc | Yu G, Lai S, Liao S, Cao Y, Li W, Long C
+     Since rRNAs do not have functional annotation features like PCGs, it is so hard to establish their boundaries [ 11 , 39 ].
+### 2023 10.1002/arch.21974 Characterization of the complete mitochondrial genome of Cryptotermes domesticus (Blattode | Yu G, Cao Y, He P, Li W, Wang J.
+     Because rRNA has no functional annotation features as PCGs, it is difficult to determine their boundaries (Ballard, 2000 ; Boore, 1999 ).
+### 2019 10.3390/genes10120992 Complete Mitogenome of a Leaf-Mining Buprestid Beetle, <i>Trachys auricollis</i>, and Its  | Xiao L, Zhang S, Long C, Guo Q, Xu J, Da
+     Ribosomal RNAs The boundaries of rRNA genes are delineated based on the alignment of the two leaf-mining jewel beetles.
+
+[exited with code 0]

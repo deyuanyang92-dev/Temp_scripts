@@ -1,0 +1,5 @@
+MITOS2-CM vs MitoZ-CM raw glocal ends: when the two models' ends agree within 3 nt, how often is MITOS2-CM end within 3 nt of NCBI (col 3) / MitoZ-CM (col 4)
+('rrnL', 'agree<=3') n 34 MITOS2 within3 18 (0.53) MitoZ within3 16 (0.47)
+('rrnL', 'disagree') n 126 MITOS2 within3 12 (0.10) MitoZ within3 3 (0.02)
+('rrnS', 'agree<=3') n 113 MITOS2 within3 69 (0.61) MitoZ within3 70 (0.62)
+('rrnS', 'disagree') n 37 MITOS2 within3 17 (0.46) MitoZ within3 4 (0.11)

@@ -1,0 +1,42 @@
+dev rRNAs 186
+both ends gap 0: 94
+both ends |gap|<=10: 119
+both ends gap<=0 (contiguous or overlapping): 112
+per-end neighbour type x gap class (type, class): count
+  tRNA total 276 {'0': 191, 'ov': 29, '1-50': 31, '51-300': 10, '>300': 15}
+  CDS total 66 {'0': 18, 'ov': 6, '1-50': 19, '51-300': 15, '>300': 8}
+  rRNA total 30 {'0': 20, 'ov': 2, '1-50': 2, '51-300': 4, '>300': 2}
+phylum: rRNAs, both ends gap 0
+  Acanthocephala 8 7
+  Annelida 12 8
+  Arthropoda 10 5
+  Brachiopoda 8 6
+  Bryozoa 6 2
+  Chaetognatha 6 3
+  Chordata 12 10
+  Cnidaria 12 0
+  Ctenophora 4 2
+  Echinodermata 12 3
+  Entoprocta 2 2
+  Gastrotricha 2 0
+  Gnathostomulida 4 0
+  Hemichordata 6 2
+  Kinorhyncha 4 0
+  Mollusca 12 8
+  Nematoda 14 5
+  Nematomorpha 2 0
+  Nemertea 6 5
+  Onychophora 4 2
+  Orthonectida 2 2
+  Phoronida 2 2
+  Placozoa 6 0
+  Platyhelminthes 12 9
+  Porifera 6 2
+  Priapulida 2 1
+  Rotifera 2 1
+  Tardigrada 4 4
+  Xenacoelomorpha 4 3
+evidence tier: rRNAs, both ends gap 0
+  A-longread 10 3
+  A-transcriptome 4 3
+  B 172 88

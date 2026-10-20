@@ -1,0 +1,44 @@
+('rrnL', 'clade', 'raw') {'n': 47, 'found': 46, 'L': 3, 'R': 6, 'both': 1, 'L3': 10, 'R3': 12, 'both3': 5}
+('rrnL', 'clade', 'snap30') {'n': 47, 'found': 46, 'L': 24, 'R': 26, 'both': 20, 'L3': 26, 'R3': 29, 'both3': 24}
+('rrnL', 'clade', 'snap300') {'n': 47, 'found': 46, 'L': 31, 'R': 28, 'both': 25, 'L3': 35, 'R3': 31, 'both3': 30}
+('rrnL', 'universal', 'raw') {'n': 47, 'found': 46, 'L': 7, 'R': 10, 'both': 4, 'L3': 11, 'R3': 13, 'both3': 9}
+('rrnL', 'universal', 'snap30') {'n': 47, 'found': 46, 'L': 30, 'R': 29, 'both': 26, 'L3': 34, 'R3': 31, 'both3': 30}
+('rrnL', 'universal', 'snap300') {'n': 47, 'found': 46, 'L': 30, 'R': 30, 'both': 25, 'L3': 34, 'R3': 32, 'both3': 29}
+('rrnS', 'clade', 'raw') {'n': 47, 'found': 47, 'L': 17, 'R': 12, 'both': 9, 'L3': 33, 'R3': 24, 'both3': 17}
+('rrnS', 'clade', 'snap30') {'n': 47, 'found': 47, 'L': 31, 'R': 30, 'both': 22, 'L3': 36, 'R3': 41, 'both3': 31}
+('rrnS', 'clade', 'snap300') {'n': 47, 'found': 47, 'L': 31, 'R': 29, 'both': 23, 'L3': 36, 'R3': 40, 'both3': 31}
+('rrnS', 'universal', 'raw') {'n': 47, 'found': 44, 'L': 15, 'R': 15, 'both': 9, 'L3': 29, 'R3': 22, 'both3': 15}
+('rrnS', 'universal', 'snap30') {'n': 47, 'found': 44, 'L': 30, 'R': 27, 'both': 22, 'L3': 35, 'R3': 35, 'both3': 30}
+('rrnS', 'universal', 'snap300') {'n': 47, 'found': 44, 'L': 31, 'R': 27, 'both': 24, 'L3': 36, 'R3': 35, 'both3': 31}
+('rrnL', 'Annelida', 'clade') {'n': 6, 'both3': 0, 'both': 0, 'snap30_both': 4}
+('rrnL', 'Annelida', 'universal') {'n': 6, 'both3': 0, 'both': 0, 'snap30_both': 4}
+('rrnL', 'Arthropoda', 'clade') {'n': 5, 'both3': 0, 'both': 0, 'snap30_both': 5}
+('rrnL', 'Arthropoda', 'universal') {'n': 5, 'both3': 0, 'both': 0, 'snap30_both': 4}
+('rrnL', 'Chordata', 'clade') {'n': 6, 'both3': 5, 'both': 1, 'snap30_both': 5}
+('rrnL', 'Chordata', 'universal') {'n': 6, 'both3': 5, 'both': 1, 'snap30_both': 4}
+('rrnL', 'Cnidaria', 'clade') {'n': 6, 'both3': 0, 'both': 0, 'snap30_both': 0}
+('rrnL', 'Cnidaria', 'universal') {'n': 6, 'both3': 2, 'both': 2, 'snap30_both': 2}
+('rrnL', 'Echinodermata', 'clade') {'n': 6, 'both3': 0, 'both': 0, 'snap30_both': 0}
+('rrnL', 'Echinodermata', 'universal') {'n': 6, 'both3': 2, 'both': 1, 'snap30_both': 2}
+('rrnL', 'Mollusca', 'clade') {'n': 6, 'both3': 0, 'both': 0, 'snap30_both': 2}
+('rrnL', 'Mollusca', 'universal') {'n': 6, 'both3': 0, 'both': 0, 'snap30_both': 4}
+('rrnL', 'Nematoda', 'clade') {'miss': 1, 'n': 5, 'both3': 0, 'both': 0, 'snap30_both': 1}
+('rrnL', 'Nematoda', 'universal') {'n': 5, 'both3': 0, 'both': 0, 'snap30_both': 1, 'miss': 1}
+('rrnL', 'Platyhelminthes', 'clade') {'n': 6, 'both3': 0, 'both': 0, 'snap30_both': 3}
+('rrnL', 'Platyhelminthes', 'universal') {'n': 6, 'both3': 0, 'both': 0, 'snap30_both': 5}
+('rrnS', 'Annelida', 'clade') {'n': 6, 'both3': 1, 'both': 1, 'snap30_both': 4}
+('rrnS', 'Annelida', 'universal') {'n': 6, 'both3': 1, 'both': 1, 'snap30_both': 4}
+('rrnS', 'Arthropoda', 'clade') {'n': 5, 'both3': 4, 'both': 1, 'snap30_both': 1}
+('rrnS', 'Arthropoda', 'universal') {'n': 5, 'both3': 3, 'both': 1, 'snap30_both': 1}
+('rrnS', 'Chordata', 'clade') {'n': 6, 'both3': 5, 'both': 3, 'snap30_both': 5}
+('rrnS', 'Chordata', 'universal') {'n': 6, 'both3': 5, 'both': 3, 'snap30_both': 5}
+('rrnS', 'Cnidaria', 'clade') {'n': 6, 'both3': 2, 'both': 2, 'snap30_both': 1}
+('rrnS', 'Cnidaria', 'universal') {'n': 6, 'both3': 1, 'both': 1, 'snap30_both': 0}
+('rrnS', 'Echinodermata', 'clade') {'n': 6, 'both3': 4, 'both': 2, 'snap30_both': 2}
+('rrnS', 'Echinodermata', 'universal') {'n': 6, 'both3': 4, 'both': 2, 'snap30_both': 2}
+('rrnS', 'Mollusca', 'clade') {'n': 6, 'both3': 1, 'both': 0, 'snap30_both': 4}
+('rrnS', 'Mollusca', 'universal') {'n': 6, 'both3': 1, 'both': 1, 'snap30_both': 4}
+('rrnS', 'Nematoda', 'clade') {'n': 6, 'both3': 0, 'both': 0, 'snap30_both': 1}
+('rrnS', 'Nematoda', 'universal') {'n': 4, 'both3': 0, 'both': 0, 'snap30_both': 2, 'miss': 2}
+('rrnS', 'Platyhelminthes', 'clade') {'n': 6, 'both3': 0, 'both': 0, 'snap30_both': 4}
+('rrnS', 'Platyhelminthes', 'universal') {'n': 5, 'both3': 0, 'both': 0, 'snap30_both': 4, 'miss': 1}

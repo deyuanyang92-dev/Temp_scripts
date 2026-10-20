@@ -1,0 +1,48 @@
+== MITOS2 rrnS CLEN=894
+  Bivalvia         n= 17 start col<=3:   9 (0.53) med    3.0 | end col>=CLEN-3:  12 (0.71) med   892.0
+  Chelicerata      n= 16 start col<=3:   0 (0.00) med   83.0 | end col>=CLEN-3:   2 (0.12) med   886.0
+  Cnidaria         n= 16 start col<=3:  12 (0.75) med    3.0 | end col>=CLEN-3:   6 (0.38) med   887.0
+  Crustacea        n= 16 start col<=3:  11 (0.69) med    1.0 | end col>=CLEN-3:  16 (1.00) med   894.0
+  Echinodermata    n= 14 start col<=3:  14 (1.00) med    1.0 | end col>=CLEN-3:  13 (0.93) med   894.0
+  Gastropoda       n= 16 start col<=3:  13 (0.81) med    1.0 | end col>=CLEN-3:  12 (0.75) med   894.0
+  Nematoda         n= 16 start col<=3:   0 (0.00) med   78.5 | end col>=CLEN-3:  11 (0.69) med   892.0
+  Platyhelminthes  n= 14 start col<=3:  10 (0.71) med    1.0 | end col>=CLEN-3:  12 (0.86) med   894.0
+  Polychaeta       n= 14 start col<=3:  13 (0.93) med    1.0 | end col>=CLEN-3:   7 (0.50) med   891.0
+  insect           n=123 start col<=3:  81 (0.66) med    1.0 | end col>=CLEN-3: 120 (0.98) med   894.0
+  vertebrate       n= 94 start col<=3:  93 (0.99) med    1.0 | end col>=CLEN-3:  91 (0.97) med   894.0
+== MitoZ 12S CLEN=952
+  Bivalvia         n= 17 start col<=3:   9 (0.53) med    3.0 | end col>=CLEN-3:  13 (0.76) med   950.0
+  Chelicerata      n= 16 start col<=3:   0 (0.00) med  100.5 | end col>=CLEN-3:   2 (0.12) med   944.0
+  Cnidaria         n= 16 start col<=3:  11 (0.69) med    3.0 | end col>=CLEN-3:   7 (0.44) med   946.5
+  Crustacea        n= 16 start col<=3:   7 (0.44) med   31.0 | end col>=CLEN-3:  16 (1.00) med   952.0
+  Echinodermata    n= 14 start col<=3:  14 (1.00) med    1.0 | end col>=CLEN-3:  13 (0.93) med   952.0
+  Gastropoda       n= 16 start col<=3:   8 (0.50) med    2.5 | end col>=CLEN-3:  11 (0.69) med   951.0
+  Nematoda         n= 16 start col<=3:   0 (0.00) med  138.0 | end col>=CLEN-3:   9 (0.56) med   949.5
+  Platyhelminthes  n= 14 start col<=3:   0 (0.00) med   72.5 | end col>=CLEN-3:   7 (0.50) med   947.0
+  Polychaeta       n= 14 start col<=3:  11 (0.79) med    1.0 | end col>=CLEN-3:   7 (0.50) med   949.0
+  insect           n=123 start col<=3:  22 (0.18) med   66.0 | end col>=CLEN-3: 120 (0.98) med   952.0
+  vertebrate       n= 94 start col<=3:  93 (0.99) med    1.0 | end col>=CLEN-3:  92 (0.98) med   952.0
+== MITOS2 rrnL CLEN=1537
+  Bivalvia         n= 18 start col<=3:   2 (0.11) med   35.5 | end col>=CLEN-3:   7 (0.39) med  1526.5
+  Chelicerata      n= 16 start col<=3:   2 (0.12) med   27.0 | end col>=CLEN-3:   2 (0.12) med  1498.0
+  Cnidaria         n= 16 start col<=3:   8 (0.50) med    4.0 | end col>=CLEN-3:  12 (0.75) med  1537.0
+  Crustacea        n= 16 start col<=3:   8 (0.50) med    5.0 | end col>=CLEN-3:   0 (0.00) med  1496.5
+  Echinodermata    n= 14 start col<=3:   5 (0.36) med   19.5 | end col>=CLEN-3:   7 (0.50) med  1532.5
+  Gastropoda       n= 16 start col<=3:   7 (0.44) med   11.0 | end col>=CLEN-3:   4 (0.25) med  1511.0
+  Nematoda         n= 16 start col<=3:   0 (0.00) med  363.0 | end col>=CLEN-3:   2 (0.12) med  1493.5
+  Platyhelminthes  n= 14 start col<=3:   0 (0.00) med  126.0 | end col>=CLEN-3:   1 (0.07) med  1461.0
+  Polychaeta       n= 14 start col<=3:   3 (0.21) med   17.0 | end col>=CLEN-3:   9 (0.64) med  1537.0
+  insect           n=121 start col<=3:  43 (0.36) med    8.0 | end col>=CLEN-3:  25 (0.21) med  1500.0
+  vertebrate       n= 95 start col<=3:  79 (0.83) med    1.0 | end col>=CLEN-3:  94 (0.99) med  1537.0
+== MitoZ 16S CLEN=1630
+  Bivalvia         n= 18 start col<=3:   1 (0.06) med   73.0 | end col>=CLEN-3:   2 (0.11) med  1596.5
+  Chelicerata      n= 16 start col<=3:   0 (0.00) med  313.0 | end col>=CLEN-3:   0 (0.00) med  1581.0
+  Cnidaria         n= 16 start col<=3:   7 (0.44) med    5.0 | end col>=CLEN-3:  11 (0.69) med  1629.0
+  Crustacea        n= 16 start col<=3:   0 (0.00) med   19.0 | end col>=CLEN-3:   0 (0.00) med  1578.0
+  Echinodermata    n= 14 start col<=3:   2 (0.14) med   41.5 | end col>=CLEN-3:   6 (0.43) med  1613.5
+  Gastropoda       n= 16 start col<=3:   2 (0.12) med   24.5 | end col>=CLEN-3:   3 (0.19) med  1595.5
+  Nematoda         n= 16 start col<=3:   0 (0.00) med  437.0 | end col>=CLEN-3:   0 (0.00) med  1583.0
+  Platyhelminthes  n= 14 start col<=3:   0 (0.00) med  393.5 | end col>=CLEN-3:   0 (0.00) med  1548.0
+  Polychaeta       n= 14 start col<=3:   1 (0.07) med   30.5 | end col>=CLEN-3:   6 (0.43) med  1617.5
+  insect           n=121 start col<=3:   6 (0.05) med   22.0 | end col>=CLEN-3:  15 (0.12) med  1587.0
+  vertebrate       n= 95 start col<=3:  79 (0.83) med    1.0 | end col>=CLEN-3:  93 (0.98) med  1630.0

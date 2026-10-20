@@ -1,0 +1,8 @@
+mz12 n=91 found=77 5'exact=20 3'exact=24 both=11 both<=3=19 |5|<=3:34 |3|<=3:40 <=10: 38 67 median d5=1 d3=0
+   model cols 1st/last: [((True, 952), 77)]
+mz16 n=91 found=81 5'exact=4 3'exact=5 both=2 both<=3=4 |5|<=3:9 |3|<=3:10 <=10: 15 16 median d5=33 d3=24
+   model cols 1st/last: [((True, 1630), 79), ((True, 1600), 1), ((False, 1630), 1)]
+mt12 n=91 found=81 5'exact=26 3'exact=24 both=14 both<=3=25 |5|<=3:44 |3|<=3:43 <=10: 51 69 median d5=0 d3=0
+   model cols 1st/last: [((True, 894), 81)]
+mt16 n=91 found=85 5'exact=8 3'exact=13 both=5 both<=3=10 |5|<=3:15 |3|<=3:16 <=10: 20 22 median d5=15 d3=8
+   model cols 1st/last: [((True, 1537), 84), ((False, 1537), 1)]

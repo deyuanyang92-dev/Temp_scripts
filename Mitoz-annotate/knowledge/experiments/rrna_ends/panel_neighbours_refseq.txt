@@ -1,0 +1,154 @@
+== Bivalvia rrnL n=18 median len=1247
+  5' end: neighbour types {'tRNA': 14, 'CDS': 2, 'rRNA': 2} ; gap bins {'0': 3, '1-10': 3, '>50': 9, '11-50': 3}
+    top (type,gene,gap): [(('tRNA', 'tRNA-Tyr', '0'), 2), (('tRNA', 'tRNA-Ser', '1-10'), 2), (('rRNA', '12S ribo', '>50'), 2), (('tRNA', 'tRNA-Arg', '>50'), 2)]
+  3' end: neighbour types {'tRNA': 11, 'CDS': 7} ; gap bins {'0': 5, '>50': 11, '11-50': 2}
+    top (type,gene,gap): [(('tRNA', 'tRNA-Leu', '0'), 2), (('tRNA', 'tRNA-Asp', '>50'), 2), (('CDS', 'ND4', '>50'), 2), (('CDS', 'ND1', '11-50'), 1)]
+  5' first10 cons: AAAAAAAAGA [0.5, 0.44, 0.44, 0.5, 0.56, 0.61, 0.5, 0.5, 0.39, 0.5]
+  3' last10 cons : TAATATTTTT [0.33, 0.56, 0.61, 0.5, 0.39, 0.33, 0.61, 0.5, 0.33, 0.5]
+== Bivalvia rrnS n=17 median len=868
+  5' end: neighbour types {'tRNA': 15, 'misc_feature': 1, 'CDS': 1} ; gap bins {'0': 6, '11-50': 4, '>50': 5, '1-10': 2}
+    top (type,gene,gap): [(('tRNA', 'tRNA-Arg', '0'), 2), (('tRNA', 'tRNA-Lys', '11-50'), 2), (('tRNA', 'tRNA-Leu', '>50'), 1), (('tRNA', 'tRNA-Pro', '0'), 1)]
+  3' end: neighbour types {'tRNA': 11, 'CDS': 3, 'misc_feature': 1, 'rRNA': 2} ; gap bins {'0': 6, '1-10': 5, '>50': 5, '11-50': 1}
+    top (type,gene,gap): [(('tRNA', 'tRNA-Lys', '0'), 3), (('tRNA', 'tRNA-Gln', '1-10'), 2), (('rRNA', '16S ribo', '>50'), 2), (('CDS', 'ND6', '>50'), 1)]
+  5' first10 cons: AAAAATTTAT [0.82, 0.59, 0.47, 0.41, 0.53, 0.41, 0.88, 0.59, 0.35, 0.47]
+  3' last10 cons : TTCTATATAA [0.47, 0.35, 0.35, 0.47, 0.47, 0.53, 0.35, 0.47, 0.53, 0.47]
+== Chelicerata rrnL n=16 median len=1192
+  5' end: neighbour types {'rRNA': 4, 'tRNA': 12} ; gap bins {'>50': 3, '0': 11, '1-10': 2}
+    top (type,gene,gap): [(('tRNA', 'tRNA-Val', '0'), 7), (('rRNA', '12S ribo', '>50'), 2), (('tRNA', 'tRNA-Gln', '0'), 1), (('tRNA', 'trnV', '0'), 1)]
+  3' end: neighbour types {'tRNA': 14, 'CDS': 2} ; gap bins {'>50': 1, '0': 13, '1-10': 2}
+    top (type,gene,gap): [(('tRNA', 'tRNA-Leu', '0'), 5), (('tRNA', 'tRNA-Trp', '0'), 2), (('tRNA', 'tRNA-Leu', '1-10'), 2), (('tRNA', 'tRNA-Leu', '>50'), 1)]
+  5' first10 cons: TTAATTATAA [0.56, 0.5, 0.56, 0.44, 0.5, 0.44, 0.5, 0.44, 0.5, 0.69]
+  3' last10 cons : TTTTGTAATT [0.56, 0.56, 0.81, 0.69, 0.56, 0.38, 0.62, 0.5, 0.75, 0.88]
+== Chelicerata rrnS n=16 median len=698
+  5' end: neighbour types {'tRNA': 10, 'misc_feature': 6} ; gap bins {'>50': 3, '0': 12, '11-50': 1}
+    top (type,gene,gap): [(('misc_feature', 'control ', '0'), 3), (('tRNA', 'tRNA-Ile', '>50'), 2), (('misc_feature', 'A+T rich', '0'), 2), (('tRNA', 'tRNA-Asn', '0'), 2)]
+  3' end: neighbour types {'tRNA': 13, 'rRNA': 3} ; gap bins {'1-10': 2, '0': 13, '11-50': 1}
+    top (type,gene,gap): [(('tRNA', 'tRNA-Val', '0'), 10), (('tRNA', 'tRNA-Val', '1-10'), 1), (('rRNA', '16S ribo', '11-50'), 1), (('tRNA', 'trnV', '0'), 1)]
+  5' first10 cons: AAATTTAATT [0.44, 0.56, 0.62, 0.69, 0.69, 0.44, 0.44, 0.69, 0.56, 0.5]
+  3' last10 cons : AAGTTTTTTT [0.62, 0.5, 0.38, 0.5, 0.5, 0.5, 0.62, 0.94, 0.88, 0.75]
+== Cnidaria rrnL n=16 median len=2209
+  5' end: neighbour types {'tRNA': 8, 'CDS': 8} ; gap bins {'11-50': 2, '0': 6, '>50': 3, 'ov': 4, '1-10': 1}
+    top (type,gene,gap): [(('CDS', 'mutS', 'ov'), 4), (('tRNA', 'tRNA-Met', '0'), 3), (('tRNA', 'tRNA-Met', '11-50'), 2), (('CDS', 'COX2', '>50'), 2)]
+  3' end: neighbour types {'CDS': 15, 'D-loop': 1} ; gap bins {'>50': 9, 'ov': 4, '0': 2, '11-50': 1}
+    top (type,gene,gap): [(('CDS', 'ND5', '>50'), 7), (('CDS', 'COX1', 'ov'), 2), (('CDS', 'COX3', '>50'), 1), (('D-loop', '?', '0'), 1)]
+  5' first10 cons: TTTATTGGAA [0.56, 0.44, 0.62, 0.5, 0.44, 0.38, 0.5, 0.31, 0.44, 0.62]
+  3' last10 cons : TGTTTAATGT [0.44, 0.44, 0.44, 0.5, 0.38, 0.62, 0.44, 0.38, 0.44, 0.56]
+== Cnidaria rrnS n=16 median len=1028
+  5' end: neighbour types {'CDS': 16} ; gap bins {'>50': 8, '11-50': 5, '1-10': 2, '0': 1}
+    top (type,gene,gap): [(('CDS', 'ND4', '>50'), 4), (('CDS', 'ND4', '11-50'), 2), (('CDS', 'ND2', '>50'), 2), (('CDS', 'ND5', '1-10'), 2)]
+  3' end: neighbour types {'CDS': 12, 'misc_feature': 2, 'tRNA': 2} ; gap bins {'>50': 7, '0': 3, '1-10': 3, '11-50': 3}
+    top (type,gene,gap): [(('CDS', 'COX3', '>50'), 3), (('CDS', 'ND1', '11-50'), 3), (('CDS', 'ND6', '1-10'), 2), (('misc_feature', 'ND5', '0'), 1)]
+  5' first10 cons: ATCCTTTGTT [0.38, 0.5, 0.56, 0.62, 0.5, 0.62, 0.81, 0.38, 0.5, 0.44]
+  3' last10 cons : CTGGTCCTTG [0.69, 0.69, 0.56, 0.62, 0.44, 0.44, 0.44, 0.69, 0.69, 0.56]
+== Crustacea rrnL n=16 median len=1316
+  5' end: neighbour types {'tRNA': 12, 'rRNA': 4} ; gap bins {'0': 10, '>50': 4, '11-50': 1, '1-10': 1}
+    top (type,gene,gap): [(('tRNA', 'tRNA-Val', '0'), 5), (('tRNA', 'trnV(tac', '0'), 3), (('rRNA', 'rrn12', '>50'), 2), (('rRNA', '12S ribo', '>50'), 1)]
+  3' end: neighbour types {'tRNA': 16} ; gap bins {'0': 15, '1-10': 1}
+    top (type,gene,gap): [(('tRNA', 'tRNA-Leu', '0'), 5), (('tRNA', 'trnL(tag', '0'), 3), (('tRNA', 'trnL1(ta', '0'), 2), (('tRNA', 'trnL(uag', '0'), 2)]
+  5' first10 cons: ATTAAATAAA [0.5, 0.5, 0.81, 0.44, 0.56, 0.56, 0.5, 0.56, 0.5, 0.69]
+  3' last10 cons : AAATAAATAT [0.44, 0.56, 0.44, 0.62, 0.56, 0.44, 0.5, 0.62, 0.44, 0.62]
+== Crustacea rrnS n=16 median len=790
+  5' end: neighbour types {'D-loop': 12, 'tRNA': 2, 'misc_feature': 2} ; gap bins {'>50': 1, '0': 13, 'ov': 2}
+    top (type,gene,gap): [(('D-loop', 'A+T rich', '0'), 4), (('D-loop', '?', '0'), 2), (('D-loop', 'AT rich ', '0'), 2), (('tRNA', 'trnI(gau', 'ov'), 2)]
+  3' end: neighbour types {'rRNA': 2, 'tRNA': 14} ; gap bins {'>50': 3, '0': 12, '1-10': 1}
+    top (type,gene,gap): [(('tRNA', 'tRNA-Val', '0'), 5), (('tRNA', 'trnV(tac', '0'), 4), (('rRNA', 'rrn16', '>50'), 1), (('tRNA', 'tRNA-Val', '>50'), 1)]
+  5' first10 cons: ATAAAGTTTT [0.44, 0.69, 0.56, 0.69, 0.81, 0.69, 0.88, 0.88, 0.75, 0.69]
+  3' last10 cons : CTAGAATAAT [0.5, 0.5, 0.5, 0.62, 0.5, 0.5, 0.5, 0.38, 0.56, 0.5]
+== Echinodermata rrnL n=14 median len=1545
+  5' end: neighbour types {'CDS': 9, 'tRNA': 5} ; gap bins {'>50': 4, '0': 5, '1-10': 1, '11-50': 4}
+    top (type,gene,gap): [(('CDS', 'ND2', '0'), 4), (('CDS', 'ND2', '>50'), 2), (('tRNA', 'trnM(cat', '11-50'), 2), (('tRNA', 'tRNA-Leu', '>50'), 1)]
+  3' end: neighbour types {'tRNA': 9, 'CDS': 5} ; gap bins {'>50': 4, '0': 4, 'ov': 4, '11-50': 2}
+    top (type,gene,gap): [(('CDS', 'COX1', 'ov'), 4), (('tRNA', 'tRNA-Thr', '>50'), 3), (('tRNA', 'tRNA-Gly', '0'), 2), (('tRNA', 'trnR(tcg', '>50'), 1)]
+  5' first10 cons: ATAAAATTTT [0.71, 0.29, 0.79, 0.71, 0.71, 0.57, 0.5, 0.5, 0.71, 0.5]
+  3' last10 cons : ATAAAAAATT [0.57, 0.43, 0.71, 0.71, 0.64, 0.71, 0.43, 0.5, 0.5, 0.36]
+== Echinodermata rrnS n=14 median len=892
+  5' end: neighbour types {'CDS': 5, 'tRNA': 9} ; gap bins {'>50': 5, '1-10': 3, '0': 6}
+    top (type,gene,gap): [(('CDS', 'CYTB', '>50'), 2), (('tRNA', 'trnF(ttc', '0'), 2), (('tRNA', 'trnF(gaa', '1-10'), 2), (('tRNA', 'tRNA-Phe', '0'), 2)]
+  3' end: neighbour types {'tRNA': 14} ; gap bins {'1-10': 6, '>50': 4, '0': 4}
+    top (type,gene,gap): [(('tRNA', 'trnE(gaa', '1-10'), 2), (('tRNA', 'trnP(tgg', '1-10'), 2), (('tRNA', 'tRNA-Thr', '>50'), 2), (('tRNA', 'tRNA-Glu', '1-10'), 1)]
+  5' first10 cons: AAAAAATTTG [0.64, 0.71, 0.64, 0.43, 0.79, 0.79, 0.71, 1.0, 0.86, 0.86]
+  3' last10 cons : CTGGAAAAAG [0.79, 0.79, 0.71, 0.79, 0.57, 0.43, 0.43, 0.64, 0.71, 0.36]
+== Gastropoda rrnL n=16 median len=1347
+  5' end: neighbour types {'rRNA': 3, 'tRNA': 13} ; gap bins {'11-50': 3, '0': 11, '>50': 2}
+    top (type,gene,gap): [(('tRNA', 'tRNA-Val', '0'), 9), (('tRNA', 'trnV(tac', '0'), 2), (('rRNA', '12S ribo', '11-50'), 1), (('tRNA', 'tRNA-Pro', '>50'), 1)]
+  3' end: neighbour types {'tRNA': 14, 'CDS': 1, 'D-loop': 1} ; gap bins {'11-50': 7, '>50': 3, '0': 5, '1-10': 1}
+    top (type,gene,gap): [(('tRNA', 'tRNA-Leu', '11-50'), 4), (('tRNA', 'tRNA-Leu', '0'), 4), (('tRNA', 'trnL(uaa', '11-50'), 2), (('CDS', 'ND6', '>50'), 1)]
+  5' first10 cons: ATTTTAATTT [0.44, 0.44, 0.81, 0.44, 0.56, 0.81, 0.5, 0.38, 0.56, 0.5]
+  3' last10 cons : TATAATATTA [0.5, 0.44, 0.44, 0.62, 0.44, 0.5, 0.38, 0.44, 0.56, 0.44]
+== Gastropoda rrnS n=16 median len=889
+  5' end: neighbour types {'tRNA': 11, 'CDS': 5} ; gap bins {'>50': 10, '1-10': 2, '0': 4}
+    top (type,gene,gap): [(('CDS', 'ND3', '>50'), 5), (('tRNA', 'tRNA-Glu', '0'), 3), (('tRNA', 'trnE(uuc', '>50'), 2), (('tRNA', 'tRNA-Glu', '>50'), 2)]
+  3' end: neighbour types {'rRNA': 4, 'tRNA': 12} ; gap bins {'11-50': 2, '0': 8, '>50': 6}
+    top (type,gene,gap): [(('tRNA', 'tRNA-Val', '0'), 6), (('tRNA', 'tRNA-Arg', '>50'), 3), (('tRNA', 'tRNA-Glu', '0'), 2), (('rRNA', '16S ribo', '11-50'), 1)]
+  5' first10 cons: AATAAATTTG [0.31, 0.56, 0.5, 0.56, 0.69, 0.31, 0.56, 0.75, 0.69, 0.5]
+  3' last10 cons : CTGTTTAATT [0.38, 0.56, 0.44, 0.44, 0.38, 0.56, 0.38, 0.5, 0.44, 0.44]
+== Nematoda rrnL n=16 median len=960
+  5' end: neighbour types {'tRNA': 14, 'CDS': 2} ; gap bins {'0': 12, '1-10': 1, '>50': 3}
+    top (type,gene,gap): [(('tRNA', 'tRNA-His', '0'), 9), (('CDS', 'COX2', '>50'), 2), (('tRNA', 'trnH(gtg', '0'), 1), (('tRNA', 'tRNA-His', '1-10'), 1)]
+  3' end: neighbour types {'CDS': 15, 'tRNA': 1} ; gap bins {'0': 14, '1-10': 2}
+    top (type,gene,gap): [(('CDS', 'ND3', '0'), 13), (('CDS', 'ND3', '1-10'), 2), (('tRNA', 'tRNA-Asp', '0'), 1)]
+  5' first10 cons: TAAATTTTTT [0.69, 0.56, 0.62, 0.62, 0.75, 0.81, 0.81, 0.81, 0.69, 0.69]
+  3' last10 cons : AATTTTTTTT [0.5, 0.69, 0.5, 0.5, 0.44, 0.56, 0.56, 0.88, 0.69, 0.56]
+== Nematoda rrnS n=16 median len=697
+  5' end: neighbour types {'CDS': 2, 'tRNA': 14} ; gap bins {'0': 11, '1-10': 2, '>50': 3}
+    top (type,gene,gap): [(('tRNA', 'tRNA-Glu', '0'), 5), (('CDS', 'ND4L', '0'), 2), (('tRNA', 'tRNA-Thr', '0'), 2), (('tRNA', 'tRNA-Trp', '>50'), 2)]
+  3' end: neighbour types {'tRNA': 16} ; gap bins {'11-50': 2, '0': 12, '>50': 1, '1-10': 1}
+    top (type,gene,gap): [(('tRNA', 'tRNA-Ser', '0'), 6), (('tRNA', 'tRNA-Trp', '0'), 2), (('tRNA', 'trnY(gta', '11-50'), 1), (('tRNA', 'trnS-TCA', '0'), 1)]
+  5' first10 cons: TAAAATATAT [0.75, 0.38, 0.5, 0.5, 0.5, 0.56, 0.44, 0.5, 0.62, 0.62]
+  3' last10 cons : TTAATAAATT [0.38, 0.62, 0.31, 0.44, 0.38, 0.44, 0.44, 0.5, 0.44, 0.5]
+== Platyhelminthes rrnL n=14 median len=983
+  5' end: neighbour types {'tRNA': 13, 'CDS': 1} ; gap bins {'1-10': 3, '11-50': 3, '0': 7, '>50': 1}
+    top (type,gene,gap): [(('tRNA', 'trnT', '0'), 3), (('tRNA', 'tRNA-Thr', '0'), 3), (('tRNA', 'tRNA-Thr', '11-50'), 2), (('tRNA', 'tRNA-Thr', '1-10'), 2)]
+  3' end: neighbour types {'rRNA': 3, 'tRNA': 11} ; gap bins {'>50': 3, '11-50': 2, '0': 7, '1-10': 2}
+    top (type,gene,gap): [(('tRNA', 'trnC', '0'), 3), (('tRNA', 'tRNA-Cys', '0'), 3), (('tRNA', 'tRNA-Cys', '1-10'), 2), (('rRNA', '12S ribo', '>50'), 1)]
+  5' first10 cons: TTTTTTTTTA [0.5, 0.36, 0.43, 0.64, 0.64, 0.64, 0.43, 0.57, 0.36, 0.43]
+  3' last10 cons : TTTTTTTGTT [0.64, 0.5, 0.71, 0.57, 0.64, 0.57, 0.71, 0.36, 0.71, 0.79]
+== Platyhelminthes rrnS n=14 median len=730
+  5' end: neighbour types {'tRNA': 10, 'rRNA': 4} ; gap bins {'1-10': 3, '>50': 4, '0': 6, '11-50': 1}
+    top (type,gene,gap): [(('tRNA', 'trnC', '0'), 3), (('rRNA', '16S ribo', '>50'), 2), (('tRNA', 'tRNA-Cys', '1-10'), 2), (('tRNA', 'tRNA-Cys', '0'), 2)]
+  3' end: neighbour types {'CDS': 13, 'tRNA': 1} ; gap bins {'1-10': 1, '>50': 2, '0': 6, '11-50': 5}
+    top (type,gene,gap): [(('CDS', 'COX2', '0'), 6), (('CDS', 'COX2', '11-50'), 4), (('CDS', 'ND6', '>50'), 2), (('CDS', 'COX2', '1-10'), 1)]
+  5' first10 cons: TTTTTGTTTA [0.5, 0.57, 0.57, 0.64, 0.57, 0.43, 0.57, 0.71, 0.64, 0.57]
+  3' last10 cons : TTTGTTTGTA [0.36, 0.43, 0.36, 0.43, 0.29, 0.5, 0.43, 0.36, 0.64, 0.5]
+== Polychaeta rrnL n=14 median len=1307
+  5' end: neighbour types {'tRNA': 10, 'rRNA': 4} ; gap bins {'0': 7, '>50': 4, '11-50': 2, '1-10': 1}
+    top (type,gene,gap): [(('tRNA', 'tRNA-Val', '0'), 6), (('tRNA', 'tRNA-Tyr', '>50'), 1), (('rRNA', '12S ribo', '11-50'), 1), (('tRNA', 'tRNA-Val', '1-10'), 1)]
+  3' end: neighbour types {'tRNA': 13, 'CDS': 1} ; gap bins {'0': 7, '11-50': 4, '>50': 3}
+    top (type,gene,gap): [(('tRNA', 'tRNA-Leu', '0'), 6), (('tRNA', 'tRNA-Leu', '11-50'), 2), (('tRNA', 'trnI(gat', '>50'), 2), (('CDS', 'ND2', '11-50'), 1)]
+  5' first10 cons: AATAACTTAA [0.57, 0.43, 0.57, 0.36, 0.57, 0.43, 0.43, 0.43, 0.36, 0.5]
+  3' last10 cons : CTAATTTAAT [0.36, 0.43, 0.5, 0.71, 0.57, 0.5, 0.57, 0.5, 0.43, 0.57]
+== Polychaeta rrnS n=14 median len=835
+  5' end: neighbour types {'tRNA': 12, 'CDS': 2} ; gap bins {'1-10': 4, '>50': 6, '0': 3, '11-50': 1}
+    top (type,gene,gap): [(('tRNA', 'tRNA-Cys', '>50'), 3), (('tRNA', 'tRNA-Met', '1-10'), 2), (('tRNA', 'tRNA-Met', '0'), 2), (('tRNA', 'trnC(gca', '>50'), 2)]
+  3' end: neighbour types {'tRNA': 8, 'rRNA': 6} ; gap bins {'1-10': 3, '11-50': 2, '>50': 4, '0': 5}
+    top (type,gene,gap): [(('tRNA', 'tRNA-Val', '0'), 4), (('tRNA', 'tRNA-Val', '1-10'), 2), (('rRNA', 'large su', '>50'), 2), (('tRNA', 'tRNA-Trp', '1-10'), 1)]
+  5' first10 cons: AAACAGTTTG [0.43, 0.5, 0.57, 0.36, 0.57, 0.5, 0.79, 0.79, 0.86, 0.64]
+  3' last10 cons : CTTGCACCTT [0.43, 0.93, 0.64, 0.43, 0.36, 0.64, 0.5, 0.43, 0.43, 0.71]
+== insect rrnL n=125 median len=1306
+  5' end: neighbour types {'rRNA': 13, 'tRNA': 111, 'CDS': 1} ; gap bins {'>50': 18, '0': 80, '1-10': 14, '11-50': 13}
+    top (type,gene,gap): [(('tRNA', 'tRNA-Val', '0'), 45), (('tRNA', 'trnV(tac', '0'), 11), (('tRNA', 'trnV(uac', '0'), 10), (('tRNA', 'trnV', '0'), 8)]
+  3' end: neighbour types {'CDS': 20, 'tRNA': 104, 'rRNA': 1} ; gap bins {'11-50': 22, '0': 78, '>50': 9, '1-10': 16}
+    top (type,gene,gap): [(('tRNA', 'tRNA-Leu', '0'), 40), (('CDS', 'ND1', '11-50'), 12), (('tRNA', 'trnL1(ta', '0'), 10), (('tRNA', 'trnL(uag', '0'), 9)]
+  5' first10 cons: TAATTAAATT [0.45, 0.4, 0.46, 0.42, 0.45, 0.48, 0.46, 0.45, 0.48, 0.5]
+  3' last10 cons : AATATATTTT [0.48, 0.54, 0.51, 0.51, 0.46, 0.5, 0.54, 0.5, 0.66, 0.51]
+== insect rrnS n=125 median len=784
+  5' end: neighbour types {'tRNA': 52, 'misc_feature': 32, 'D-loop': 41} ; gap bins {'ov': 45, '0': 66, '>50': 11, '11-50': 3}
+    top (type,gene,gap): [(('D-loop', 'A+T rich', '0'), 15), (('tRNA', 'trnI(gat', 'ov'), 11), (('D-loop', 'control ', '0'), 11), (('misc_feature', 'putative', '0'), 10)]
+  3' end: neighbour types {'tRNA': 103, 'rRNA': 22} ; gap bins {'1-10': 26, '0': 76, '>50': 22, '11-50': 1}
+    top (type,gene,gap): [(('tRNA', 'tRNA-Val', '0'), 46), (('tRNA', 'trnV(tac', '1-10'), 15), (('tRNA', 'trnV(tac', '0'), 10), (('rRNA', '16S ribo', '>50'), 9)]
+  5' first10 cons: TTAAAGTTTT [0.46, 0.46, 0.64, 0.66, 0.69, 0.47, 0.77, 0.79, 0.78, 0.65]
+  3' last10 cons : CTAGAAAGAT [0.48, 0.59, 0.52, 0.56, 0.53, 0.65, 0.47, 0.42, 0.51, 0.47]
+== vertebrate rrnL n=96 median len=1593
+  5' end: neighbour types {'tRNA': 82, 'rRNA': 14} ; gap bins {'0': 70, '1-10': 8, '11-50': 3, '>50': 15}
+    top (type,gene,gap): [(('tRNA', 'tRNA-Val', '0'), 55), (('rRNA', '12S ribo', '>50'), 12), (('tRNA', 'trnV', '0'), 5), (('tRNA', 'trnV(uac', '0'), 5)]
+  3' end: neighbour types {'tRNA': 86, 'CDS': 10} ; gap bins {'0': 78, '11-50': 2, '1-10': 8, '>50': 8}
+    top (type,gene,gap): [(('tRNA', 'tRNA-Leu', '0'), 58), (('CDS', 'ND1', '>50'), 7), (('tRNA', 'trnL', '0'), 5), (('tRNA', 'trnL(uaa', '1-10'), 5)]
+  5' first10 cons: GCCAAAACCC [0.47, 0.56, 0.49, 0.46, 0.49, 0.72, 0.65, 0.46, 0.34, 0.47]
+  3' last10 cons : AAAAGGGCTT [0.73, 0.58, 0.71, 0.58, 0.58, 0.76, 0.5, 0.39, 0.47, 0.41]
+== vertebrate rrnS n=96 median len=956
+  5' end: neighbour types {'tRNA': 92, 'misc_feature': 2, 'D-loop': 2} ; gap bins {'0': 79, 'ov': 12, '1-10': 5}
+    top (type,gene,gap): [(('tRNA', 'tRNA-Phe', '0'), 60), (('tRNA', 'trnF', '0'), 6), (('tRNA', 'trnE(uuc', 'ov'), 6), (('tRNA', 'trnF(ttc', '0'), 5)]
+  3' end: neighbour types {'tRNA': 80, 'rRNA': 16} ; gap bins {'0': 74, '1-10': 6, '>50': 16}
+    top (type,gene,gap): [(('tRNA', 'tRNA-Val', '0'), 56), (('rRNA', '16S ribo', '>50'), 16), (('tRNA', 'trnV', '0'), 6), (('tRNA', 'trnV(gta', '0'), 4)]
+  5' first10 cons: CAAAGGTTTG [0.5, 0.89, 0.88, 0.81, 0.75, 0.49, 0.61, 0.88, 0.85, 0.78]
+  3' last10 cons : TTGGAAAAAC [0.58, 0.8, 0.39, 0.71, 0.41, 0.58, 0.39, 0.71, 0.65, 0.35]

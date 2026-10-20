@@ -1,0 +1,23 @@
+RefSeq panel rRNA lengths (nt) by clade and gene: n, min, 5th pct, median, 95th pct, max
+Bivalvia rrnL 18 575 575 1247 1414 1414
+Bivalvia rrnS 17 760 760 868 1190 1190
+Chelicerata rrnL 16 1019 1019 1192 1265 1265
+Chelicerata rrnS 16 656 656 698 803 803
+Cnidaria rrnL 16 1540 1540 2209 2663 2663
+Cnidaria rrnS 16 870 870 1028 1186 1186
+Crustacea rrnL 16 1198 1198 1316 1337 1337
+Crustacea rrnS 16 732 732 790 829 829
+Echinodermata rrnL 14 1347 1347 1545 1628 1628
+Echinodermata rrnS 14 828 828 892 917 917
+Gastropoda rrnL 16 1016 1016 1347 1601 1601
+Gastropoda rrnS 16 711 711 889 1037 1037
+Nematoda rrnL 16 804 804 960 1054 1054
+Nematoda rrnS 16 610 610 697 722 722
+Platyhelminthes rrnL 14 909 909 983 1032 1032
+Platyhelminthes rrnS 14 712 712 730 776 776
+Polychaeta rrnL 14 1001 1001 1307 1367 1367
+Polychaeta rrnS 14 743 743 835 878 878
+insect rrnL 125 1049 1220 1306 1386 1481
+insect rrnS 125 56 733 784 836 869
+vertebrate rrnL 96 1445 1478 1593 1700 1735
+vertebrate rrnS 96 532 921 956 982 1114

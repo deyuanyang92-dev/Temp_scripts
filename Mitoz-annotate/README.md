@@ -3,11 +3,11 @@
 本文档说明 `batch_mitoz.py` 的用途、输入格式、各子命令、常用参数、输出文件和工作流程。
 This document explains the purpose, inputs, subcommands, key options, outputs, and workflow of `batch_mitoz.py`.
 
-## MitoFuse：声明、致谢与引用 / Statement, acknowledgements and citation
+## MitoM：声明、致谢与引用 / Statement, acknowledgements and citation
 
-**MitoFuse**（暂定名）把多个优秀软件的长处整合成一条动物线粒体基因组注释流程：MitoZ 定位蛋白基因，MITOS2 注释 tRNA，MFannot 方法加内含子，并做端点校正和 NCBI 校验；每个环节选哪个软件，都以 benchmark 结果为依据（`benchmark/`）。
+**MitoM**（命令名 `mitom`；M = Merge / Metazoa）把多个优秀软件的长处整合成一条动物线粒体基因组注释流程：MitoZ 定位蛋白基因，MITOS2 注释 tRNA，MFannot 方法加内含子，并做端点校正和 NCBI 校验；每个环节选哪个软件，都以 benchmark 结果为依据（`benchmark/`）。
 
-**MitoFuse** (working name) combines the strengths of several excellent tools into one annotation workflow for animal mitochondrial genomes: MitoZ for protein-coding genes, MITOS2 for tRNAs, the MFannot method for introns, plus boundary curation and NCBI validation. Which tool handles each step is decided by benchmark results (`benchmark/`).
+**MitoM** (command name `mitom`; M = Merge / Metazoa) combines the strengths of several excellent tools into one annotation workflow for animal mitochondrial genomes: MitoZ for protein-coding genes, MITOS2 for tRNAs, the MFannot method for introns, plus boundary curation and NCBI validation. Which tool handles each step is decided by benchmark results (`benchmark/`).
 
 **声明 / Statement**
 
@@ -22,7 +22,7 @@ This document explains the purpose, inputs, subcommands, key options, outputs, a
 
 本软件调用的软件不随本仓库分发，需要单独安装（`install.sh`），并各自保留原有许可证：例如 MitoZ 为 GPL-3.0，MITOS2 为 MIT（据 bioconda 包信息）。
 
-The tools that MitoFuse runs are not distributed with this repository and are installed separately (`install.sh`). Each keeps its own license, e.g. MitoZ GPL-3.0 and MITOS2 MIT (per their bioconda packages).
+The tools that MitoM runs are not distributed with this repository and are installed separately (`install.sh`). Each keeps its own license, e.g. MitoZ GPL-3.0 and MITOS2 MIT (per their bioconda packages).
 
 **致谢 / Acknowledgements**
 

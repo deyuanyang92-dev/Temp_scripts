@@ -795,6 +795,58 @@ def conflicting_genes(rec, gene: str, strand: int, exons: List[Tuple[int, int]])
     return out
 
 
+def repair_chain(rec, prot_id: str, gene: str, groups: List[List[Report]], qlen: int
+                 ) -> Optional[Tuple[Model, List[Tuple[int, int]]]]:
+    """Best chain minus its exons on another gene's CDS, chained with the next report that lies on the
+    side the dropped exons were on. NC_006902.1 ND5: exonerate aligns nad5 residues 135-600 as an exon on
+    ND4 (nad4/nad5 are homologous) + the true exon 2, and residues 1-239 as the true exon 1 in a separate
+    report; their query overlap (> 5 %) keeps group_reports from chaining them. Returns (model, dropped exons)."""
+    best = groups[0]
+    strand = best[0].strand
+    kept = [Report(r.qab, r.qae, r.tab, r.tae, r.score, r.strand,
+                   [e for e in r.exons if not conflicting_genes(rec, gene, strand, [e])]) for r in best]
+    lo = min(e[0] for r in best for e in r.exons)
+    k_ex = [e for r in kept for e in r.exons]
+    if not k_ex or len(k_ex) == sum(len(r.exons) for r in best):
+        return None
+    k_lo, k_hi = min(a for a, _ in k_ex), max(b for _, b in k_ex)
+    dropped_low = lo < k_lo                            # dropped exon(s) before the kept ones in genome order
+    dropped = [e for r in best for e in r.exons if e not in k_ex]
+    for g in groups[1:6]:
+        g_ex = [e for r in g for e in r.exons]
+        if g[0].strand != strand or conflicting_genes(rec, gene, strand, g_ex):
+            continue
+        if (dropped_low and max(b for _, b in g_ex) < k_lo) or (not dropped_low and min(a for a, _ in g_ex) > k_hi):
+            m, _ = build_model(prot_id, gene, g + [r for r in kept if r.exons], qlen)
+            if m is not None:
+                return m, dropped
+    return None
+
+
+def realign_masked(rec, seq: str, prot_id: str, gene: str, groups: List[List[Report]], qlen: int, pf: Path,
+                   tmp: Path, a, tools: Dict[str, Optional[str]]) -> Optional[Model]:
+    """repair_chain, then exonerate again with the dropped exons masked (N) and --maxintron long enough for
+    the repaired model, so both splice sites of the new junction come from one spliced alignment (the
+    repaired junction keeps the acceptor exonerate chose for the wrong donor: 8 nt off in NC_006902.1)."""
+    rep = repair_chain(rec, prot_id, gene, groups, qlen)
+    if rep is None:
+        return None
+    m, dropped = rep
+    masked = list(seq)
+    for x, y in dropped:
+        masked[x - 1:y] = "N" * (y - x + 1)
+    fna = tmp / "masked.fna"
+    fna.write_text(">g\n" + "".join(masked) + "\n")
+    longest = max(m.exons[i + 1][0] - m.exons[i][1] for i in range(len(m.exons) - 1))
+    reps = run_exonerate(str(tools["exonerate"]), pf, fna, a.genetic_code, max(a.maxintron, longest + 200))
+    for g in group_reports(reps, qlen)[:3]:
+        alt, _ = build_model(prot_id, gene, g, qlen)
+        if alt is not None and alt.strand == m.strand and not conflicting_genes(rec, gene, alt.strand, alt.exons) \
+                and overlap(alt.span, m.span) > 0:
+            return alt
+    return m
+
+
 def stop_qualifiers(rec, cds_loc, gencode: int) -> Dict[str, List[str]]:
     """Incomplete stop codon (T / TA completed by polyadenylation): NCBI wants
     /transl_except=(pos:..,aa:TERM) and the standard note."""
@@ -900,6 +952,12 @@ def process_record(rec, lib: Dict[str, LibProt], lib_db: Path, a, tools: Dict[st
         pf.write_text(f">{c['prot']}\n{prot}\n")
         groups = group_reports(run_exonerate(str(tools["exonerate"]), pf, fna, a.genetic_code, a.maxintron), len(prot))
         m, why = build_model(c["prot"], gene, groups[0], len(prot)) if groups else (None, "")
+        # nad4/nad5 (and other paralogues) are homologous: when the best chain overlaps another gene's CDS,
+        # the next chain that does not is used (NC_006902.1 ND5); otherwise the best one is reported as low.
+        if m is not None and conflicting_genes(rec, m.gene, m.strand, m.exons):
+            m = next((alt for alt in (build_model(c["prot"], gene, g, len(prot))[0] for g in groups[1:6])
+                      if alt is not None and not conflicting_genes(rec, alt.gene, alt.strand, alt.exons)),
+                     None) or realign_masked(rec, seq, c["prot"], gene, groups, len(prot), pf, tmp, a, tools) or m
         if m is None:
             if why:
                 rows.append({"record": rec.id, "gene": gene, "written": "no", "note": why})

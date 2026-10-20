@@ -14,6 +14,10 @@ to automatic annotation (e.g. MitoZ / MITOS output):
   P3  PCG end: the first in-frame complete stop codon, or an abbreviated stop (T / TA) ending
       immediately before the downstream same-strand tRNA, completed by polyadenylation
       (criterion iii; tRNA punctuation model, Ojala et al. 1981). /transl_except + note added.
+  O1  circular record: a CDS that ends <= 2 nt before the transcript end without a stop is continued
+      across the origin to its first in-frame stop (join; genes cut by the cox1-first rotation).
+  P5/P6  illegal start / no stop codon: CDS marked 5'- / 3'-partial with 'start / stop codon not
+      determined' (NCBI practice; table2asn SEQ_FEAT.StartCodon / NoStop otherwise).
   R1  rRNA (12S rrnS, 16S rrnL) must not overlap flanking genes; boundaries are trimmed to the
       neighbours (criterion vi) and, by default, extended to the flanking genes (gaps <= --max_fill
       nt, the GenBank convention; --rrna_bounds fill). --rrna_bounds trim only removes overlaps.
@@ -68,6 +72,8 @@ PCG_NAMES = {
 PCG_SYN = {syn: name for name, (_, syns) in PCG_NAMES.items() for syn in syns}
 SPACERS = (0, 1, 2, 3, -1)  # nt from an abbreviated stop to the downstream tRNA; -1 last: a T on the tRNA's first base is often chance
 NO_START_NOTE = "start codon not determined"
+NO_STOP_NOTE = "stop codon not determined"
+MAX_ORIGIN_EXT = 300        # O1: nt searched past the origin for the stop of a CDS cut at the record end
 POLYA_NOTE = "TAA stop codon is completed by the addition of 3' A residues to the mRNA"
 
 
@@ -240,6 +246,33 @@ class Curator:
             f.qualifiers["note"] = notes + [POLYA_NOTE]
         f.qualifiers.pop("translation", None)          # stale after coordinate changes
 
+    def across_origin(self, f: SeqFeature) -> None:
+        """O1: CDS cut at the end of a circular record (dev benchmark: ATP8 overlapping COX1 in NC_006902.1 /
+        NC_022829.1, ND4L in NC_025335.1 stopped 2 nt before the end) -> joined across the origin to its stop."""
+        if self.rec.annotations.get("topology") != "circular" or not simple(f):
+            return
+        s = self.tseq(f)
+        a, b = self.tx(f)
+        if b < self.L - 2 or (b - a + 1) % 3 and s[a - 1:b][-((b - a + 1) % 3):] in ("T", "TA"):
+            return
+        if (b - a + 1) % 3 == 0 and s[b - 3:b] in self.stops:
+            return
+        ss = s + s[:MAX_ORIGIN_EXT]
+        end = next((c + 3 for c in range(b - (b - a + 1) % 3, len(ss) - 2, 3) if ss[c:c + 3] in self.stops), None)
+        if end is None or end <= self.L:
+            return
+        old, k = span(f), end - self.L
+        if f.location.strand == 1:
+            f.location = CompoundLocation([FeatureLocation(a - 1, self.L, 1), FeatureLocation(0, k, 1)])
+        else:
+            f.location = CompoundLocation([FeatureLocation(0, self.L + 1 - a, -1),
+                                           FeatureLocation(self.L - k, self.L, -1)])
+        g = gene_feature(self.rec, f)
+        if g is not None:
+            g.location = f.location
+        f.qualifiers.pop("translation", None)
+        self.log(f, "O1", old, old, f"continued {k} nt across the origin to the first in-frame stop codon")
+
     def pcg_check(self, f: SeqFeature) -> None:
         """P4: report problems that rules cannot fix (no change is made)."""
         if not simple(f):
@@ -263,6 +296,15 @@ class Curator:
             f.qualifiers["note"] = [n for n in f.qualifiers.get("note", []) if n != NO_START_NOTE] + [NO_START_NOTE]
             self.log(f, "P5", span(f), span(f), f"first codon {nt[:3]} is not a start codon of table "
                      f"{self.a.genetic_code}: CDS marked 5'-partial, 'start codon not determined' (NCBI practice)")
+        tail = len(nt) % 3
+        if not n_stop and nt[len(nt) - 3:] not in self.stops and not (tail and nt[-tail:] in ("T", "TA")):
+            # P6: no complete or abbreviated stop -> table2asn SEQ_FEAT.NoStop; written 3'-partial like P5
+            loc = f.location
+            f.location = FeatureLocation(loc.start, AfterPosition(loc.end), 1) if loc.strand == 1 else \
+                FeatureLocation(BeforePosition(loc.start), loc.end, -1)
+            f.qualifiers["note"] = [n for n in f.qualifiers.get("note", []) if n != NO_STOP_NOTE] + [NO_STOP_NOTE]
+            self.log(f, "P6", span(f), span(f), "no complete or abbreviated stop codon: CDS marked 3'-partial, "
+                     "'stop codon not determined' (NCBI practice) - check manually")
 
     def pcg_overlaps(self) -> None:
         cds = [f for f in self.rec.features if f.type == "CDS" and simple(f)]
@@ -370,6 +412,7 @@ class Curator:
         for f in list(self.rec.features):
             if f.type == "CDS":
                 self.pcg(f)
+                self.across_origin(f)
                 self.pcg_check(f)
         self.pcg_overlaps()
         for f in self.rec.features:                    # gene feature = exactly its CDS / RNA (SEQ_FEAT.CDSgeneRange)

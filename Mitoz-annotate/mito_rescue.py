@@ -11,6 +11,8 @@ only genes absent from the record are added, each with a note to check it.
 Rules (each from the benchmark):
   - protein gene: added when no CDS of that gene exists and the MITOS2 gene does not lie mostly
     (> 50 %) on an existing CDS or rRNA (that is a naming disagreement, not a missed gene);
+    An existing CDS/rRNA that wholly contains >= 2 MITOS2 genes of other names does not block them: it
+    spans an intron or merges genes (NC_006902.1: MitoZ nad5 over its 11 kb group I intron, 10 genes inside).
   - rRNA: MITOS2 often splits a divergent rRNA into short pieces (29-200 nt); only the longest piece of
     each rRNA, and only when >= 300 nt, is added (rescued-rRNA FP 13 -> 3 on the other phyla).
   - tRNAs are not handled here (MITOS2 already annotates them in the default pipeline).
@@ -104,9 +106,19 @@ def _positions(f: SeqFeature, n: int) -> set:
 def rescue(rec: SeqRecord, mitos: SeqRecord, code: int) -> List[str]:
     """Add to rec (MitoZ annotation) the protein genes and rRNAs of mitos (mitos_to_record) that rec lacks.
     Returns the MitoZ-style names added."""
-    n = len(rec.seq)
+    n = len(rec)
     have = {f.qualifiers.get("gene", [""])[0] for f in rec.features if f.type in ("CDS", "rRNA")}
-    taken = [_positions(f, n) for f in rec.features if f.type in ("CDS", "rRNA")]
+    others = [(f.qualifiers["gene"][0], _positions(f, n)) for f in mitos.features
+              if f.type in ("CDS", "rRNA") and f.qualifiers["gene"][0] in MITOZ_NAMES]
+    taken = []
+    for f in rec.features:
+        if f.type not in ("CDS", "rRNA"):
+            continue
+        pos = _positions(f, n)
+        name = f.qualifiers.get("gene", [""])[0]
+        inside = {g for g, p in others if MITOZ_NAMES[g][0] != name and p <= pos}
+        if len(inside) < 2:      # >= 2 whole other genes inside: CDS spans an intron or merged genes
+            taken.append(pos)
     best: Dict[str, SeqFeature] = {}
     for f in mitos.features:
         if f.type not in ("CDS", "rRNA") or f.qualifiers["gene"][0] not in MITOZ_NAMES:
@@ -155,9 +167,11 @@ def run_mitos(fa: Path, code: int, out: Path, linear: bool, mitos_bin: Optional[
     return out
 
 
-def rescue_dir(final_dir: Path, code: int, run: Callable = None, **kw) -> List[dict]:
+def rescue_dir(final_dir: Path, code: int, run: Optional[Callable] = None, **kw) -> List[dict]:
     """Rescue every record of every *.gbf in final_dir (in place); returns report rows."""
-    run = run or (lambda fa, c, out, linear: run_mitos(fa, c, out, linear, **kw))
+    if run is None:
+        def run(fa, c, out, linear):
+            return run_mitos(fa, c, out, linear, **kw)
     rows = []
     for gbf in sorted(Path(final_dir).rglob("*.gbf")):
         recs = list(SeqIO.parse(str(gbf), "genbank"))

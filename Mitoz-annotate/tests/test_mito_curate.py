@@ -240,3 +240,64 @@ def test_circular_defline_complete():
     assert "[completeness=complete]" in nv.fasta_defline(r, 5)
     r.annotations["topology"] = "linear"
     assert "completeness" not in nv.fasta_defline(r, 5)
+
+
+def test_missing_stop_marked_partial(tmp_path):
+    """2026-10-21 dev benchmark: SEQ_FEAT.NoStop ERROR (e.g. NC_044095.1 ND6, NC_085563.1 ND6) when a CDS has neither
+    a complete nor an abbreviated (T/TA) stop; written 3'-partial with 'stop codon not determined' like P5."""
+    out = _one_cds(tmp_path, "ATG" + "GCC" * 40, 5)
+    cds = next(f for f in out.features if f.type == "CDS")
+    assert str(cds.location).endswith(">183](+)") and "stop codon not determined" in cds.qualifiers["note"]
+
+
+def _origin_record(tmp_path, strand):
+    from Bio.Seq import Seq
+    from Bio.SeqFeature import FeatureLocation, SeqFeature
+    from Bio.SeqRecord import SeqRecord
+    body = "CCCGGG" * 20
+    gene = "ATG" + "GCC" * 21 + "TAA"                      # 69 nt; the last 4 nt lie past the origin
+    plus = gene[-4:] + body + gene[:-4]
+    seq = plus if strand == 1 else str(Seq(plus).reverse_complement())
+    L = len(seq)
+    loc = FeatureLocation(L - 65, L - 2, 1) if strand == 1 else FeatureLocation(2, 65, -1)
+    rec = SeqRecord(Seq(seq), id="X", description="")
+    rec.annotations.update(molecule_type="DNA", topology="circular")
+    rec.features = [SeqFeature(FeatureLocation(0, L, 1), type="source"),
+                    SeqFeature(loc, type="gene", qualifiers={"gene": ["ATP8"]}),
+                    SeqFeature(loc, type="CDS", qualifiers={"gene": ["ATP8"], "codon_start": ["1"], "transl_table": ["5"]})]
+    d = tmp_path / "in"
+    d.mkdir(parents=True)
+    SeqIO.write(rec, str(d / "x.gbf"), "genbank")
+    subprocess.run([sys.executable, "-W", "ignore", str(SCRIPT), "-i", str(d), "-o", str(tmp_path / "out"),
+                    "--genetic_code", "5", "--no_validate"], check=True, capture_output=True)
+    return SeqIO.read(str(tmp_path / "out" / "x.gbf"), "genbank"), gene
+
+
+def test_cds_extended_across_origin(tmp_path):
+    """2026-10-21 dev benchmark NC_006902.1 / NC_022829.1 (ATP8 overlaps COX1, cut by the cox1-first rotation),
+    NC_025335.1 (ND4L): CDS stops 2 nt before the end of a circular record; its stop lies past the origin."""
+    for strand in (1, -1):
+        out, gene = _origin_record(tmp_path / str(strand), strand)
+        cds = next(f for f in out.features if f.type == "CDS")
+        assert len(cds.location.parts) == 2 and str(cds.extract(out.seq)) == gene, strand
+        g = next(f for f in out.features if f.type == "gene")
+        assert str(g.location) == str(cds.location)
+
+
+def test_tbl_minus_strand_join_in_biological_order():
+    """2026-10-21: NC_035061.1 trnY complement(join(16132..16186,1..8)) was written to the .tbl as 16186-16132
+    then 8-1; a feature table lists intervals in transcript order (8-1, then 16186-16132). Biopython already
+    keeps minus-strand parts in transcript order."""
+    import io
+    from Bio.Seq import Seq
+    from Bio.SeqFeature import CompoundLocation, FeatureLocation, SeqFeature
+    from Bio.SeqRecord import SeqRecord
+    sys.path.insert(0, str(HERE.parent))
+    import ncbi_validate as nv
+    r = SeqRecord(Seq("A" * 100), id="X")
+    r.annotations["molecule_type"] = "DNA"
+    r.features = [SeqFeature(CompoundLocation([FeatureLocation(0, 10, -1), FeatureLocation(90, 100, -1)]), type="tRNA")]
+    h = io.StringIO()
+    SeqIO.write(r, h, "genbank")
+    assert "complement(join(91..100,1..10))" in h.getvalue()
+    assert nv.feature_lines(r)[1:3] == ["10\t1\ttRNA", "100\t91"]

@@ -126,11 +126,11 @@ def test_mini_exon_plakinastrella(tmp_path):
 
 
 def test_conflicting_model_not_written(tmp_path):
-    """Montipora: a model fusing an ND4-region exon with nad5 exon 2 must not overwrite MitoZ's ND4."""
+    """Montipora: a model fusing an ND4-region exon with nad5 exon 2 must not overwrite MitoZ's ND4
+    (since 2026-10-21 that model is replaced by a re-aligned one, see test_next_chain_when_best_conflicts)."""
     run(mitoz_like("NC_006902", tmp_path), tmp_path / "out", 4)
     rows = report(tmp_path / "out")
-    bad = [r for r in rows if "overlaps existing ND4" in r["evidence"]]
-    assert bad and all(r["written"] == "no" for r in bad)
+    assert all(r["written"] == "no" for r in rows if "overlaps existing ND4" in r["evidence"])
     out_rec = SeqIO.read(str(tmp_path / "out" / "NC_006902.gbf"), "genbank") \
         if (tmp_path / "out" / "NC_006902.gbf").exists() else None
     if out_rec is not None:
@@ -183,3 +183,11 @@ def test_partial_cds_bare_fragment(tmp_path):
     assert [(s, e) for s, e, _ in introns] == [(236, 1100)] and "group II" in introns[0][2]
     cds = [f for f in SeqIO.read(str(tmp_path / "out" / "LC670763.gbf"), "genbank").features if f.type == "CDS"][0]
     assert isinstance(cds.location.parts[0].start, BeforePosition)
+
+
+def test_next_chain_when_best_conflicts(tmp_path):
+    """2026-10-21 dev benchmark NC_006902.1: the best exonerate chain puts nad5 exon 1 on ND4 (nad4/nad5 are
+    homologous) and is refused; the next chain that does not overlap another gene gives NCBI's ND5."""
+    run(mitoz_like("NC_006902", tmp_path), tmp_path / "out", 4)
+    cds, _ = intron_models(tmp_path / "out" / "NC_006902.gbf")
+    assert cds["ND5"][0] == ncbi_cds("NC_006902")["ND5"][0]

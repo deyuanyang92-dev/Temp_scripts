@@ -41,9 +41,7 @@ def feature_lines(rec) -> List[str]:
     for f in rec.features:
         if f.type == "source":
             continue
-        parts = list(f.location.parts)
-        if f.location.strand == -1:
-            parts = parts[::-1]
+        parts = list(f.location.parts)               # Biopython keeps minus-strand parts in transcript order
         for i, p in enumerate(parts):
             s, e = int(p.start) + 1, int(p.end)
             lo = "<" if isinstance(p.start, BeforePosition) else ""

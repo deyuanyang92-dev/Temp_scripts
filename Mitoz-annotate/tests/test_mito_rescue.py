@@ -93,3 +93,19 @@ def test_complete_record_skips_mitos2(tmp_path):
     feats = [("rRNA" if "rRNA" in n else "CDS", 100 * i, 100 * i + 90, 1, n) for i, n in enumerate(names)]
     SeqIO.write(mitoz_rec(feats), str(d / "S1.gbf"), "genbank")
     assert mr.rescue_dir(d, 5, run=lambda *a: (_ for _ in ()).throw(AssertionError("MITOS2 must not run"))) == []
+
+
+def test_genes_inside_intron_spanning_cds_added(tmp_path):
+    """2026-10-21 dev benchmark NC_006902.1 (Metridium-like anthozoan): MitoZ called nad5 as one CDS over
+    its ~11 kb group I intron, which carries 10 other genes; all were skipped as 'lying on an existing CDS'.
+    A CDS that fully contains >= 2 MITOS2 genes of other names does not block them."""
+    r = mitoz_rec([("CDS", 100, 2900, 1, "ND5")])
+    m = bed(tmp_path, [(100, 400, "nad5", "+"), (500, 1400, "nad1", "+"), (1500, 2600, "cob", "+"),
+                       (2650, 2900, "nad5", "+")])
+    assert sorted(mr.rescue(r, m, 4)) == ["CYTB", "ND1"]
+
+
+def test_partial_overlap_still_blocks(tmp_path):
+    """Only whole contained genes release a CDS: a single overlapping call stays a naming disagreement."""
+    r = mitoz_rec([("CDS", 100, 1600, 1, "COX1")])
+    assert mr.rescue(r, bed(tmp_path, [(150, 1500, "nad4", "+")]), 5) == []

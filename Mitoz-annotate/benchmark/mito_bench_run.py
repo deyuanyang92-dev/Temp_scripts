@@ -119,8 +119,12 @@ def build_cmd(tool: str, row: dict, bare: Path, out: Path, threads: int) -> Opti
     acc, code = row["accession"], str(row["genetic_code"])
     if tool in ("ours", "mitoz") and not row["mitoz_clade"]:
         return None
-    if tool in ("ours", "mitom"):
+    if tool == "mitom":                       # one command: annotation, MitoM steps, curation (05.curated)
         clade = row["mitoz_clade"] or EXTRA_CLADE.get(row.get("phylum", ""), "Animal")
+        return [[sys.executable, str(PIPE / "batch_mitoz.py"), "run", "-i", str(bare), "-o", str(out / "raw"),
+                 "--clade", clade, "--genetic_code", code, "--threads", str(threads), "--max_tasks", "1"]]
+    if tool == "ours":
+        clade = row["mitoz_clade"]
         return [[sys.executable, str(PIPE / "batch_mitoz.py"), "run", "-i", str(bare), "-o", str(out / "raw"),
                  "--clade", clade, "--genetic_code", code, "--threads", str(threads), "--max_tasks", "1"],
                 [sys.executable, str(PIPE / "mito_curate.py"), "-i", str(out / "raw" / "04.final_gb"),
@@ -196,7 +200,7 @@ def collect(tool: str, out: Path, ncbi: SeqRecord) -> SeqRecord:
     """The tool's annotation of this record, before lift-over."""
     if tool == "mitos2":
         return mitos_to_record(out / "mitos", Seq(str(ncbi.seq)), str(ncbi.id))
-    pattern = {"ours": "curated/*.gbf", "mitom": "curated/*.gbf", "mitoz": "w/**/*.gbf"}[tool]
+    pattern = {"ours": "curated/*.gbf", "mitom": "raw/05.curated/*.gbf", "mitoz": "w/**/*.gbf"}[tool]
     files = sorted(out.glob(pattern), key=lambda p: p.stat().st_size, reverse=True)
     if not files:
         raise LiftError(f"no GenBank output ({pattern})")

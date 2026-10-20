@@ -158,3 +158,23 @@ def test_core_choice_keeps_mitom_steps():
     assert bm.resolve_tools(a) == "" and (a.core, a.trna, a.rescue) == ("hybrid", "mitos2", "auto")
     a = p.parse_args(["run", "-i", "x", "-o", "y", "--clade", "Animal", "--genetic_code", "5", "--core", "mitoz"])
     assert "MitoZ" in bm.resolve_tools(a)
+
+
+@pytest.mark.skipif(not mito_env.find("table2asn"), reason="table2asn not available")
+def test_run_ends_with_curated_and_submission_files(tmp_path):
+    """User 2026-10-21: output must be submittable to NCBI. run = MitoM annotation (04.final_gb) -> curation with
+    NCBI names (05.curated) -> per record .fsa/.tbl (BankIt) + .sqn/.val (table2asn) in 06.ncbi_submission."""
+    import argparse
+    final = tmp_path / "04.final_gb"
+    final.mkdir()
+    (final / "KY753833.gbf").write_bytes((HERE / "data" / "KY753833_mitoz.gbf").read_bytes())
+    args = argparse.Namespace(curate="yes", genetic_code=5, sbt=None)
+    merged_from = bm.run_curate_and_submit(args, final, tmp_path)
+    assert merged_from == tmp_path / "05.curated"
+    rec = SeqIO.read(str(merged_from / "KY753833.gbf"), "genbank")
+    assert {f.qualifiers["gene"][0] for f in rec.features if f.type == "rRNA"} == {"rrnS", "rrnL"}
+    sub = tmp_path / "06.ncbi_submission"
+    rid = rec.id
+    assert all((sub / f"{rid}{ext}").exists() for ext in (".fsa", ".tbl", ".sqn", ".val"))
+    head = (sub / "submission_summary.tsv").read_text().splitlines()
+    assert head[0].startswith("record\tERROR\tWARNING") and head[1].startswith(rid)

@@ -82,3 +82,161 @@ def test_ncbi_validation_before_after(tmp_path):
     err = [r for r in rows if r["severity"] == "ERROR"]
     assert any(r["status"] == "fixed" for r in err)
     assert not any(r["status"] == "new" for r in err)
+
+
+def _spacer_record(tmp_path, spacer):
+    """+ strand gene ATG(GCC)x30 + T, then `spacer`, then a 66-nt tRNA whose frame holds the first TAA."""
+    from Bio.Seq import Seq
+    from Bio.SeqFeature import FeatureLocation, SeqFeature
+    from Bio.SeqRecord import SeqRecord
+    gene = "ATG" + "GCC" * 30 + "T"                                  # 94 nt, abbreviated stop T
+    k = -(len(gene) + len(spacer) + 30) % 3                          # put the TAA in the gene's frame
+    trna = ("GGCCGC" * 5 + "G" * k + "TAA" + "GCGGCC" * 5 + "CCC")[:66]
+    pad = "CCCGGG" * 20
+    seq = gene + spacer + trna + pad
+    t0 = len(gene) + len(spacer)
+    frame_stop = next(i for i in range(0, len(seq) - 2, 3) if seq[i:i + 3] in ("TAA", "TAG"))
+    rec = SeqRecord(Seq(seq), id="X", description="")
+    rec.annotations.update(molecule_type="DNA", topology="linear")
+    cds = FeatureLocation(0, frame_stop + 3, 1)                      # MitoZ: greedy stop inside the tRNA
+    rec.features = [SeqFeature(FeatureLocation(0, len(seq), 1), type="source"),
+                    SeqFeature(cds, type="gene", qualifiers={"gene": ["COX3"]}),
+                    SeqFeature(cds, type="CDS", qualifiers={"gene": ["COX3"], "codon_start": ["1"], "transl_table": ["5"]}),
+                    SeqFeature(FeatureLocation(t0, t0 + len(trna), 1), type="tRNA",
+                               qualifiers={"gene": ["trnS(uga)"], "product": ["tRNA-Ser"]})]
+    d = tmp_path / "in"
+    d.mkdir()
+    SeqIO.write(rec, str(d / "x.gbf"), "genbank")
+    subprocess.run([sys.executable, "-W", "ignore", str(SCRIPT), "-i", str(d), "-o", str(tmp_path / "out"),
+                    "--genetic_code", "5", "--no_validate"], check=True, capture_output=True)
+    out = SeqIO.read(str(tmp_path / "out" / "x.gbf"), "genbank")
+    return next(f for f in out.features if f.type == "CDS")
+
+
+def test_abbreviated_stop_with_short_spacer(tmp_path):
+    """2026-10-20 dev benchmark: NCBI ends incomplete-stop genes 0 (143x), -1 (9x), 1-3 nt (10x) before the next
+    same-strand tRNA; P3 only accepted 0, so e.g. NC_018362.1 nad2 (T, 1 nt, trnE) kept MitoZ's stop inside the tRNA."""
+    cds = _spacer_record(tmp_path, "CC")
+    assert int(cds.location.end) == 94 and cds.qualifiers["transl_except"] == ["(pos:94,aa:TERM)"]
+
+
+def test_abbreviated_stop_no_spacer_unchanged(tmp_path):
+    assert int(_spacer_record(tmp_path, "").location.end) == 94
+
+
+def test_rrna_never_contains_a_trna(tmp_path):
+    """2026-10-21 table2asn on dev outputs: 16x SEQ_FEAT.BadRRNAcomponentOverlapTRNA, e.g. NC_028229.1 rrnS 3368..4148
+    containing trnE 3373..3429 - R1 only trimmed neighbours overlapping an rRNA end. The rRNA keeps the longer side."""
+    import random
+    from Bio.Seq import Seq
+    from Bio.SeqFeature import FeatureLocation, SeqFeature
+    from Bio.SeqRecord import SeqRecord
+    rnd = random.Random(2)
+    rec = SeqRecord(Seq("".join(rnd.choice("ACGT") for _ in range(2000))), id="X", description="")
+    rec.annotations.update(molecule_type="DNA", topology="linear")
+    def add(kind, s, e, gene, product):
+        loc = FeatureLocation(s - 1, e, 1)
+        rec.features += [SeqFeature(loc, type="gene", qualifiers={"gene": [gene]}),
+                         SeqFeature(loc, type=kind, qualifiers={"gene": [gene], "product": [product]})]
+    rec.features = [SeqFeature(FeatureLocation(0, 2000, 1), type="source")]
+    add("tRNA", 100, 160, "trnA(ugc)", "tRNA-Ala")
+    add("rRNA", 150, 1000, "s-rRNA", "12S ribosomal RNA")          # overlaps trnA end, contains trnE
+    add("tRNA", 170, 230, "trnE(uuc)", "tRNA-Glu")
+    add("tRNA", 1001, 1060, "trnS(uga)", "tRNA-Ser")
+    d = tmp_path / "in"
+    d.mkdir()
+    SeqIO.write(rec, str(d / "x.gbf"), "genbank")
+    subprocess.run([sys.executable, "-W", "ignore", str(SCRIPT), "-i", str(d), "-o", str(tmp_path / "out"),
+                    "--genetic_code", "5", "--no_validate"], check=True, capture_output=True)
+    out = SeqIO.read(str(tmp_path / "out" / "x.gbf"), "genbank")
+    r = next(f for f in out.features if f.type == "rRNA")
+    assert (int(r.location.start) + 1, int(r.location.end)) == (231, 1000)
+    assert r.qualifiers["gene"] == ["rrnS"]
+
+
+def test_ncbi_gene_names(tmp_path):
+    """User 2026-10-21: names consistent and NCBI-conform. /gene is the plain symbol (NCBI genome annotation guide:
+    tRNA labels go to /note); Leu/Ser by anticodon (L1 CUN, L2 UUR, S1 AGN, S2 UCN); rRNA rrnS/rrnL also when the
+    feature is a join (3 dev records kept MitoZ's l-rRNA / s-rRNA); CDS synonyms -> COX1..CYTB, ND1..ND6, ND4L."""
+    import random
+    from Bio.Seq import Seq
+    from Bio.SeqFeature import CompoundLocation, FeatureLocation, SeqFeature
+    from Bio.SeqRecord import SeqRecord
+    rnd = random.Random(3)
+    rec = SeqRecord(Seq("".join(rnd.choice("ACGT") for _ in range(3000))), id="X", description="")
+    rec.annotations.update(molecule_type="DNA", topology="circular")
+    rec.features = [SeqFeature(FeatureLocation(0, 3000, 1), type="source")]
+    def add(kind, loc, gene, **q):
+        rec.features += [SeqFeature(loc, type="gene", qualifiers={"gene": [gene]}),
+                         SeqFeature(loc, type=kind, qualifiers={"gene": [gene], **{k: [v] for k, v in q.items()}})]
+    add("tRNA", FeatureLocation(100, 165, 1), "trnL(uaa)", product="tRNA-Leu")
+    add("tRNA", FeatureLocation(200, 265, -1), "trnS(gcu)", product="tRNA-Ser")
+    add("tRNA", FeatureLocation(300, 365, 1), "trnM(cau)", product="tRNA-Met")
+    add("rRNA", CompoundLocation([FeatureLocation(2500, 3000, 1), FeatureLocation(0, 90, 1)]), "l-rRNA",
+        product="16S ribosomal RNA")
+    add("CDS", FeatureLocation(400, 1000, 1), "cob", product="Cytb", codon_start="1", transl_table="5")
+    d = tmp_path / "in"
+    d.mkdir()
+    SeqIO.write(rec, str(d / "x.gbf"), "genbank")
+    subprocess.run([sys.executable, "-W", "ignore", str(SCRIPT), "-i", str(d), "-o", str(tmp_path / "out"),
+                    "--genetic_code", "5", "--no_validate"], check=True, capture_output=True)
+    out = SeqIO.read(str(tmp_path / "out" / "x.gbf"), "genbank")
+    got = [(f.type, f.qualifiers["gene"][0], f.qualifiers.get("product", [""])[0], f.qualifiers.get("note", [""])[0])
+           for f in out.features if f.type in ("tRNA", "rRNA", "CDS")]
+    assert ("tRNA", "trnL2", "tRNA-Leu", "anticodon: UAA") in got
+    assert ("tRNA", "trnS1", "tRNA-Ser", "anticodon: GCU") in got
+    assert ("tRNA", "trnM", "tRNA-Met", "anticodon: CAU") in got
+    assert ("rRNA", "rrnL", "16S ribosomal RNA", "") in got
+    assert any(x[:3] == ("CDS", "CYTB", "cytochrome b") for x in got)
+    genes = sorted(f.qualifiers["gene"][0] for f in out.features if f.type == "gene")
+    assert genes == ["CYTB", "rrnL", "trnL2", "trnM", "trnS1"]
+
+
+def _one_cds(tmp_path, nt, code, gene_loc=None):
+    from Bio.Seq import Seq
+    from Bio.SeqFeature import FeatureLocation, SeqFeature
+    from Bio.SeqRecord import SeqRecord
+    seq = "CCCGGG" * 10 + nt + "CCCGGG" * 10
+    rec = SeqRecord(Seq(seq), id="X", description="")
+    rec.annotations.update(molecule_type="DNA", topology="linear")
+    loc = FeatureLocation(60, 60 + len(nt), 1)
+    rec.features = [SeqFeature(FeatureLocation(0, len(seq), 1), type="source"),
+                    SeqFeature(gene_loc or loc, type="gene", qualifiers={"gene": ["ND4L"]}),
+                    SeqFeature(loc, type="CDS", qualifiers={"gene": ["ND4L"], "codon_start": ["1"], "transl_table": [str(code)]})]
+    d = tmp_path / "in"
+    d.mkdir()
+    SeqIO.write(rec, str(d / "x.gbf"), "genbank")
+    subprocess.run([sys.executable, "-W", "ignore", str(SCRIPT), "-i", str(d), "-o", str(tmp_path / "out"),
+                    "--genetic_code", str(code), "--no_validate"], check=True, capture_output=True)
+    return SeqIO.read(str(tmp_path / "out" / "x.gbf"), "genbank")
+
+
+def test_illegal_start_marked_partial(tmp_path):
+    """2026-10-21 table2asn: SEQ_FEAT.StartCodon ERROR on echinoderm nad4l (ATT/ATC, code 9 starts are ATG/GTG only);
+    NCBI writes the same CDS as <start with note 'start codon not determined' (NC_001627.1, NC_061414.1)."""
+    out = _one_cds(tmp_path, "ATT" + "GCC" * 40 + "TAA", 9)
+    cds = next(f for f in out.features if f.type == "CDS")
+    assert str(cds.location).startswith("[<60") and "start codon not determined" in cds.qualifiers["note"]
+    gene = next(f for f in out.features if f.type == "gene")
+    assert str(gene.location) == str(cds.location)
+
+
+def test_gene_feature_matches_cds(tmp_path):
+    """table2asn SEQ_FEAT.CDSgeneRange: gene features must span exactly their CDS / RNA."""
+    from Bio.SeqFeature import FeatureLocation
+    out = _one_cds(tmp_path, "ATG" + "GCC" * 40 + "TAA", 5, gene_loc=FeatureLocation(55, 150, 1))
+    cds, gene = (next(f for f in out.features if f.type == t) for t in ("CDS", "gene"))
+    assert (int(gene.location.start), int(gene.location.end)) == (int(cds.location.start), int(cds.location.end))
+
+
+def test_circular_defline_complete():
+    """table2asn SEQ_INST.CompleteCircleProblem on every circular record: the .fsa needs [completeness=complete]."""
+    from Bio.Seq import Seq
+    from Bio.SeqRecord import SeqRecord
+    sys.path.insert(0, str(HERE.parent))
+    import ncbi_validate as nv
+    r = SeqRecord(Seq("ACGT"), id="X")
+    r.annotations.update(organism="Aus bus", topology="circular")
+    assert "[completeness=complete]" in nv.fasta_defline(r, 5)
+    r.annotations["topology"] = "linear"
+    assert "completeness" not in nv.fasta_defline(r, 5)

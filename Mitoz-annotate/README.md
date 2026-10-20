@@ -607,6 +607,15 @@ mitoz_run_out/
 ├── 04.final_gb/
 │   ├── SAMPLE.gbf
 │   └── no_{which_gene_first}_gene/
+├── 05.curated/                 # 最终结果：端点校正 + NCBI 命名（--curate yes，默认）
+│   ├── SAMPLE.gbf
+│   └── curation_report.tsv
+├── 06.ncbi_submission/         # NCBI 提交文件（需 table2asn）
+│   ├── SAMPLE.fsa / SAMPLE.tbl # BankIt 直接上传
+│   ├── SAMPLE.sqn / SAMPLE.val # table2asn 生成；--sbt 加提交者模板后 .sqn 可用于 Submission Portal
+│   ├── submission_summary.tsv  # 每条记录 NCBI ERROR / WARNING 数
+│   └── validation_messages.tsv
+├── rescue_report.tsv           # 从 MITOS2 补回的漏注基因（需人工检查）
 ├── annotation-summary.tsv
 ├── metadata_transfer_log.tsv
 ├── all.final.gbf
@@ -626,8 +635,10 @@ mitoz_run_out/
 - `dedup_report.tsv`: GenBank 输入去重报告。
 - `annotation-summary.tsv`: 最终 PCG / tRNA / rRNA 统计。
 - `metadata_transfer_log.tsv`: metadata 转移审计。
-- `04.final_gb/*.gbf`: 最终 GenBank 文件。
-- `all.final.gbf`: 合并后的最终 GenBank。
+- `04.final_gb/*.gbf`: MitoM 注释结果（方向调整、元数据迁回、内含子、tRNA、漏注救回之后，端点校正之前）。
+- `05.curated/*.gbf`: **最终 GenBank**：端点校正（mito_curate.py）并统一为 NCBI 命名——CDS `COX1…CYTB`、`ND1…ND6`、`ND4L`；rRNA `rrnS`/`rrnL`（12S/16S ribosomal RNA）；tRNA `/gene` 只写符号（`trnL1`/`trnL2`、`trnS1`/`trnS2` 按反密码子），反密码子写在 `/note`；非法起始密码子按 NCBI 惯例标 5′ partial（"start codon not determined"）。
+- `06.ncbi_submission/`: 每条记录的 NCBI 提交文件和校验报告。`submission_summary.tsv` 中 ERROR 为 0 的记录可直接提交；GenBank 平面文件（.gbf）本身不能直接提交给 NCBI。
+- `all.final.gbf`: 合并后的最终 GenBank（来自 `05.curated/`；`--curate no` 时来自 `04.final_gb/`）。
 - `*_failed.txt`, `*_mismatch.txt`: 问题样本列表。
 
 `annotation-summary.tsv` 中的 `cox1_orientation_ok` 是历史列名。当 `--which_gene_first` 不是 `cox1` 时，该列实际表示指定目标基因是否重定向成功。

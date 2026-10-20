@@ -15,9 +15,8 @@ to automatic annotation (e.g. MitoZ / MITOS output):
       immediately before the downstream same-strand tRNA, completed by polyadenylation
       (criterion iii; tRNA punctuation model, Ojala et al. 1981). /transl_except + note added.
   R1  rRNA (12S rrnS, 16S rrnL) must not overlap flanking genes; boundaries are trimmed to the
-      neighbours and, by default, NOT extended into free space (criterion vi, --rrna_bounds trim).
-      --rrna_bounds fill extends them to the flanking genes (gaps <= --max_fill nt), the common
-      convention of many GenBank records.
+      neighbours (criterion vi) and, by default, extended to the flanking genes (gaps <= --max_fill
+      nt, the GenBank convention; --rrna_bounds fill). --rrna_bounds trim only removes overlaps.
   R3  rRNA names standardised (rrnS / rrnL; 12S / 16S ribosomal RNA); rRNA with a large CDS
       overlap is reported.
 tRNA boundaries are kept as annotated (criterion v). Every change is listed in
@@ -34,22 +33,41 @@ from __future__ import annotations
 import argparse
 import csv
 import re
-import shutil
 import sys
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 from Bio import SeqIO
 from Bio.Data import CodonTable
-from Bio.SeqFeature import CompoundLocation, ExactPosition, FeatureLocation, SeqFeature
+from Bio.SeqFeature import AfterPosition, BeforePosition, CompoundLocation, ExactPosition, FeatureLocation, SeqFeature
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import mito_env  # noqa: E402  (finds external programs: config, PATH, conda environments)
+import mito_trna  # noqa: E402  (tRNA names: trnL1/L2, trnS1/S2 by anticodon)
 
 GB_EXT = {".gb", ".gbk", ".gbf", ".genbank", ".gbff"}
 RRNA_NAMES = {"rrns": "rrnS", "srrna": "rrnS", "12s": "rrnS", "12srrna": "rrnS", "rns": "rrnS", "rrn12": "rrnS",
               "rrnl": "rrnL", "lrrna": "rrnL", "16s": "rrnL", "16srrna": "rrnL", "rnl": "rrnL", "rrn16": "rrnL"}
 RRNA_PRODUCT = {"rrnS": "12S ribosomal RNA", "rrnL": "16S ribosomal RNA"}
+# N1: NCBI-style protein gene symbols and products (as in RefSeq, e.g. NC_012920.1), with common synonyms
+PCG_NAMES = {
+    "COX1": ("cytochrome c oxidase subunit I", ("cox1", "coi", "co1", "coxi", "cytochromecoxidasesubuniti")),
+    "COX2": ("cytochrome c oxidase subunit II", ("cox2", "coii", "co2", "coxii", "cytochromecoxidasesubunitii")),
+    "COX3": ("cytochrome c oxidase subunit III", ("cox3", "coiii", "co3", "coxiii", "cytochromecoxidasesubunitiii")),
+    "ATP6": ("ATP synthase F0 subunit 6", ("atp6", "atpase6", "atp", "atpsynthasef0subunit6")),
+    "ATP8": ("ATP synthase F0 subunit 8", ("atp8", "atpase8", "atpsynthasef0subunit8")),
+    "CYTB": ("cytochrome b", ("cytb", "cob", "ctb", "cyb", "cytochromeb")),
+    "ND1": ("NADH dehydrogenase subunit 1", ("nd1", "nad1", "nadh1", "nadhdehydrogenasesubunit1")),
+    "ND2": ("NADH dehydrogenase subunit 2", ("nd2", "nad2", "nadh2", "nadhdehydrogenasesubunit2")),
+    "ND3": ("NADH dehydrogenase subunit 3", ("nd3", "nad3", "nadh3", "nadhdehydrogenasesubunit3")),
+    "ND4": ("NADH dehydrogenase subunit 4", ("nd4", "nad4", "nadh4", "nadhdehydrogenasesubunit4")),
+    "ND4L": ("NADH dehydrogenase subunit 4L", ("nd4l", "nad4l", "nadh4l", "nadhdehydrogenasesubunit4l")),
+    "ND5": ("NADH dehydrogenase subunit 5", ("nd5", "nad5", "nadh5", "nadhdehydrogenasesubunit5")),
+    "ND6": ("NADH dehydrogenase subunit 6", ("nd6", "nad6", "nadh6", "nadhdehydrogenasesubunit6")),
+}
+PCG_SYN = {syn: name for name, (_, syns) in PCG_NAMES.items() for syn in syns}
+SPACERS = (0, 1, 2, 3, -1)  # nt from an abbreviated stop to the downstream tRNA; -1 last: a T on the tRNA's first base is often chance
+NO_START_NOTE = "start codon not determined"
 POLYA_NOTE = "TAA stop codon is completed by the addition of 3' A residues to the mRNA"
 
 
@@ -179,11 +197,20 @@ class Curator:
         if trna and new_a <= trna - 1 and (first_stop is None or first_stop - 2 >= trna):
             # the first complete stop lies inside/after the downstream tRNA: the mRNA is cut at the
             # tRNA, so the gene ends with T / TA right before it (criterion iii)
-            tail = (trna - 1 - new_a + 1) % 3
-            if tail in (1, 2) and s[trna - 1 - tail:trna - 1] == ("T", "TA")[tail - 1]:
-                new_b, why_end = trna - 1, "abbreviated stop T/TA immediately before downstream tRNA"
-            elif tail == 0 and s[trna - 4:trna - 1] in self.stops:
-                new_b, why_end = trna - 1, "complete stop codon immediately before downstream tRNA"
+            # NCBI places such ends 0 (143x), -1 (9x) and 1-3 nt (10x) before the tRNA (2026-10-20 dev set,
+            # 93 RefSeq records). Order (0, 1, 2, 3, -1) measured best on the dev set: PCG both ends exact
+            # 466 -> 468 / 580 (-1 tried second: 467, it matches chance T's on the tRNA's first base)
+            for gap in SPACERS:
+                end = trna - 1 - gap
+                tail = (end - new_a + 1) % 3
+                if tail in (1, 2) and s[end - tail:end] == ("T", "TA")[tail - 1]:
+                    new_b, why_end = end, "abbreviated stop T/TA immediately before downstream tRNA" + \
+                        (f" ({gap:+d} nt spacer)" if gap else "")
+                    break
+                if tail == 0 and s[end - 3:end] in self.stops:
+                    new_b, why_end = end, "complete stop codon immediately before downstream tRNA" + \
+                        (f" ({gap:+d} nt spacer)" if gap else "")
+                    break
             else:
                 self.log(f, "P4", old, old, "no complete or abbreviated stop before the downstream tRNA - check manually")
         elif first_stop is not None and first_stop != b and abs(first_stop - b) <= 3 * self.a.max_start_shift:
@@ -228,7 +255,14 @@ class Curator:
             self.log(f, "P4", span(f), span(f), f"{n_stop} internal stop codon(s): wrong frame, frameshift "
                      "(assembly indel?) or unannotated intron - check manually")
         if nt[:3] not in self.starts:
-            self.log(f, "P4", span(f), span(f), f"first codon {nt[:3]} is not a start codon of table {self.a.genetic_code}")
+            # P5: NCBI rejects an illegal start (SEQ_FEAT.StartCodon); RefSeq writes such CDS 5'-partial with
+            # "start codon not determined" (e.g. echinoderm nad4l ATT/ATC under code 9: NC_001627.1, NC_061414.1)
+            loc = f.location
+            f.location = FeatureLocation(BeforePosition(loc.start), loc.end, loc.strand) if loc.strand == 1 else \
+                FeatureLocation(loc.start, AfterPosition(loc.end), loc.strand)
+            f.qualifiers["note"] = [n for n in f.qualifiers.get("note", []) if n != NO_START_NOTE] + [NO_START_NOTE]
+            self.log(f, "P5", span(f), span(f), f"first codon {nt[:3]} is not a start codon of table "
+                     f"{self.a.genetic_code}: CDS marked 5'-partial, 'start codon not determined' (NCBI practice)")
 
     def pcg_overlaps(self) -> None:
         cds = [f for f in self.rec.features if f.type == "CDS" and simple(f)]
@@ -247,20 +281,25 @@ class Curator:
         if not simple(f):
             return
         g = gene_feature(self.rec, f)
-        name = RRNA_NAMES.get(key(f.qualifiers.get("gene", [""])[0])) or \
-            {"12sribosomalrna": "rrnS", "16sribosomalrna": "rrnL"}.get(key(f.qualifiers.get("product", [""])[0]))
-        if name:
-            for x in (f, g):
-                if x is not None:
-                    x.qualifiers["gene"] = [name]
-            f.qualifiers["product"] = [RRNA_PRODUCT[name]]
         s, e = old = span(f)
         neigh = [span(x) for x in self.others(f, types=("tRNA", "CDS", "rRNA")) if x.type != "gene"]
-        for ns, ne in neigh:                          # R1: trim overlaps with flanking genes
-            if ns <= s <= ne < e:
-                s = ne + 1
-            if s < ns <= e <= ne:
-                e = ns - 1
+        changed = True
+        while changed:                                # R1: no overlap with any other gene (repeat until stable)
+            changed = False
+            for ns, ne in sorted(neigh):
+                if ne < s or ns > e:
+                    continue
+                if ns <= s and ne >= e:               # rRNA inside another gene: left to R3 / manual check
+                    continue
+                if ns <= s:                           # overlaps the 5' (left) end
+                    s = ne + 1
+                elif ne >= e:                         # overlaps the 3' (right) end
+                    e = ns - 1
+                elif ns - s >= e - ne:                # gene inside the rRNA: keep the longer side
+                    e = ns - 1
+                else:
+                    s = ne + 1
+                changed = True
         if self.a.rrna_bounds == "fill":
             left = max([ne for ns, ne in neigh if ne < s] or [0])
             right = min([ns for ns, ne in neigh if ns > e] or [self.L + 1])
@@ -278,7 +317,53 @@ class Curator:
                 set_span(g, s, e)
             self.log(f, "R1", old, (s, e), "trimmed to flanking genes" + (" and filled to them" if self.a.rrna_bounds == "fill" else ""))
 
+    # ── N1: NCBI-style names (every feature, also joins / origin-spanning ones) ──
+    def names(self, f: SeqFeature) -> None:
+        g = gene_feature(self.rec, f)
+        cur = f.qualifiers.get("gene", [""])[0]
+        q: Dict[str, List[str]] = {}
+        if f.type == "CDS":
+            name = PCG_SYN.get(key(cur)) or PCG_SYN.get(key(f.qualifiers.get("product", [""])[0]))
+            if name:
+                q = {"gene": [name], "product": [PCG_NAMES[name][0]]}
+        elif f.type == "rRNA":
+            name = RRNA_NAMES.get(key(cur)) or \
+                {"12sribosomalrna": "rrnS", "16sribosomalrna": "rrnL"}.get(key(f.qualifiers.get("product", [""])[0]))
+            if name:
+                q = {"gene": [name], "product": [RRNA_PRODUCT[name]]}
+        elif f.type == "tRNA":
+            txt = " ".join(f.qualifiers.get("product", []) + [cur])
+            m = re.search(r"tRNA-([A-Z][a-z]{2})", txt)
+            aa = mito_trna.AA3.get(m.group(1), "") if m else ""
+            if not aa and re.match(r"trn([A-Z])", cur):
+                aa = cur[3]
+            ac = ""
+            m = re.search(r"\(([acgtuACGTU]{3})\)", cur) or \
+                re.search(r"anticodon:\s*([acgtuACGTU]{3})", " ".join(f.qualifiers.get("note", []))) or \
+                re.search(r"seq:([acgtuACGTU]{3})", " ".join(f.qualifiers.get("anticodon", [])))
+            if m:
+                ac = m.group(1).lower().replace("u", "t")
+            if aa in mito_trna.ONE2THREE:
+                name = mito_trna.trna_name(aa, ac)
+                notes = [n for n in f.qualifiers.get("note", []) if not n.startswith("anticodon:")]
+                q = {"gene": [name], "product": [f"tRNA-{mito_trna.ONE2THREE[aa]}"],
+                     "note": ([f"anticodon: {ac.upper().replace('T', 'U')}"] if ac else []) + notes}
+        if not q:
+            if f.type in ("CDS", "rRNA", "tRNA"):
+                self.log(f, "N1", span(f), span(f), f"gene name '{cur}' not recognised - kept")
+            return
+        for k, v in q.items():
+            if v:
+                f.qualifiers[k] = v
+            else:
+                f.qualifiers.pop(k, None)
+        if g is not None:
+            g.qualifiers["gene"] = q["gene"]
+
     def run(self) -> List[Dict[str, str]]:
+        for f in list(self.rec.features):
+            if f.type in ("CDS", "rRNA", "tRNA"):
+                self.names(f)
         for f in list(self.rec.features):
             if f.type == "rRNA":
                 self.rrna(f)
@@ -287,6 +372,11 @@ class Curator:
                 self.pcg(f)
                 self.pcg_check(f)
         self.pcg_overlaps()
+        for f in self.rec.features:                    # gene feature = exactly its CDS / RNA (SEQ_FEAT.CDSgeneRange)
+            if f.type in ("CDS", "rRNA", "tRNA"):
+                g = gene_feature(self.rec, f)
+                if g is not None and str(g.location) != str(f.location):
+                    g.location = f.location
         self.rec.features.sort(key=lambda x: (int(x.location.start), x.type != "source", x.type != "gene"))
         return self.rows
 
@@ -319,10 +409,13 @@ def main(argv=None) -> int:
     p.add_argument("-i", "--input", required=True)
     p.add_argument("-o", "--out", required=True)
     p.add_argument("--genetic_code", type=int, default=5)
-    p.add_argument("--rrna_bounds", choices=["trim", "fill"], default="trim",
-                   help="trim (default): only remove overlaps with flanking genes (Fourdrilis criterion vi); "
-                        "fill: also extend rRNA ends to the flanking genes")
-    p.add_argument("--max_fill", type=int, default=100, help="Largest gap filled with --rrna_bounds fill (nt)")
+    p.add_argument("--rrna_bounds", choices=["trim", "fill"], default="fill",
+                   help="fill (default): remove overlaps with flanking genes and extend rRNA ends to them (gaps <= "
+                        "--max_fill), the GenBank convention; trim: only remove overlaps (Fourdrilis criterion vi). "
+                        "2026-10-21 dev benchmark (90 rRNAs vs NCBI): both ends exact trim 22, fill(300) 33")
+    p.add_argument("--max_fill", type=int, default=300,
+                   help="Largest gap filled with --rrna_bounds fill (nt; default 300: exact rRNAs 30 / 33 / 33 / 31 "
+                        "at 100 / 300 / 500 / 1000 on the dev set)")
     p.add_argument("--max_start_shift", type=int, default=30, help="Largest start/stop move (codons)")
     p.add_argument("--aggressive_start", action="store_true",
                    help="Always move PCG starts to the in-frame start codon nearest the preceding gene "
@@ -356,10 +449,7 @@ def main(argv=None) -> int:
                 val_after += nv.validate_record(rec, out / "validation" / "after", t2a)
         dest = out / (f.relative_to(src) if src.is_dir() else f.name)
         dest.parent.mkdir(parents=True, exist_ok=True)
-        if dest.resolve() == f.resolve() or rows:
-            SeqIO.write(recs, str(dest), "genbank")
-        else:
-            shutil.copy2(f, dest)
+        SeqIO.write(recs, str(dest), "genbank")      # always: N1 names / gene ranges change without a report row
     cols = ["record", "feature", "gene", "strand", "rule", "old", "new", "reason"]
     with open(out / "curation_report.tsv", "w", newline="", encoding="utf-8") as fh:
         w = csv.DictWriter(fh, fieldnames=cols, delimiter="\t", restval="")

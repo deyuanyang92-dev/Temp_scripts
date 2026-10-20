@@ -2666,8 +2666,9 @@ def workflow_annotate(args: argparse.Namespace) -> int:
     run_rescue(args, final_dir, out_root)
     run_intron_fix(args, in_path, final_dir, out_root)
     add_wrapped_trnas(final_dir, out_root / "trna_wrap.tsv")
+    merge_dir = run_curate_and_submit(args, final_dir, out_root)
     all_final_gbs = sorted(
-        p for p in final_dir.rglob("*.gbf")
+        p for p in merge_dir.rglob("*.gbf")
         if p.is_file() and p.stat().st_size > 0)
     if all_final_gbs:
         merge_gb_files(all_final_gbs, out_root / "all.final.gbf")
@@ -2788,6 +2789,52 @@ def resolve_tools(args: argparse.Namespace) -> str:
     args.mitoz_fast = str(MITOZ_FAST) if (args.trna == "mitos2" or args.circos == "no" or args.clade in EXTRA_CLADES) \
         and MITOZ_FAST.exists() else ""
     return ""
+
+
+def run_curate_and_submit(args: argparse.Namespace, final_dir: Path, out_root: Path) -> Path:
+    """MitoM final steps: mito_curate.py (boundary rules, NCBI gene names) -> 05.curated/, then the NCBI
+    submission inputs per record in 06.ncbi_submission/: <id>.fsa + <id>.tbl (BankIt), <id>.sqn + <id>.val
+    (table2asn; --sbt adds the submitter template) and submission_summary.tsv. Returns the folder of the
+    final GenBank files (05.curated, or final_dir with --curate no)."""
+    if getattr(args, "curate", "yes") == "no":
+        return final_dir
+    here = Path(__file__).resolve().parent
+    cur = out_root / "05.curated"
+    p = subprocess.run([sys.executable, "-W", "ignore", str(here / "mito_curate.py"), "-i", str(final_dir), "-o", str(cur),
+                        "--genetic_code", str(int(args.genetic_code)), "--no_validate"], capture_output=True, text=True)
+    if p.returncode:
+        logging.error(f"[CURATE] failed (exit {p.returncode}): {p.stderr[-300:]} - final files left uncurated")
+        return final_dir
+    logging.info(f"[CURATE] {(p.stdout.strip().splitlines() or [''])[-1]}  -> {cur}")
+    if str(here) not in sys.path:
+        sys.path.insert(0, str(here))
+    import mito_env
+    import ncbi_validate as nv
+    t2a = mito_env.find("table2asn")
+    if not t2a:
+        logging.info("[SUBMISSION] table2asn not found: no .sqn / validation (install.sh installs it)")
+        return cur
+    sub = out_root / "06.ncbi_submission"
+    sub.mkdir(parents=True, exist_ok=True)
+    summary, msgs = [], []
+    for gbf in sorted(cur.rglob("*.gbf")):
+        for rec in SeqIO.parse(str(gbf), "genbank"):
+            rows = nv.validate_record(rec, sub / "_work", t2a, getattr(args, "sbt", None))
+            d = sub / "_work" / re.sub(r"[^\w.]+", "_", rec.id)
+            for ext in (".fsa", ".tbl", ".sqn", ".val"):
+                if (d / f"rec{ext}").exists():
+                    shutil.copy2(d / f"rec{ext}", sub / f"{d.name}{ext}")
+            n = {sev: sum(r["severity"] == sev for r in rows) for sev in ("ERROR", "WARNING")}
+            summary.append(f"{rec.id}\t{n['ERROR']}\t{n['WARNING']}\t"
+                           + "; ".join(sorted({r["code"] for r in rows if r["severity"] == "ERROR"})))
+            msgs += [f"{r['record']}\t{r['severity']}\t{r['code']}\t{r['message']}" for r in rows]
+    shutil.rmtree(sub / "_work", ignore_errors=True)
+    write_nonempty_table(sub / "submission_summary.tsv", "record\tERROR\tWARNING\terror_codes", summary)
+    write_nonempty_table(sub / "validation_messages.tsv", "record\tseverity\tcode\tmessage", msgs)
+    bad = [x.split("\t")[0] for x in summary if x.split("\t")[1] != "0"]
+    logging.info(f"[SUBMISSION] {len(summary)} record(s) -> {sub}; NCBI ERROR in {len(bad)}: {bad[:10]}"
+                 + (" - see validation_messages.tsv" if bad else ""))
+    return cur
 
 
 def run_rescue(args: argparse.Namespace, final_dir: Path, out_root: Path) -> None:
@@ -3123,8 +3170,9 @@ def workflow_run(args: argparse.Namespace) -> int:
     run_rescue(args, final_dir, out_root)
     run_intron_fix(args, in_path, final_dir, out_root)
     add_wrapped_trnas(final_dir, out_root / "trna_wrap.tsv")
+    merge_dir = run_curate_and_submit(args, final_dir, out_root)
     all_final_gbs = sorted(
-        p for p in final_dir.rglob("*.gbf")
+        p for p in merge_dir.rglob("*.gbf")
         if p.is_file() and p.stat().st_size > 0
     )
     if all_final_gbs:
@@ -3399,6 +3447,12 @@ def build_parser() -> argparse.ArgumentParser:
                        help="Directory containing MITOS2 refseq89m. Default: found automatically.")
         g.add_argument("--circos", choices=["no", "yes"], default="no",
                        help="Draw MitoZ's circos plot (default no: ~8 s per record, not used downstream).")
+        g.add_argument("--curate", choices=["yes", "no"], default="yes",
+                       help="yes (default): mito_curate.py boundary rules and NCBI gene names -> 05.curated/, and "
+                            "NCBI submission files (.fsa/.tbl/.sqn/.val) -> 06.ncbi_submission/")
+        g.add_argument("--sbt", default=None,
+                       help="NCBI submitter template (template.sbt from submit.ncbi.nlm.nih.gov/genbank/template) "
+                            "for the .sqn files")
         g.add_argument("--rescue", choices=["auto", "yes", "no"], default="auto",
                        help="Add protein genes / rRNAs MitoZ missed from a MITOS2 annotation (mito_rescue.py; "
                             "nothing MitoZ annotated is changed). auto = run when MITOS2 is found (default).")

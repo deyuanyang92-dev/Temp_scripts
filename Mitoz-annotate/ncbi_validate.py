@@ -65,6 +65,8 @@ def fasta_defline(rec, gencode: Optional[int]) -> str:
     org = rec.annotations.get("organism", "unknown organism")
     topo = rec.annotations.get("topology", "linear")
     mods = [f"[organism={org}]", "[location=mitochondrion]", f"[topology={topo}]"]
+    if topo == "circular":                       # else SEQ_INST.CompleteCircleProblem (table2asn 2026-10-21)
+        mods.append("[completeness=complete]")
     if gencode:
         mods.append(f"[mgcode={gencode}]")
     return f">{rec.id} " + " ".join(mods)
@@ -85,13 +87,16 @@ def our_intervals(rec, tag: str) -> List[str]:
     return out
 
 
-def validate_record(rec, out: Path, table2asn: str) -> List[Dict[str, str]]:
+def validate_record(rec, out: Path, table2asn: str, sbt: Optional[str] = None) -> List[Dict[str, str]]:
+    """Write rec as NCBI submission inputs (rec.fsa + rec.tbl) and run table2asn on them (rec.sqn, rec.val);
+    sbt = submitter template from https://submit.ncbi.nlm.nih.gov/genbank/template/submission/ (optional)."""
     d = out / re.sub(r"[^\w.]+", "_", rec.id)
     d.mkdir(parents=True, exist_ok=True)
     base = d / "rec"
     (d / "rec.fsa").write_text(fasta_defline(rec, record_gencode(rec)) + "\n" + str(rec.seq) + "\n")
     (d / "rec.tbl").write_text("\n".join(feature_lines(rec)) + "\n")
-    subprocess.run([table2asn, "-i", str(d / "rec.fsa"), "-V", "vb", "-o", str(base) + ".sqn"],
+    subprocess.run([table2asn, "-i", str(d / "rec.fsa"), "-V", "vb", "-o", str(base) + ".sqn",
+                    *(["-t", sbt] if sbt else [])],
                    capture_output=True, text=True, check=False)
     rows = []
     val = d / "rec.val"

@@ -1,0 +1,5 @@
+# MITOS2 2.1.10 (tRNA step of the default workflow; mito_trna.py). Reference data refseq89m: install.sh
+name: mitos
+channels: [conda-forge, bioconda]
+dependencies:
+  - mitos=2.1.10

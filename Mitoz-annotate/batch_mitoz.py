@@ -327,6 +327,27 @@ def build_tool_cmd(
     return [found] + base_args
 
 
+MITOZ_FAST = Path(__file__).resolve().parent / "scripts" / "mitoz_fast.py"
+# MitoZ 3.6 `annotate --clade` choices (checked before any job starts)
+MITOZ_CLADES = ("Chordata", "Arthropoda", "Echinodermata", "Annelida-segmented-worms", "Bryozoa", "Mollusca",
+                "Nematoda", "Nemertea-ribbon-worms", "Porifera-sponges")
+
+
+def fast_mitoz_cmd(cmd: List[str], fast: str) -> List[str]:
+    """`... mitoz annotate ARGS` -> `... <MitoZ env python> scripts/mitoz_fast.py annotate ARGS`.
+    mitoz_fast.py runs MitoZ unchanged except the tRNA step (MITOS2 instead of single-core MiTFi) and the
+    circos plot (skipped); it must run with the Python of the MitoZ environment."""
+    if not fast or "annotate" not in cmd:
+        return cmd
+    for i, x in enumerate(cmd):
+        if Path(x).name == MITOZ_EXE_NAME:
+            if x == MITOZ_EXE_NAME and "run" in cmd[:i]:          # conda run -n ENV ... mitoz
+                return cmd[:i] + ["python", fast] + cmd[i + 1:]
+            py = Path(x).parent / "python"
+            return cmd[:i] + [str(py), fast] + cmd[i + 1:] if py.exists() else cmd
+    return cmd
+
+
 _FASTA_EXTS = {".fa", ".fasta", ".fna", ".fas"}
 _GB_EXTS    = {".gb", ".gbk", ".genbank", ".gbf"}
 
@@ -1955,6 +1976,7 @@ def mitoz_annotate_one(
         tool_label="MitoZ", exe_name=MITOZ_EXE_NAME, base_args=base_args,
         conda_env=args.conda_env_mitoz, tool_path=args.mitoz_path,
         conda_exe=args.conda_exe)
+    cmd = fast_mitoz_cmd(cmd, getattr(args, "mitoz_fast", ""))
     lg.info("[CMD] " + " ".join(cmd))
 
     logs_dir    = workdir / "logs"
@@ -2136,6 +2158,15 @@ def main():
         "MitoZ", MITOZ_EXE_NAME, base_args,
         args.get("conda_env_mitoz"), args.get("mitoz_path"),
         args.get("conda_exe", "conda"))
+    fast = args.get("mitoz_fast")
+    if fast:
+        for i, x in enumerate(cmd):
+            if Path(x).name == MITOZ_EXE_NAME:
+                if x == MITOZ_EXE_NAME and "run" in cmd[:i]:
+                    cmd = cmd[:i] + ["python", fast] + cmd[i + 1:]
+                elif (Path(x).parent / "python").exists():
+                    cmd = cmd[:i] + [str(Path(x).parent / "python"), fast] + cmd[i + 1:]
+                break
 
     t0 = time.time()
     p  = subprocess.run(cmd, cwd=str(workdir),
@@ -2238,6 +2269,7 @@ def run_snakemake_for_annotation_tasks(
         "genetic_code": int(args.genetic_code), "species_name": args.species_name,
         "mitoz_extra": args.mitoz_extra or [], "conda_env_mitoz": args.conda_env_mitoz,
         "mitoz_path": args.mitoz_path, "conda_exe": args.conda_exe,
+        "mitoz_fast": getattr(args, "mitoz_fast", ""),
     }
     args_json.write_text(json.dumps(args_payload, indent=2, ensure_ascii=False) + "\n",
                          encoding="utf-8")
@@ -2702,6 +2734,36 @@ def write_orientation_fallback(out_root: Path, samples: List["SampleInfo"]) -> N
     names = {si.internal_id: si.sample_name for si in samples}
     rows = sorted({f"{names.get(k.split('.')[0], k)}\t{g}" for k, g in ORIENTATION_FALLBACK.items()})
     write_nonempty_table(out_root / "oriented_by_fallback.txt", "sample_name\tstart_gene", rows)
+
+
+def resolve_tools(args: argparse.Namespace) -> str:
+    """Fill unset tool locations from mito_env (config file, PATH, conda environments), check the clade,
+    and pass the MITOS2 settings to scripts/mitoz_fast.py. Returns an error message, '' when fine."""
+    if str(MITOZ_FAST.parents[1]) not in sys.path:
+        sys.path.insert(0, str(MITOZ_FAST.parents[1]))
+    import mito_env
+    if args.clade not in MITOZ_CLADES:
+        return (f"ERROR: --clade '{args.clade}' is not a MitoZ clade. Choose one of:\n  " + ", ".join(MITOZ_CLADES)
+                + "\n  (MitoZ has no clade for e.g. Cnidaria: choose the closest one and check the result.)")
+    if not args.conda_env_mitoz and not args.mitoz_path:
+        args.conda_env_mitoz = mito_env.mitoz_env()
+        if not args.conda_env_mitoz and mito_env.find("mitoz"):
+            args.mitoz_path = mito_env.find("mitoz")
+        if args.conda_env_mitoz or args.mitoz_path:
+            logging.info(f"[ENV] MitoZ found automatically: {args.conda_env_mitoz or args.mitoz_path}")
+    if not args.intron_bin:
+        args.intron_bin = mito_env.bin_with("exonerate", "cmsearch", "blastp", "makeblastdb")
+    args.mitos_bin = mito_env.mitos_bin(args.mitos_bin)
+    args.mitos_refdir = mito_env.mitos_refdir(args.mitos_refdir)
+    os.environ["YZZ_TRNA"] = args.trna
+    os.environ["YZZ_CIRCOS"] = args.circos
+    if args.mitos_bin and args.mitos_refdir:
+        os.environ["YZZ_MITOS_BIN"], os.environ["YZZ_MITOS_REFDIR"] = args.mitos_bin, args.mitos_refdir
+    elif args.trna == "mitos2":
+        print("[ENV] MITOS2 not found: MitoZ's own MiTFi tRNA step is used (slow). "
+              "Install it: bash install.sh, or give --mitos_bin / --mitos_refdir", file=sys.stderr)
+    args.mitoz_fast = str(MITOZ_FAST) if (args.trna == "mitos2" or args.circos == "no") and MITOZ_FAST.exists() else ""
+    return ""
 
 
 def run_intron_fix(args: argparse.Namespace, in_path: Path, final_dir: Path, out_root: Path) -> None:
@@ -3258,6 +3320,16 @@ def build_parser() -> argparse.ArgumentParser:
                        help="Conda env containing MitoZ (e.g. mitoz3.6).")
         g.add_argument("--mitoz_path",      default=None,
                        help="Path to MitoZ executable or directory.")
+        g.add_argument("--trna", choices=["mitos2", "mitoz"], default="mitos2",
+                       help="tRNA step inside MitoZ: mitos2 (default) = MITOS2 fast mode, same MiTFi Metazoa "
+                            "models, ~10 s instead of ~140 s single-core MiTFi; falls back to MiTFi when MITOS2 "
+                            "is missing or fails. mitoz = original MiTFi.")
+        g.add_argument("--mitos_bin", default=None,
+                       help="MITOS2 environment bin (runmitos). Default: found automatically (mito_env.py).")
+        g.add_argument("--mitos_refdir", default=None,
+                       help="Directory containing MITOS2 refseq89m. Default: found automatically.")
+        g.add_argument("--circos", choices=["no", "yes"], default="no",
+                       help="Draw MitoZ's circos plot (default no: ~8 s per record, not used downstream).")
         g.add_argument("--intron_fix", choices=["auto", "yes", "no"], default="auto",
                        help="Add introns MitoZ misses with mito_intron.py (MFannot method: Exonerate "
                             "protein2genome + MFannot boundary rules + Rfam intron type). "
@@ -3423,6 +3495,11 @@ def main() -> int:
 
     if getattr(args, "conda_env_mitoz", None) == "":
         args.conda_env_mitoz = None
+    if args.cmd in ("annotate", "run"):
+        err = resolve_tools(args)
+        if err:
+            print(err, file=sys.stderr)
+            return 2
 
     if getattr(args, "suffix_fq", None):
         parse_suffix_fq(args.suffix_fq)

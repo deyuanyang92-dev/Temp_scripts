@@ -1,0 +1,13 @@
+# Our own steps: mito_intron.py (exonerate, BLAST, Infernal), mito_curate.py / ncbi_validate.py (table2asn),
+# optional extra tRNA methods for mito_trna.py (ARAGORN, tRNAscan-SE). Versions = those validated 2026-10.
+name: mitotools
+channels: [conda-forge, bioconda]
+dependencies:
+  - python=3.11
+  - biopython
+  - exonerate=2.4.0
+  - blast=2.17.0
+  - infernal=1.1.5
+  - table2asn=1.28.1179
+  - aragorn=1.2.41
+  - trnascan-se=2.0.13

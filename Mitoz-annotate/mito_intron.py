@@ -61,6 +61,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from Bio import SeqIO
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import mito_env  # noqa: E402  (finds external programs: config, PATH, conda environments)
 from Bio.Align import PairwiseAligner, substitution_matrices
 from Bio.Data import CodonTable
 from Bio.Seq import Seq
@@ -1002,9 +1004,7 @@ def process_file(f: Path) -> List[dict]:
 
 
 def find_tool(name: str, bin_dir: Optional[str]) -> Optional[str]:
-    if bin_dir and (Path(bin_dir) / name).exists():
-        return str(Path(bin_dir) / name)
-    return shutil.which(name)
+    return mito_env.find(name, bin_dir)
 
 
 def main(argv=None) -> int:

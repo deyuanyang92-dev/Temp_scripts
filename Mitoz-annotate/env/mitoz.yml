@@ -1,0 +1,5 @@
+# MitoZ 3.6 (PCG + rRNA annotation; its own pinned Python 3.8 / Infernal 1.1.1 / HMMER 3.1b2)
+name: mitoz
+channels: [conda-forge, bioconda]
+dependencies:
+  - mitoz=3.6

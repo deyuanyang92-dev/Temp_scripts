@@ -43,6 +43,9 @@ from Bio import SeqIO
 from Bio.Data import CodonTable
 from Bio.SeqFeature import CompoundLocation, ExactPosition, FeatureLocation, SeqFeature
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import mito_env  # noqa: E402  (finds external programs: config, PATH, conda environments)
+
 GB_EXT = {".gb", ".gbk", ".gbf", ".genbank", ".gbff"}
 RRNA_NAMES = {"rrns": "rrnS", "srrna": "rrnS", "12s": "rrnS", "12srrna": "rrnS", "rns": "rrnS", "rrn12": "rrnS",
               "rrnl": "rrnL", "lrrna": "rrnL", "16s": "rrnL", "16srrna": "rrnL", "rnl": "rrnL", "rrn16": "rrnL"}
@@ -325,13 +328,11 @@ def main(argv=None) -> int:
                    help="Always move PCG starts to the in-frame start codon nearest the preceding gene "
                         "(criterion i literally); default only when the annotated start codon is invalid")
     p.add_argument("--table2asn", default=None,
-                   help="NCBI table2asn for validation before/after curation (default: PATH or the mitointron env)")
+                   help="NCBI table2asn for validation before/after curation (default: found by mito_env.py)")
     p.add_argument("--no_validate", action="store_true", help="Skip the NCBI validation before/after curation")
     a = p.parse_args(argv)
     src, out = Path(a.input), Path(a.out)
-    t2a = None if a.no_validate else (a.table2asn or shutil.which("table2asn")
-                                       or next((str(x) for x in [Path("/root/miniconda3/envs/mitointron/bin/table2asn")]
-                                                if x.exists()), None))
+    t2a = None if a.no_validate else mito_env.find("table2asn", a.table2asn)
     if t2a:
         sys.path.insert(0, str(Path(__file__).resolve().parent))
         import copy

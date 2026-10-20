@@ -10,3 +10,10 @@ Reproduce (paths are examples):
 6. `python3 compare.py bench` -> summary + `bench/compare.tsv`.
 
 Truth = NCBI intron features + introns implied by joined CDS (gap >= 142 nt, not wrapping the origin) without an intron feature. A prediction matches a truth intron when it overlaps >= 50 % of it. Results: see ../README.md.
+
+## eval_trna.py (mito_trna.py)
+
+Records: `trna_sets.tsv` (85 intron-containing RefSeq mitogenomes, genetic code 4 as run; 40 annelid RefSeq
+mitogenomes with 22 NCBI tRNAs, first 40 by accession from the Annelida `incl-refseq-mitogenome` dedup set).
+Strip all features but `source`, run `mito_trna.py -i <acc_dir> -o out/<acc> --genetic_code <code>
+--tools mitos2,arwen,aragorn,trnascan`, then `python3 eval_trna.py <ncbi_gb_dir> out <label>`.

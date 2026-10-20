@@ -29,6 +29,16 @@ def test_laslett_origin_spanning_unwrapped():
     assert (p[1].aa, p[1].start, p[1].end, p[1].strand) == ("W", 13399, 13469, 1)
 
 
+def test_mitos_bed_keeps_numbered_copies():
+    # 2026-10-20: trnM_0(cat) / trnY_1(gta) (extra copies, Lottia digitalis NC_007782) were silently dropped
+    bed = ("x\t5774\t5841\ttrnM_0(cat)\t7.2e-08\t+\nx\t6857\t6927\ttrnY_1(gta)\t8.4e-10\t-\n"
+           "x\t100\t165\ttrnL1(tag)\t1e-9\t+\nx\t15508\t15575\ttrnQ(---)\t4.8e-4\t+\nx\t200\t260\tcox1\t0\t+\n")
+    p = mt.parse_mitos_bed(bed)
+    assert [(x.aa, x.anticodon, x.start, x.end, x.strand) for x in p] == [
+        ("M", "cat", 5775, 5841, 1), ("Y", "gta", 6858, 6927, -1), ("L", "tag", 101, 165, 1),
+        ("Q", "", 15509, 15575, 1)]   # trnQ(---): anticodon unreadable, tRNA kept
+
+
 def test_origin_spanning_groups_with_unwrapped_copy():
     """MITOS2 1..72 and ARWEN 16138..16211 (= 16138,1..73) are the same tRNA on a circular genome."""
     mt.CIRC_L = 16138

@@ -17,7 +17,6 @@ from __future__ import annotations
 import argparse
 import csv
 import re
-import shutil
 import subprocess
 import sys
 from collections import Counter
@@ -26,6 +25,9 @@ from typing import Dict, List, Optional
 
 from Bio import SeqIO
 from Bio.SeqFeature import AfterPosition, BeforePosition
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import mito_env  # noqa: E402  (finds external programs: config, PATH, conda environments)
 
 GB_EXT = {".gb", ".gbk", ".gbf", ".genbank", ".gbff"}
 SKIP_QUALS = {"translation", "db_xref", "protein_id", "locus_tag_old"}
@@ -109,12 +111,12 @@ def main(argv=None) -> int:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("-i", "--input", required=True)
     p.add_argument("-o", "--out", required=True)
-    p.add_argument("--table2asn", default=None, help="table2asn executable (default: PATH)")
+    p.add_argument("--table2asn", default=None, help="table2asn executable (default: found by mito_env.py)")
     p.add_argument("--focus", default="", help="Only count messages whose text matches this regex (e.g. intron|CDS)")
     p.add_argument("--only_ours", action="store_true",
                    help="Only count messages on features written by mito_intron.py")
     a = p.parse_args(argv)
-    exe = a.table2asn or shutil.which("table2asn")
+    exe = mito_env.find("table2asn", a.table2asn)
     if not exe:
         print("[ncbi_validate] table2asn not found (conda install -c bioconda table2asn)", file=sys.stderr)
         return 2

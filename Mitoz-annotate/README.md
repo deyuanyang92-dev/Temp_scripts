@@ -664,12 +664,14 @@ python3 mito_trna.py -i gb_or_fasta -o out --genetic_code 5 --tools mitos2,arwen
 
 **验证**（裸序列，对照 NCBI tRNA，氨基酸 + 反密码子 + 重叠 ≥50% 算找到；FP = 该处无 NCBI tRNA；`benchmark/eval_trna.py`）：
 
-| | 刺胞/海绵/扁盘 85 条，183 tRNA | 环节动物 23 条，506 tRNA |
+| | 刺胞/海绵/扁盘 85 条，183 tRNA | 环节动物 RefSeq 40 条，880 tRNA |
 |---|---|---|
-| MITOS2 | 89.6%，FP 20 | 95.7%，FP 1 |
-| ARWEN / ARAGORN | 91.8%，FP 348 / 462 | 95.5–96.4%，FP 45 / 69 |
-| tRNAscan-SE | 61.2%，FP 1 | 44.7%，FP 0 |
-| **默认选择** | **93.4%，FP 21** | **96.0%，FP 1** |
+| MITOS2 | 96.7%，FP 21 | 97.3%，FP 3 |
+| ARWEN / ARAGORN | 91.8%，FP 348 / 462 | 95.7% / 96.5%，FP 79 / 117 |
+| tRNAscan-SE | 61.2%，FP 1 | 46.1%，FP 0 |
+| **默认选择** | **96.7%，FP 21** | **97.5%，FP 3** |
+
+记录清单 `benchmark/trna_sets.tsv`（2026-10-20 重跑）。旧版把 MITOS2 的 `trnM_0(cat)`（同一模型多拷贝）和 `trnQ(---)`（反密码子读不出）丢掉，刺胞 MITOS2 只有 89.6%、默认 93.4%；同一批 85 条修复后 96.7%（另三种工具数字不变，差异全部来自此修复）。
 
 单用 ARWEN/ARAGORN 在 tRNA 少的类群假阳性极多，故只放 review 文件。刺胞的 FP 多来自 MITOS2，是否为 NCBI 漏注未确证。
 

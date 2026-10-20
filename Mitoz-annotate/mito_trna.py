@@ -58,6 +58,9 @@ from typing import Any, Dict, List, Optional
 from Bio import SeqIO
 from Bio.SeqFeature import CompoundLocation, FeatureLocation, SeqFeature
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import mito_env  # noqa: E402  (finds external programs: config, PATH, conda environments)
+
 AA3 = {"Ala": "A", "Arg": "R", "Asn": "N", "Asp": "D", "Cys": "C", "Gln": "Q", "Glu": "E", "Gly": "G",
        "His": "H", "Ile": "I", "Leu": "L", "Lys": "K", "Met": "M", "Phe": "F", "Pro": "P", "Ser": "S",
        "Thr": "T", "Trp": "W", "Tyr": "Y", "Val": "V"}
@@ -140,7 +143,9 @@ def trnascan(fa: Path, code: int, b: Dict[str, str], tmp: Path, a) -> List[Pred]
     return out
 
 
-MITOS_NAME = re.compile(r"^trn([A-Z])\d?\(([acgtnu]{3})\)", re.I)
+# trnL1(tag), trnS2(tga), extra copies of one model as trnM_0(cat) / trnM_1(cat), and trnQ(---) when the
+# anticodon could not be read (kept, anticodon '')
+MITOS_NAME = re.compile(r"^trn([A-Z])\d?(?:_\d+)?\(([acgtnu]{3}|---)\)", re.I)
 
 
 def mitos2(fa: Path, code: int, b: Dict[str, str], tmp: Path, a) -> List[Pred]:
@@ -157,15 +162,20 @@ def mitos2(fa: Path, code: int, b: Dict[str, str], tmp: Path, a) -> List[Pred]:
     bed = od / "result.bed"
     if not bed.exists():                              # failed run, not "no tRNA found"
         raise RuntimeError("MITOS2 produced no result.bed")
+    return parse_mitos_bed(bed.read_text())
+
+
+def parse_mitos_bed(text: str) -> List[Pred]:
+    """tRNA lines of MITOS2 result.bed (0-based start)."""
     out = []
-    for line in bed.read_text().splitlines():
+    for line in text.splitlines():
         c = line.split("\t")
         if len(c) < 6:
             continue
         m = MITOS_NAME.match(c[3])
         if m:
             out.append(Pred("MITOS2", int(c[1]) + 1, int(c[2]), -1 if c[5].strip() == "-" else 1, m.group(1).upper(),
-                            m.group(2).lower().replace("u", "t"), c[4], extra={"mitos_name": c[3]}))
+                            m.group(2).lower().replace("u", "t").strip("-"), c[4], extra={"mitos_name": c[3]}))
     return out
 
 
@@ -286,11 +296,8 @@ def feature(p: Pred, ac: str, note: str, L: int) -> SeqFeature:
 
 
 # ── driver ───────────────────────────────────────────────────────────────────
-def find(name: str, *dirs: Optional[str]) -> Optional[str]:
-    for d in dirs:
-        if d and (Path(d) / name).exists():
-            return str(Path(d) / name)
-    return shutil.which(name)
+def find(name: str, bin_dir: Optional[str], mitos_bin: Optional[str]) -> Optional[str]:
+    return mito_env.find(name, mitos_bin if name == "runmitos" else bin_dir)
 
 
 def main(argv=None) -> int:
@@ -319,6 +326,7 @@ def main(argv=None) -> int:
                    help="fast (default): MITOS2 without its sensitive-mode fallback (scripts/runmitos_fast.py); "
                         "full: unmodified runmitos (much slower when tRNAs are missing, e.g. anthozoans)")
     a = p.parse_args(argv)
+    a.mitos_refdir = mito_env.mitos_refdir(a.mitos_refdir, a.mitos_ref)
 
     if a.tools is None:
         a.tools = "mitos2,input" if a.select == "mitos2" else "mitos2,arwen,aragorn,trnascan,input"
@@ -330,7 +338,8 @@ def main(argv=None) -> int:
             print(f"[mito_trna] {t}: {need[t]} not found - skipped", file=sys.stderr)
             want.remove(t)
         if t == "mitos2" and t in want and not a.mitos_refdir:
-            print("[mito_trna] mitos2: --mitos_refdir not given - skipped", file=sys.stderr)
+            print("[mito_trna] mitos2: MITOS2 reference data (refseq89m) not found - skipped "
+                  "(give --mitos_refdir, or run install.sh)", file=sys.stderr)
             want.remove(t)
     if a.select == "mitos2" and "mitos2" not in want:
         print("[mito_trna] --select mitos2 needs MITOS2 (runmitos via --mitos_bin, and --mitos_refdir)", file=sys.stderr)

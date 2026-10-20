@@ -3,6 +3,51 @@
 本文档说明 `batch_mitoz.py` 的用途、输入格式、各子命令、常用参数、输出文件和工作流程。
 This document explains the purpose, inputs, subcommands, key options, outputs, and workflow of `batch_mitoz.py`.
 
+## MitoFuse：声明、致谢与引用 / Statement, acknowledgements and citation
+
+**MitoFuse**（暂定名）把多个优秀软件的长处整合成一条动物线粒体基因组注释流程：MitoZ 定位蛋白基因，MITOS2 注释 tRNA，MFannot 方法加内含子，并做端点校正和 NCBI 校验；每个环节选哪个软件，都以 benchmark 结果为依据（`benchmark/`）。
+
+**MitoFuse** (working name) combines the strengths of several excellent tools into one annotation workflow for animal mitochondrial genomes: MitoZ for protein-coding genes, MITOS2 for tRNAs, the MFannot method for introns, plus boundary curation and NCBI validation. Which tool handles each step is decided by benchmark results (`benchmark/`).
+
+**声明 / Statement**
+
+- 本软件基于作者多年研究中的一些心得，整合了大家的优秀软件，并使用 Claude Code（Anthropic）开发。
+- 作者不保留任何版权：本仓库代码以 CC0 1.0 放入公有领域（见 `LICENSE`），任何人都可以使用、修改、再发布，欢迎持续优化升级。
+- 使用本软件时，请引用本 GitHub 仓库，其他没有任何要求。
+- This software builds on the author's experience from years of research. It integrates excellent tools written by others and was developed with Claude Code (Anthropic).
+- The author claims no copyright: the code in this repository is dedicated to the public domain under CC0 1.0 (see `LICENSE`). Anyone may use, modify and redistribute it, and further improvements are welcome.
+- If you use it, please cite this GitHub repository. Nothing else is required.
+
+**第三方软件 / Third-party tools**
+
+本软件调用的软件不随本仓库分发，需要单独安装（`install.sh`），并各自保留原有许可证：例如 MitoZ 为 GPL-3.0，MITOS2 为 MIT（据 bioconda 包信息）。
+
+The tools that MitoFuse runs are not distributed with this repository and are installed separately (`install.sh`). Each keeps its own license, e.g. MitoZ GPL-3.0 and MITOS2 MIT (per their bioconda packages).
+
+**致谢 / Acknowledgements**
+
+感谢 MitoZ、MITOS2/MITOS、MiTFi、MFannot、Infernal、BLAST+、GeneWise、Exonerate、NCBI table2asn、Biopython 等软件的作者。没有他们的工作，就没有本软件。
+
+We thank the authors of MitoZ, MITOS2/MITOS, MiTFi, MFannot, Infernal, BLAST+, GeneWise, Exonerate, NCBI table2asn, Biopython and the other tools listed below. This software would not exist without their work.
+
+**引用 / Citation**
+
+引用本软件的同时，请一并引用实际用到的软件 / When citing this software, please also cite the tools it ran:
+
+- 本软件 / This software: https://github.com/deyuanyang92-dev/Temp_scripts (`CITATION.cff`)
+- MitoZ: Meng G, et al. 2019. Nucleic Acids Res. doi:10.1093/nar/gkz173
+- MITOS2: Donath A, et al. 2019. Nucleic Acids Res. doi:10.1093/nar/gkz833
+- MITOS: Bernt M, et al. 2013. Mol Phylogenet Evol. doi:10.1016/j.ympev.2012.08.023
+- MiTFi (tRNA models used by MITOS2 and MitoZ): Jühling F, et al. 2012. Nucleic Acids Res. doi:10.1093/nar/gkr1131
+- Infernal: Nawrocki EP, Eddy SR. 2013. Bioinformatics. doi:10.1093/bioinformatics/btt509
+- BLAST+: Camacho C, et al. 2009. BMC Bioinformatics. doi:10.1186/1471-2105-10-421
+- GeneWise (used by MitoZ): Birney E, et al. 2004. Genome Res. doi:10.1101/gr.1865504
+- 内含子 / introns（`mito_intron.py`）— MFannot: Lang BF, et al. 2023. Front Plant Sci. doi:10.3389/fpls.2023.1222186; Exonerate: Slater GSC, Birney E. 2005. BMC Bioinformatics. doi:10.1186/1471-2105-6-31
+- 端点校正依据 / boundary curation rules（`mito_curate.py`）: Fourdrilis S, et al. 2018. Sci Rep 8:17964. doi:10.1038/s41598-018-36428-7; Ghiselli F, et al. 2021. Phil Trans R Soc B. doi:10.1098/rstb.2020.0159
+- 可选 tRNA 工具 / optional tRNA tools（`mito_trna.py`）: ARWEN doi:10.1093/bioinformatics/btm573; ARAGORN doi:10.1093/nar/gkh152; tRNAscan-SE 2.0 doi:10.1093/nar/gkab688
+- Biopython: Cock PJA, et al. 2009. Bioinformatics. doi:10.1093/bioinformatics/btp163
+- NCBI table2asn: https://www.ncbi.nlm.nih.gov/genbank/table2asn/
+
 ## 脚本定位 / What The Script Does
 
 `batch_mitoz.py` 是一个 MitoZ 批量线粒体注释和 GenBank 后处理管线。

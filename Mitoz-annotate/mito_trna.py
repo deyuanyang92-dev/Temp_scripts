@@ -156,7 +156,8 @@ def mitos2(fa: Path, code: int, b: Dict[str, str], tmp: Path, a) -> List[Pred]:
     od.mkdir()
     env_bin = str(Path(b["runmitos"]).parent)
     exe = [b["runmitos"]] if a.mitos_mode == "full" else \
-        [str(Path(env_bin) / "python"), str(Path(__file__).resolve().parent / "scripts" / "runmitos_fast.py")]
+        [str(Path(env_bin) / "python"), str(Path(__file__).resolve().parent / "scripts" / "runmitos_fast.py"),
+         *(["--no_sensitive"] if a.mitos_mode == "fast" else [])]
     cmd = ["env", f"PATH={env_bin}:/usr/bin:/bin", *exe, "-i", str(fa), "-c", str(code), "-o", str(od),
            "-r", a.mitos_ref, "--refdir", a.mitos_refdir, "--prot", "0", "--rrna", "0", "--intron", "0", "--oril", "0"]
     run(cmd)
@@ -368,7 +369,7 @@ def main(argv=None) -> int:
     p.add_argument("--mitos_bin", default=None, help="directory with runmitos (MITOS2 environment bin)")
     p.add_argument("--mitos_refdir", default=None, help="MITOS2 reference data directory (contains refseq89m)")
     p.add_argument("--mitos_ref", default="refseq89m")
-    p.add_argument("--mitos_mode", choices=["fast", "full"], default="fast",
+    p.add_argument("--mitos_mode", choices=["fast", "sensitive", "full"], default="fast",
                    help="fast (default): MITOS2 without its sensitive-mode fallback (scripts/runmitos_fast.py); "
                         "full: unmodified runmitos (much slower when tRNAs are missing, e.g. anthozoans)")
     a = p.parse_args(argv)

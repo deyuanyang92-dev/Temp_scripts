@@ -1,0 +1,73 @@
+cff-version: 1.2.0
+title: "MitoFuse: animal mitochondrial genome annotation that combines MitoZ, MITOS2 and other tools"
+message: >-
+  If you use this software, please cite this GitHub repository AND the tools it runs
+  (see "references" below and the README section "Citation"). No other conditions apply:
+  the code of this repository is dedicated to the public domain (CC0 1.0).
+type: software
+authors:
+  - alias: deyuanyang92-dev
+repository-code: "https://github.com/deyuanyang92-dev/Temp_scripts"
+license: CC0-1.0
+keywords: [mitochondrial genome, annotation, MitoZ, MITOS2, GenBank, Metazoa]
+references:
+  - type: article
+    title: "MitoZ: a toolkit for animal mitochondrial genome assembly, annotation and visualization"
+    authors: [{family-names: Meng, given-names: Guanliang}]
+    journal: Nucleic Acids Research
+    year: 2019
+    doi: 10.1093/nar/gkz173
+  - type: article
+    title: "Improved annotation of protein-coding genes boundaries in metazoan mitochondrial genomes"
+    authors: [{family-names: Donath, given-names: Alexander}]
+    journal: Nucleic Acids Research
+    year: 2019
+    doi: 10.1093/nar/gkz833
+  - type: article
+    title: "MITOS: Improved de novo metazoan mitochondrial genome annotation"
+    authors: [{family-names: Bernt, given-names: Matthias}]
+    journal: Molecular Phylogenetics and Evolution
+    year: 2013
+    doi: 10.1016/j.ympev.2012.08.023
+  - type: article
+    title: "Improved systematic tRNA gene annotation allows new insights into the evolution of mitochondrial tRNA structures and into the mechanisms of mitochondrial genome rearrangements"
+    authors: [{family-names: Jühling, given-names: Frank}]
+    journal: Nucleic Acids Research
+    year: 2012
+    doi: 10.1093/nar/gkr1131
+  - type: article
+    title: "Infernal 1.1: 100-fold faster RNA homology searches"
+    authors: [{family-names: Nawrocki, given-names: Eric P.}]
+    journal: Bioinformatics
+    year: 2013
+    doi: 10.1093/bioinformatics/btt509
+  - type: article
+    title: "Mitochondrial genome annotation with MFannot: a critical analysis of gene identification and gene model prediction"
+    authors: [{family-names: Lang, given-names: B. Franz}]
+    journal: Frontiers in Plant Science
+    year: 2023
+    doi: 10.3389/fpls.2023.1222186
+  - type: article
+    title: "Automated generation of heuristics for biological sequence comparison"
+    authors: [{family-names: Slater, given-names: Guy St C.}]
+    journal: BMC Bioinformatics
+    year: 2005
+    doi: 10.1186/1471-2105-6-31
+  - type: article
+    title: "BLAST+: architecture and applications"
+    authors: [{family-names: Camacho, given-names: Christiam}]
+    journal: BMC Bioinformatics
+    year: 2009
+    doi: 10.1186/1471-2105-10-421
+  - type: article
+    title: "GeneWise and Genomewise"
+    authors: [{family-names: Birney, given-names: Ewan}]
+    journal: Genome Research
+    year: 2004
+    doi: 10.1101/gr.1865504
+  - type: article
+    title: "Biopython: freely available Python tools for computational molecular biology and bioinformatics"
+    authors: [{family-names: Cock, given-names: Peter J. A.}]
+    journal: Bioinformatics
+    year: 2009
+    doi: 10.1093/bioinformatics/btp163

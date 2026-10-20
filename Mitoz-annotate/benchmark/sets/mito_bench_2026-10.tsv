@@ -1,0 +1,174 @@
+accession	source_accession	phylum	class	order	family	genus	species	genetic_code	code_assumed	topology	length	evidence_tier	annotation_method	refseq_created	structure_flags	mitoz_clade	split	retrieved
+NC_016754.1	JN710452	Acanthocephala	Archiacanthocephala	Oligacanthorhynchida	Oligacanthorhynchidae	Oncicola	Oncicola luehei	5		circular	14281	B	unknown	2012-01-25			dev	2026-10-20
+NC_022921.1	JQ943583	Acanthocephala	Eoacanthocephala	Gyracanthocephala	Quadrigyridae	Pallisentis	Pallisentis celatus	5		circular	13855	B	unknown	2013-11-27			test	2026-10-20
+NC_026516.1	KJ869251	Acanthocephala	Palaeacanthocephala	Polymorphida	Polymorphidae	Southwellina	Southwellina hispida	5		circular	14742	B	unknown	2015-02-25			dev	2026-10-20
+NC_029766.1	KT592358	Acanthocephala	Polyacanthocephala	?Polyacanthocephala	Polyacanthorhynchidae	Polyacanthorhynchus	Polyacanthorhynchus caballeroi	5		circular	13956	B	unknown	2016-03-28			test	2026-10-20
+NC_060482.1	JQ809448	Acanthocephala	Palaeacanthocephala	Echinorhynchida	Pomphorhynchidae	Pomphorhynchus	Pomphorhynchus tereticollis	5		circular	13891	B	unknown	2022-02-11			dev	2026-10-20
+NC_060484.1	JQ824373	Acanthocephala	Palaeacanthocephala	Echinorhynchida	Pomphorhynchidae	Pomphorhynchus	Pomphorhynchus rocci	5		circular	13845	B	unknown	2022-02-11			dev	2026-10-20
+NC_007933.1	AY961084	Annelida	Polychaeta	?Polychaeta	Orbiniidae	Orbinia	Orbinia latreillii	5		circular	15558	B	unknown	2006-04-06		Annelida-segmented-worms	test	2026-10-20
+NC_026995.1	KP867019	Annelida	Polychaeta	Phyllodocida	Goniadidae	Goniada	Goniada japonica	5		circular	15327	B	unknown	2015-05-05		Annelida-segmented-worms	dev	2026-10-20
+NC_044092.1	MK105766	Annelida	Polychaeta	Terebellida	Cirratulidae	Timarete	Timarete posteria	5		circular	15497	B	unknown	2019-08-01		Annelida-segmented-worms	dev	2026-10-20
+NC_046790.1	MN334532	Annelida	Polychaeta	Phyllodocida	Aphroditidae	Aphrodita	Aphrodita australis	5		circular	15288	B	unknown	2020-04-10		Annelida-segmented-worms	dev	2026-10-20
+NC_061323.1	MN542781	Annelida	Clitellata	Hirudinida	Hirudinidae	Poecilobdella	Poecilobdella javanica	5		circular	15030	A-longread	unknown	2022-03-11		Annelida-segmented-worms	test	2026-10-20
+NC_065213.1	OK513070	Annelida	Clitellata	Crassiclitellata	Lumbricidae	Eisenia	Eisenia fetida	5		circular	16560	B	unknown	2022-08-03		Annelida-segmented-worms	test	2026-10-20
+NC_066399.1	OL840314	Annelida	Clitellata	Crassiclitellata	Lumbricidae	Eisenia	Eisenia nordenskioldi	5		circular	15290	B	MitoZ	2022-09-22		Annelida-segmented-worms	test	2026-10-20
+NC_069205.1	OM117614	Annelida	Clitellata	Acanthobdellida		Paracanthobdella	Paracanthobdella livanowi	5		circular	15500	B	unknown	2023-01-10		Annelida-segmented-worms	test	2026-10-20
+NC_069206.1	OM257165	Annelida	Clitellata	Rhynchobdellida	Glossiphoniidae	Baicaloclepsis	Baicaloclepsis echinulata	5		circular	15120	B	unknown	2023-01-10		Annelida-segmented-worms	dev	2026-10-20
+NC_069297.1	ON360997	Annelida	Polychaeta	?Polychaeta	Maldanidae	Asychis	Asychis amphiglyptus	5		circular	15918	B	unknown	2023-01-10		Annelida-segmented-worms	test	2026-10-20
+NC_072223.1	OQ076772	Annelida	Clitellata	Hirudinida	Salifidae	Barbronia	Barbronia yunnanensis	5		circular	15092	B	unknown	2023-03-15		Annelida-segmented-worms	dev	2026-10-20
+NC_082192.1	ON929998	Annelida	Polychaeta	Sabellida	Siboglinidae	Alaysia	Alaysia spiralis	5		circular	15040	B	MitoFinder	2023-09-16		Annelida-segmented-worms	dev	2026-10-20
+NC_020774.1	JX913769	Arthropoda	Insecta	Orthoptera	Lentulidae	Lentula	Lentula callani	5		circular	15944	B	unknown	2013-03-25		Arthropoda	test	2026-10-20
+NC_027109.1	KR020515	Arthropoda	Insecta	Lepidoptera	Nymphalidae	Euripus	Euripus nyctelius	5		circular	15417	B	unknown	2015-05-14		Arthropoda	test	2026-10-20
+NC_035061.1	KX758086	Arthropoda	Insecta	Coleoptera	Lampyridae	Aquatica	Aquatica wuhana	5		circular	16186	A-transcriptome	unknown	2017-06-13		Arthropoda	dev	2026-10-20
+NC_044669.1	MK575470	Arthropoda	Insecta	Diptera	Drosophilidae	Drosophila	Drosophila mercatorum	5		circular	16024	B	unknown	2019-09-21		Arthropoda	test	2026-10-20
+NC_045231.1	MK088052	Arthropoda	Insecta	Blattodea	Rhinotermitidae	Reticulitermes	Reticulitermes tibialis	5		circular	14990	A-transcriptome	unknown	2019-12-12		Arthropoda	dev	2026-10-20
+NC_046851.1	MN356095	Arthropoda	Insecta	Coleoptera	Cerambycidae	Annamanum	Annamanum lunulatum	5		circular	15610	B	unknown	2020-04-10		Arthropoda	dev	2026-10-20
+NC_066979.1	OK105076	Arthropoda	Insecta	Hemiptera	Cicadellidae	Doratura	Doratura homophyla	5		circular	16269	B	unknown	2022-10-09		Arthropoda	dev	2026-10-20
+NC_067797.1	ON840087	Arthropoda	Insecta	Hymenoptera	Athaliidae	Athalia	Athalia sikkimensis	5		circular	15986	B	MitoZ	2022-11-12		Arthropoda	dev	2026-10-20
+NC_067900.1	ON800830	Arthropoda	Arachnida	Ixodida	Argasidae	Argas	Argas ricei	5		circular	14450	A-longread	unknown	2022-11-12		Arthropoda	dev	2026-10-20
+NC_067930.1	ON800896	Arthropoda	Arachnida	Ixodida	Ixodidae	Rhipicephalus	Rhipicephalus zambeziensis	5		circular	14739	A-longread	unknown	2022-11-12		Arthropoda	test	2026-10-20
+NC_069055.1	ON209297	Arthropoda	Insecta	Hemiptera	Fulgoridae	Pyrops	Pyrops viridirostris	5		circular	16304	A-longread	unknown	2022-12-16		Arthropoda	test	2026-10-20
+NC_069241.1	OL677999	Arthropoda	Insecta	Trichoptera	Glossosomatidae	Agapetus	Agapetus zniachtl	5		circular	15482	B	unknown	2023-01-10		Arthropoda	test	2026-10-20
+NC_000941.1	AJ245743	Brachiopoda	Rhynchonellata	Terebratulida	Cancellothyrididae	Terebratulina	Terebratulina retusa	5		circular	15451	B	unknown	1999-10-29			test	2026-10-20
+NC_002322.1	AB035869	Brachiopoda	Rhynchonellata	Terebratulida	Laqueidae	Laqueus	Laqueus rubellus	5		circular	14017	B	unknown	2000-05-31			dev	2026-10-20
+NC_003086.1	AF331161	Brachiopoda	Rhynchonellata	Terebratulida	Laqueidae	Terebratalia	Terebratalia transversa	5		circular	14291	B	unknown	2001-08-28			test	2026-10-20
+NC_036679.1	KX774482	Brachiopoda	Lingulata	Lingulida	Lingulidae	Lingula	Lingula anatina	5		circular	25790	B	unknown	2018-01-18			dev	2026-10-20
+NC_039685.1	MG520333	Brachiopoda	Rhynchonellata	Terebratulida	Laqueidae	Laqueus	Laqueus japonicus	5		circular	14267	B	unknown	2018-11-09			dev	2026-10-20
+NC_085563.1	OR906209	Brachiopoda	Lingulata	Lingulida	Lingulidae	Lingula	Lingula reevei	5		circular	20778	B	unknown	2024-02-01			dev	2026-10-20
+NC_008192.1	DQ157889	Bryozoa	Gymnolaemata	Ctenostomatida	Flustrellidridae	Flustrellidra	Flustrellidra hispida	5		circular	13026	B	unknown	2006-06-20		Bryozoa	test	2026-10-20
+NC_011820.2	EU365892	Bryozoa	Gymnolaemata	Cheilostomatida	Watersiporidae	Watersipora	Watersipora subtorquata	5		circular	14144	B	unknown	2009-01-05		Bryozoa	dev	2026-10-20
+NC_015646.1	EU563937	Bryozoa	Stenolaemata	Tubuliporida	Tubuliporidae	Tubulipora	Tubulipora flabellaris	5		circular	13763	B	unknown	2011-06-14		Bryozoa	test	2026-10-20
+NC_016722.1	JQ061319	Bryozoa	Gymnolaemata	Cheilostomatida	Flustridae	Flustra	Flustra foliacea	5		circular	16089	B	unknown	2012-01-17		Bryozoa	test	2026-10-20
+NC_018355.1	JF957859	Bryozoa	Gymnolaemata	Cheilostomatida	Membraniporidae	Membranipora	Membranipora grandicella	5		circular	15861	B	unknown	2012-08-10		Bryozoa	dev	2026-10-20
+NC_038192.1	MG546680	Bryozoa	Phylactolaemata	?Phylactolaemata	Pectinatellidae	Pectinatella	Pectinatella magnifica	5		circular	17539	B	unknown	2018-08-03		Bryozoa	dev	2026-10-20
+NC_006083.1	AY619710	Chaetognatha	Sagittoidea	Phragmophora	Spadellidae	Paraspadella	Paraspadella gotoi	5		circular	11423	B	unknown	2004-07-29			dev	2026-10-20
+NC_006386.1	AY545549	Chaetognatha	Sagittoidea	Phragmophora	Spadellidae	Spadella	Spadella cephaloptera	5		circular	11905	B	unknown	2004-11-04			test	2026-10-20
+NC_013810.1	AP011545	Chaetognatha	Sagittoidea	Aphragmophora	Sagittidae	Zonosagitta	Zonosagitta nagae	5		circular	11459	B	unknown	2010-02-16			test	2026-10-20
+NC_013811.1	AP011546	Chaetognatha	Sagittoidea	Aphragmophora	Sagittidae	Decipisagitta	Decipisagitta decipiens	5		circular	11121	B	unknown	2010-02-16			dev	2026-10-20
+NC_013814.1	AP011547	Chaetognatha	Sagittoidea	Aphragmophora	Sagittidae	Flaccisagitta	Flaccisagitta enflata	5		circular	12631	B	unknown	2010-02-16			dev	2026-10-20
+NC_002082.1	X99256	Chordata	Mammalia	Primates	Hylobatidae	Hylobates	Hylobates lar	2		circular	16472	B	unknown	1999-08-24		Chordata	dev	2026-10-20
+NC_009732.1	AM493869	Chordata		Crocodylia	Alligatoridae	Paleosuchus	Paleosuchus trigonatus	2		circular	15948	B	unknown	2007-08-08		Chordata	dev	2026-10-20
+NC_011638.1	EU273712	Chordata	Mammalia	Rodentia	Muridae	Rattus	Rattus tanezumi	2		circular	16306	B	unknown	2008-12-05		Chordata	dev	2026-10-20
+NC_026285.1	KF840390	Chordata	Chondrichthyes	Myliobatiformes	Dasyatidae	Himantura	Himantura microphthalma	2		circular	17636	B	unknown	2015-01-31		Chordata	test	2026-10-20
+NC_028416.1	KT591478	Chordata	Actinopteri	Cypriniformes	Acheilognathidae	Acheilognathus	Acheilognathus gracilis	2		circular	16988	B	unknown	2015-11-17		Chordata	dev	2026-10-20
+NC_049998.1	MH481130	Chordata	Lepidosauria	Squamata	Lacertidae	Darevskia	Darevskia derjugini	2		circular	16960	B	unknown	2020-08-03		Chordata	dev	2026-10-20
+NC_053107.1	MN356372	Chordata	Aves	Passeriformes	Tyrannidae	Sapayoa	Sapayoa aenigma	2		circular	16945	B	unknown	2021-03-08		Chordata	test	2026-10-20
+NC_057981.1	MT712150	Chordata	Actinopteri	Tetraodontiformes	Ostraciidae	Lactoria	Lactoria cornuta	2		circular	16495	B	unknown	2021-09-30		Chordata	test	2026-10-20
+NC_062277.1	LR822067	Chordata	Mammalia	Carnivora	Mustelidae	Lutra	Lutra lutra	2		circular	16536	A-longread	unknown	2020-07-10		Chordata	test	2026-10-20
+NC_063745.1	OM830225	Chordata	Actinopteri	Gobiiformes	Gobiidae	Chaenogobius	Chaenogobius annularis	2		circular	16477	B	unknown	2022-06-03		Chordata	test	2026-10-20
+NC_083035.1	OR546189	Chordata	Actinopteri	Argentiniformes	Argentinidae	Argentina	Argentina striata	2		circular	16631	B	unknown	2023-10-04		Chordata	test	2026-10-20
+NC_088493.1	PP556414	Chordata	Mammalia	Rodentia	Cricetidae	Nephelomys	Nephelomys childi	2		circular	16218	A-longread	unknown	2024-05-01		Chordata	dev	2026-10-20
+NC_006902.1	AY903296	Cnidaria	Anthozoa	Scleractinia	Acroporidae	Montipora	Montipora cactus	4		circular	17887	B	unknown	2005-04-02			dev	2026-10-20
+NC_022829.1	KF448534	Cnidaria	Anthozoa	Scleractinia	Acroporidae	Acropora	Acropora yongei	4		circular	18342	B	unknown	2013-11-19			dev	2026-10-20
+NC_027103.1	KP938438	Cnidaria	Anthozoa	Corallimorpharia	Discosomidae	Rhodactis	Rhodactis indosinensis	4		circular	20100	B	unknown	2015-05-14			test	2026-10-20
+NC_031213.1	KT020766	Cnidaria	Hydrozoa	Anthoathecata	Oceaniidae	Turritopsis	Turritopsis dohrnii	4		linear	15425	B	unknown	2016-09-23	linear		dev	2026-10-20
+NC_046405.1	MN873596	Cnidaria	Anthozoa	Zoantharia	Parazoanthidae	Parazoanthus	Parazoanthus elongatus	4		circular	21148	B	unknown	2020-03-26			test	2026-10-20
+NC_046775.1	MN448506	Cnidaria	Scyphozoa	Semaeostomeae	Pelagiidae	Chrysaora	Chrysaora pacifica	4		circular	16964	B	unknown	2020-04-10			dev	2026-10-20
+NC_062009.1	OL616227	Cnidaria	Anthozoa	Scleralcyonacea	Ellisellidae	Dichotella	Dichotella gemmacea	4		circular	18769	B	unknown	2022-04-04			dev	2026-10-20
+NC_062023.1	OL616257	Cnidaria	Anthozoa	Scleralcyonacea	Parasphaerascleridae	Parasphaerasclera	Parasphaerasclera valdiviae	4		circular	18646	B	unknown	2022-04-04			test	2026-10-20
+NC_073494.1	MW588805	Cnidaria	Anthozoa	Malacalcyonacea	Eunicellidae	Eunicella	Eunicella verrucosa	4		circular	19267	B	unknown	2023-04-17			test	2026-10-20
+NC_080261.1	OQ785263	Cnidaria	Anthozoa	Zoantharia	Sphenopidae	Palythoa	Palythoa grandiflora	4		circular	21242	B	unknown	2023-06-26			test	2026-10-20
+NC_080948.1	OQ957217	Cnidaria	Hydrozoa	Siphonophorae	Resomiidae	Resomia	Resomia ornicephala	4		linear	15345	B	unknown	2023-07-29	linear		test	2026-10-20
+NC_080956.1	OQ957194	Cnidaria	Hydrozoa	Siphonophorae	Agalmatidae	Stephanomia	Stephanomia amphytridis	4		linear	15741	B	unknown	2023-07-29	linear		dev	2026-10-20
+NC_016117.1	JF760210	Ctenophora	Tentaculata	Lobata	Bolinopsidae	Mnemiopsis	Mnemiopsis leidyi	4		circular	10326	B	unknown	2011-10-21			dev	2026-10-20
+NC_038065.1	MG655622	Ctenophora	Nuda	Beroida	Beroidae	Beroe	Beroe forskalii	4		circular	13338	B	unknown	2018-07-31			test	2026-10-20
+NC_045305.1	MK361035	Ctenophora	Nuda	Beroida	Beroidae	Beroe	Beroe cucumis	4		circular	10487	B	unknown	2019-12-12			test	2026-10-20
+NC_045864.1	MN544300	Ctenophora	Tentaculata	Cydippida	Pleurobrachiidae	Hormiphora	Hormiphora californensis	4		circular	12564	A-longread	unknown	2020-02-24			dev	2026-10-20
+NC_001627.1	D16387	Echinodermata	Asteroidea	Valvatida	Asterinidae	Patiria	Patiria pectinifera	9		circular	16260	B	unknown	1999-08-25		Echinodermata	dev	2026-10-20
+NC_013878.1	FN562580	Echinodermata	Ophiuroidea	Euryalida	Gorgonocephalidae	Astrospartus	Astrospartus mediterraneus	9		circular	16238	B	unknown	2010-02-17		Echinodermata	dev	2026-10-20
+NC_023772.1	KC490912	Echinodermata	Echinoidea	Camarodonta	Strongylocentrotidae	Strongylocentrotus	Strongylocentrotus intermedius	9		circular	15700	B	unknown	2014-03-13		Echinodermata	test	2026-10-20
+NC_027063.1	KF214257	Echinodermata	Echinoidea	Camarodonta	Echinidae	Sterechinus	Sterechinus neumayeri	9		circular	15684	A-transcriptome	unknown	2015-05-14		Echinodermata	test	2026-10-20
+NC_040150.1	MH671882	Echinodermata	Ophiuroidea	Amphilepidida	Ophiuridae	Ophioplinthus	Ophioplinthus brevirima	9		circular	15967	B	unknown	2018-12-14		Echinodermata	test	2026-10-20
+NC_044109.1	MH424436	Echinodermata	Ophiuroidea	Amphilepidida	Ophiolepididae	Ophioplocus	Ophioplocus japonicus	9		circular	16144	B	unknown	2019-08-02		Echinodermata	test	2026-10-20
+NC_054230.1	MT476596	Echinodermata	Asteroidea	Valvatida	Oreasteridae	Anthenea	Anthenea aspera	9		circular	16298	B	unknown	2021-04-15		Echinodermata	dev	2026-10-20
+NC_061414.1	OL502703	Echinodermata	Echinoidea	Clypeasteroida	Astriclypeidae	Astriclypeus	Astriclypeus mannii	9		circular	15744	B	MitoZ	2022-03-11		Echinodermata	dev	2026-10-20
+NC_063787.1	OM272844	Echinodermata	Asteroidea	Forcipulatida	Asteriidae	Coscinasterias	Coscinasterias acutispina	9		circular	16186	B	unknown	2022-06-03		Echinodermata	test	2026-10-20
+NC_065088.1	MZ321055	Echinodermata	Holothuroidea	Dendrochirotida	Cucumariidae	Cucumaria	Cucumaria frondosa	9		circular	17507	B	unknown	2022-08-03		Echinodermata	dev	2026-10-20
+NC_068797.1	OM964491	Echinodermata	Crinoidea	Isocrinida	Isocrinidae	Metacrinus	Metacrinus rotundus	9		circular	15830	B	MitoZ	2022-12-05		Echinodermata	test	2026-10-20
+NC_083273.1	OR494080	Echinodermata	Echinoidea	Holasteroida	Pourtalesiidae	Echinocrepis	Echinocrepis rostrata	9		circular	15716	B	MitoFinder	2023-10-16		Echinodermata	dev	2026-10-20
+NC_010431.1	AB264799	Entoprocta		?	Loxosomatidae	Loxocorone	Loxocorone allax	5		circular	14862	B	unknown	2008-03-12			dev	2026-10-20
+NC_010432.1	AB264800	Entoprocta		?	Loxosomatidae	Loxosomella	Loxosomella aloxiata	5		circular	15323	B	unknown	2008-03-12			test	2026-10-20
+NC_026985.1	KP965862	Gastrotricha		Chaetonotida	Chaetonotidae	Lepidodermella	Lepidodermella squamata	5		circular	14558	B	unknown	2015-05-05			dev	2026-10-20
+NC_026983.1	KP965860	Gnathostomulida		Bursovaginoidea	Gnathostomulidae	Gnathostomula	Gnathostomula armata	5		circular	14030	B	unknown	2015-05-05			dev	2026-10-20
+NC_026984.1	KP965861	Gnathostomulida		Bursovaginoidea	Gnathostomulidae	Gnathostomula	Gnathostomula paradoxa	5		circular	14197	B	unknown	2015-05-05			dev	2026-10-20
+NC_001887.1	AF051097	Hemichordata	Enteropneusta	?Enteropneusta	Ptychoderidae	Balanoglossus	Balanoglossus carnosus	9		circular	15708	B	unknown	1999-08-24			test	2026-10-20
+NC_007438.1	AY336131	Hemichordata	Enteropneusta	?Enteropneusta	Harrimaniidae	Saccoglossus	Saccoglossus kowalevskii	9		circular	17037	B	unknown	2005-10-05			dev	2026-10-20
+NC_013877.1	FN562579	Hemichordata	Enteropneusta	?Enteropneusta	Ptychoderidae	Balanoglossus	Balanoglossus clavigerus	9		circular	15710	B	unknown	2010-02-17			test	2026-10-20
+NC_040107.1	MH841935	Hemichordata	Enteropneusta	?Enteropneusta	Harrimaniidae	Stereobalanus	Stereobalanus canadensis	5		circular	17366	B	unknown	2018-12-14			test	2026-10-20
+NC_040108.1	MH841936	Hemichordata	Enteropneusta	?Enteropneusta	Spengelidae	Schizocardium	Schizocardium brasiliense	5		circular	15416	B	unknown	2018-12-14			dev	2026-10-20
+NC_040109.1	MG652439	Hemichordata	Enteropneusta	?Enteropneusta	Ptychoderidae	Glossobalanus	Glossobalanus marginatus	9		circular	16827	B	unknown	2018-12-14			dev	2026-10-20
+NC_031872.1	KU975551	Kinorhyncha	Allomalorhagida	?Allomalorhagida	Pycnophyidae	Setaphyes	Setaphyes kielensis	5		circular	14985	B	unknown	2016-11-14			test	2026-10-20
+NC_031873.1	KU975552	Kinorhyncha	Cyclorhagida	?Cyclorhagida	Echinoderidae	Echinoderes	Echinoderes svetlanae	5		circular	15304	B	unknown	2016-11-14			dev	2026-10-20
+NC_045069.1	MF953591	Kinorhyncha	Cyclorhagida	Kentrorhagata	Semnoderidae	Semnoderes	Semnoderes armiger	5		circular	14986	B	unknown	2019-10-29			dev	2026-10-20
+NC_006886.2	AY497292	Mollusca	Bivalvia	Mytilida	Mytilidae	Mytilus	Mytilus galloprovincialis	5		circular	16744	B	unknown	2005-04-02		Mollusca	dev	2026-10-20
+NC_018362.1	JQ970425	Mollusca	Bivalvia	Mytilida	Mytilidae	Perna	Perna viridis	5		circular	16014	B	unknown	2012-08-10		Mollusca	dev	2026-10-20
+NC_037188.1	MG181942	Mollusca	Gastropoda	Littorinimorpha	Ranellidae	Charonia	Charonia lampas	5		circular	15405	B	unknown	2018-03-23		Mollusca	test	2026-10-20
+NC_061910.1	MN385249	Mollusca	Gastropoda	Neogastropoda	Olividae	Amalda	Amalda mucronata	5		circular	15353	B	unknown	2022-04-04		Mollusca	test	2026-10-20
+NC_063753.1	OM910828	Mollusca	Bivalvia	Myida	Xylophagaidae	Xylonora	Xylonora corona	5		circular	15083	B	unknown	2022-06-03		Mollusca	test	2026-10-20
+NC_063769.1	ON018802	Mollusca	Gastropoda	Neogastropoda	Conidae	Conus	Conus ebraeus	5		circular	18031	A-longread	unknown	2022-06-03		Mollusca	test	2026-10-20
+NC_065650.1	MW478843	Mollusca	Cephalopoda	Sepiida	Sepiolidae	Sepiola	Sepiola robusta	5		circular	14912	B	unknown	2022-08-25		Mollusca	dev	2026-10-20
+NC_068082.1	OM048765	Mollusca	Gastropoda	Cycloneritida	Neritidae	Nerita	Nerita reticulata	5		circular	15630	B	unknown	2022-11-12		Mollusca	test	2026-10-20
+NC_072228.1	OP723877	Mollusca	Gastropoda	Littorinimorpha	Cypraeidae	Purpuradusta	Purpuradusta gracilis	5		circular	16240	B	unknown	2023-03-15		Mollusca	dev	2026-10-20
+NC_083122.1	OR455957	Mollusca	Bivalvia	Limoida	Limidae	Lima	Lima vulgaris	5		circular	19014	B	unknown	2023-10-11		Mollusca	test	2026-10-20
+NC_084457.1	OR463910	Mollusca	Gastropoda	Nudibranchia	Dendrodorididae	Dendrodoris	Dendrodoris krusensternii	5		circular	14361	B	unknown	2023-12-07		Mollusca	dev	2026-10-20
+NC_086642.1	PP100270	Mollusca	Gastropoda	?Gastropoda	Lymnaeidae	Austropeplea	Austropeplea brazieri	5		circular	13757	A-longread	unknown	2024-03-05		Mollusca	dev	2026-10-20
+NC_001861.1	AF015193	Nematoda	Chromadorea	Rhabditida	Onchocercidae	Onchocerca	Onchocerca volvulus	5		circular	13747	B	unknown	1999-08-25		Nematoda	test	2026-10-20
+NC_002681.1	AF293969	Nematoda	Enoplea	Trichinellida	Trichinellidae	Trichinella	Trichinella spiralis	5		circular	16706	B	unknown	2001-02-26		Nematoda	test	2026-10-20
+NC_005928.1	AY382608	Nematoda	Enoplea	Dorylaimida	Longidoridae	Xiphinema	Xiphinema americanum	5		circular	12626	B	unknown	2004-06-23		Nematoda	test	2026-10-20
+NC_008047.1	DQ520859	Nematoda	Enoplea	Mermithida	Mermithidae	Diximermis	Diximermis spiculatus	5		circular	18030	B	unknown	2006-05-24		Nematoda	dev	2026-10-20
+NC_008640.1	EF154459	Nematoda	Enoplea	Mermithida	Mermithidae	Romanomermis	Romanomermis culicivorax	5		circular	26194	B	unknown	2006-12-12		Nematoda	test	2026-10-20
+NC_013831.1	GQ888721	Nematoda	Chromadorea	Rhabditida	Strongylidae	Chabertia	Chabertia ovina	5		circular	13682	B	unknown	2010-02-16		Nematoda	dev	2026-10-20
+NC_017750.1	GU385218	Nematoda	Enoplea	Trichinellida	Trichuridae	Trichuris	Trichuris trichiura	5		circular	14046	B	unknown	2012-04-20		Nematoda	dev	2026-10-20
+NC_027697.1	KR815453	Nematoda	Chromadorea	Rhabditida	Rhabditidae	Litoditis	Litoditis aff. marina PmIV	5		circular	13909	B	unknown	2015-08-04		Nematoda	test	2026-10-20
+NC_028229.1	LC050213	Nematoda	Chromadorea	Rhabditida	Strongyloididae	Strongyloides	Strongyloides venezuelensis	5		circular	15956	A-transcriptome	unknown	2015-11-01		Nematoda	dev	2026-10-20
+NC_033868.1	KU746819	Nematoda	Enoplea	Dorylaimida	Longidoridae	Paralongidorus	Paralongidorus litoralis	5		circular	12763	B	unknown	2017-02-27		Nematoda	dev	2026-10-20
+NC_036308.1	MF580344	Nematoda	Chromadorea	Rhabditida	Camallanidae	Camallanus	Camallanus cotti	5		circular	17901	B	unknown	2017-11-16		Nematoda	dev	2026-10-20
+NC_085811.1	OP965539	Nematoda	Chromadorea	Rhabditida	Panagrolaimidae	Halicephalobus	Halicephalobus mephisto	5		circular	14349	A-longread	unknown	2024-02-01		Nematoda	test	2026-10-20
+NC_044095.1	MG257765	Nematomorpha	Gordioida	Chordodea	Parachordodidae	Gordionus	Gordionus alpestris	5		circular	15132	B	unknown	2019-08-02			dev	2026-10-20
+NC_085569.1	OR003915	Nematomorpha	Gordioida	Chordodea	Chordodidae	Parachordodes	Parachordodes pustulosus	5		circular	14013	B	unknown	2024-02-01			test	2026-10-20
+NC_012821.1	FJ594739	Nemertea	Palaeonemertea	Archinemertea	Cephalotrichidae	Cephalothrix	Cephalothrix simula	5		circular	16296	B	unknown	2009-06-19		Nemertea-ribbon-worms	test	2026-10-20
+NC_014869.1	GU564482	Nemertea	Palaeonemertea	Archinemertea	Cephalotrichidae	Cephalothrix	Cephalothrix sp. SCS-2010	5		circular	15800	B	unknown	2011-01-06		Nemertea-ribbon-worms	test	2026-10-20
+NC_023523.1	KF719984	Nemertea	Pilidiophora	Heteronemertea	Lineidae	Iwatanemertes	Iwatanemertes piperata	5		circular	16382	B	unknown	2014-02-28		Nemertea-ribbon-worms	test	2026-10-20
+NC_023929.1	KC710979	Nemertea	Enopla	Monostilifera	Amphiporidae	Amphiporus	Amphiporus formidabilis	5		circular	14616	B	unknown	2014-04-09		Nemertea-ribbon-worms	dev	2026-10-20
+NC_023931.1	KC710981	Nemertea	Enopla	Monostilifera	Prosorhochmidae	Prosadenoporus	Prosadenoporus spectaculum	5		circular	14655	B	unknown	2014-04-09		Nemertea-ribbon-worms	dev	2026-10-20
+NC_042687.1	MH714705	Nemertea	Pilidiophora	Heteronemertea	Lineidae	Notospermus	Notospermus geniculatus	5		circular	15180	B	unknown	2019-06-25		Nemertea-ribbon-worms	dev	2026-10-20
+NC_009082.1	DQ666064	Onychophora	Udeonychophora	Euonychophora	Peripatidae	Epiperipatus	Epiperipatus biolleyi	5		circular	14411	B	unknown	2007-03-02			dev	2026-10-20
+NC_010961.1	EF624055	Onychophora	Udeonychophora	Euonychophora	Peripatopsidae	Metaperipatus	Metaperipatus inae	5		circular	15347	B	unknown	2008-06-13			test	2026-10-20
+NC_014273.1	HM008997	Onychophora	Udeonychophora	Euonychophora	Peripatopsidae	Opisthopatus	Opisthopatus cinctipes	5		circular	13673	B	unknown	2010-06-30			test	2026-10-20
+NC_015890.1	JF800076	Onychophora	Udeonychophora	Euonychophora	Peripatidae	Oroperipatus	Oroperipatus sp. DVL-2011	5		circular	14493	B	unknown	2011-08-01			dev	2026-10-20
+NC_060553.1	MG209116	Orthonectida		?	Rhopaluridae	Intoshia	Intoshia linei	5		circular	15217	B	unknown	2022-02-11			dev	2026-10-20
+NC_018761.1	JN832704	Phoronida		?	Phoronidae	Phoronopsis	Phoronopsis harmeri	5		circular	15495	B	unknown	2012-10-12			dev	2026-10-20
+NC_008151.3	DQ112541	Placozoa	Uniplacotomia	Trichoplacea	Trichoplacidae	Trichoplax	Trichoplax adhaerens	4		circular	43079	B	unknown	2006-06-13	no_cox1		dev	2026-10-20
+NC_015309.1	AB538868	Placozoa		?		Placozoan	Placozoan sp. 'Shirahama'	4		circular	36676	B	unknown	2011-03-28			test	2026-10-20
+NC_041549.1	MH682141	Placozoa		?		Polyplacotoma	Polyplacotoma mediterranea	4		circular	23462	B	unknown	2019-04-10			dev	2026-10-20
+NC_002545.1	AF216698	Platyhelminthes	Trematoda	Strigeidida	Schistosomatidae	Schistosoma	Schistosoma mansoni	9		circular	14415	B	unknown	2000-09-14			dev	2026-10-20
+NC_009938.1	AY684274	Platyhelminthes	Cestoda	Cyclophyllidea	Taeniidae	Taenia	Taenia saginata	9		circular	13670	B	unknown	2007-10-18			test	2026-10-20
+NC_017613.1	AB425839	Platyhelminthes	Cestoda	Diphyllobothriidea	Diphyllobothriidae	Diphyllobothrium	Diphyllobothrium balaenopterae	9		circular	13724	B	unknown	2012-04-11			dev	2026-10-20
+NC_030528.1	KX169163	Platyhelminthes	Trematoda	Plagiorchiida	Fasciolidae	Fasciolopsis	Fasciolopsis buskii	9		circular	14833	B	unknown	2016-07-12			test	2026-10-20
+NC_034715.1	KX434430	Platyhelminthes	Cestoda	Bothriocephalidea	Bothriocephalidae	Senga	Senga ophiocephalina	9		circular	13816	B	unknown	2017-05-24			test	2026-10-20
+NC_035255.1	MF078637	Platyhelminthes		?	Macrostomidae	Macrostomum	Macrostomum lignano	9		circular	14193	B	unknown	2017-07-14			test	2026-10-20
+NC_036051.1	KX822152	Platyhelminthes		Polycladida	Planoceridae	Planocera	Planocera reticulata	9		circular	14724	B	unknown	2017-10-18			test	2026-10-20
+NC_048467.1	MK685274	Platyhelminthes	Trematoda	Plagiorchiida	Dicrocoeliidae	Lyperosomum	Lyperosomum longicauda	9		circular	14567	B	unknown	2020-06-01			dev	2026-10-20
+NC_061205.1	MW808980	Platyhelminthes	Cestoda	Cyclophyllidea	Anoplocephalidae	Paranoplocephala	Paranoplocephala sp. RKZ13	9		circular	14148	B	unknown	2022-03-11			dev	2026-10-20
+NC_062047.1	MW646298	Platyhelminthes	Monogenea	Mazocraeidea	Diplozoidae	Paradiplozoon	Paradiplozoon yunnanensis	9		circular	14829	B	unknown	2022-04-04			dev	2026-10-20
+NC_079698.1	OQ693832	Platyhelminthes	Trematoda	Opisthorchiida	Opisthorchiidae	Metorchis	Metorchis bilis	9		circular	13854	B	unknown	2023-06-15			test	2026-10-20
+NC_085462.1	OR835203	Platyhelminthes		Tricladida	Geoplanidae	Arthurdendyus	Arthurdendyus triangulatus	9		circular	20309	A-longread	unknown	2024-02-01			dev	2026-10-20
+NC_010209.1	EU237488	Porifera	Demospongiae	Axinellida	Axinellidae	Ptilocaulis	Ptilocaulis walpersi	4		circular	18865	B	unknown	2008-01-03		Porifera-sponges	dev	2026-10-20
+NC_014868.1	HQ269362	Porifera	Homoscleromorpha	Homosclerophorida	Plakinidae	Plakortis	Plakortis simplex	4		circular	18551	B	unknown	2011-01-06		Porifera-sponges	test	2026-10-20
+NC_021422.1	JX535019	Porifera	Demospongiae	Dictyoceratida	Spongiidae	Hyattella	Hyattella sinuosa	4		circular	16422	B	unknown	2013-06-10		Porifera-sponges	dev	2026-10-20
+NC_025335.1	KM362735	Porifera	Demospongiae	Tetractinellida	Vulcanellidae	Poecillastra	Poecillastra laminaris	4		circular	18413	B	unknown	2014-10-24		Porifera-sponges	dev	2026-10-20
+NC_035983.1	KY682864	Porifera	Homoscleromorpha	Homosclerophorida	Oscarellidae	Oscarella	Oscarella pearsei	4		circular	20320	A-transcriptome	unknown	2017-10-06		Porifera-sponges	test	2026-10-20
+NC_085825.1	PP068995	Porifera	Demospongiae	Spongillida	Metaniidae	Corvomeyenia	Corvomeyenia everetti	4		circular	23941	A-longread	unknown	2024-02-01		Porifera-sponges	test	2026-10-20
+NC_008557.1	DQ463747	Priapulida	Priapulimorpha	Priapulimorphida	Priapulidae	Priapulus	Priapulus caudatus	5		linear	14919	B	unknown	2006-11-02	linear		dev	2026-10-20
+NC_010472.1	AP009407	Rotifera	Eurotatoria	Ploima	Brachionidae	Brachionus	Brachionus plicatilis	5		circular	11153	B	unknown	2008-03-17	no_cox1		dev	2026-10-20
+NC_010484.1	AP009408	Rotifera	Eurotatoria	Ploima	Brachionidae	Brachionus	Brachionus plicatilis	5		circular	12672	B	unknown	2008-03-19			dev	2026-10-20
+NC_013568.1	GQ304898	Rotifera	Eurotatoria	Philodinida	Philodinidae	Rotaria	Rotaria rotatoria	5		circular	15319	B	unknown	2009-12-04			test	2026-10-20
+NC_014848.1	FR749884	Tardigrada	Eutardigrada	Parachela	Hypsibiidae	Hypsibius	Hypsibius dujardini	5		circular	15169	B	unknown	2010-12-23			dev	2026-10-20
+NC_015829.1	HM600784	Tardigrada	Eutardigrada	Parachela	Doryphoribiidae	Thulinius	Thulinius sp. DVL-2010	5		circular	15047	B	unknown	2011-07-14			dev	2026-10-20
+NC_031407.1	AP017609	Tardigrada	Eutardigrada	Parachela	Ramazzottiidae	Ramazzottius	Ramazzottius varieornatus	5		circular	14428	B	unknown	2016-10-13			test	2026-10-20
+NC_008556.1	DQ832701	Xenacoelomorpha		?	Xenoturbellidae	Xenoturbella	Xenoturbella bocki	5		circular	15234	B	unknown	2006-10-31			test	2026-10-20
+NC_014578.1	HM237350	Xenacoelomorpha		Acoela	Convolutidae	Symsagittifera	Symsagittifera roscoffensis	5		circular	14803	B	unknown	2010-10-15			dev	2026-10-20
+NC_029217.1	KT862786	Xenacoelomorpha		?	Xenoturbellidae	Xenoturbella	Xenoturbella churro	5		circular	15339	B	unknown	2016-02-12			test	2026-10-20
+NC_029219.1	KT862788	Xenacoelomorpha		?	Xenoturbellidae	Xenoturbella	Xenoturbella monstrosa	5		circular	15279	B	unknown	2016-02-12			test	2026-10-20
+NC_034946.1	KY825222	Xenacoelomorpha		Acoela	Paratomellidae	Paratomella	Paratomella rubra	5		circular	14954	B	unknown	2017-06-02			test	2026-10-20
+NC_034948.1	KY825224	Xenacoelomorpha		Acoela	Isodiametridae	Isodiametra	Isodiametra pulchra	5		circular	18725	B	unknown	2017-06-02			dev	2026-10-20

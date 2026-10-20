@@ -1,0 +1,81 @@
+acc	pair	strand	overlap_nt	frame_offset	overlap_seq	down_first_codon	up_last_codon
+NC_000931.1	atp8/atp6	1	0				
+NC_000931.1	nad4l/nad4	1	7	2	ATGTTAA	ATG	TAA
+NC_001673.1	atp8/atp6	1	0				
+NC_001673.1	nad4l/nad4	1	7	2	ATGTTAA	ATG	TAA
+NC_006321.1	atp8/atp6	1	0				
+NC_006321.1	nad4l/nad4	1	0				
+NC_006379.1	atp8/atp6	1	0				
+NC_006379.1	nad4l/nad4	1	7	2	ATGTTAA	ATG	TAA
+NC_007933.1	atp8/atp6	1	0				
+NC_007933.1	nad4l/nad4	1	7	2	ATGTTAA	ATG	TAA
+NC_011826.1	atp8/atp6	1	0				
+NC_011826.1	nad4l/nad4	1	7	2	ATGATAA	ATG	TAA
+NC_012618.1	atp8/atp6	1	0				
+NC_012618.1	nad4l/nad4	1	4	2	ATAA	ATA	TAA
+NC_012768.1	atp8/atp6	1	0				
+NC_012768.1	nad4l/nad4	1	7	2	ATGTTAA	ATG	TAA
+NC_013569.1	atp8/atp6	1	0				
+NC_013569.1	nad4l/nad4	1	7	2	ATGTTAA	ATG	TAA
+NC_020609.1	atp8/atp6	1	0				
+NC_020609.1	nad4l/nad4	1	7	2	ATGCTAA	ATG	TAA
+NC_023124.1	atp8/atp6	1	0				
+NC_023124.1	nad4l/nad4	1	7	2	ATGTTAA	ATG	TAA
+NC_023776.1	atp8/atp6	1	0				
+NC_023776.1	nad4l/nad4	1	7	2	ATGTTAA	ATG	TAA
+NC_023836.1	atp8/atp6	1	0				
+NC_023836.1	nad4l/nad4	1	7	2	ATGCTAA	ATG	TAA
+NC_023925.1	atp8/atp6	1	0				
+NC_023925.1	nad4l/nad4	1	7	2	ATGTTAA	ATG	TAA
+NC_023926.1	atp8/atp6	1	0				
+NC_023926.1	nad4l/nad4	1	7	2	ATGTTAA	ATG	TAA
+NC_023927.1	atp8/atp6	1	0				
+NC_023927.1	nad4l/nad4	1	7	2	ATGTTAA	ATG	TAA
+NC_023928.1	atp8/atp6	1	0				
+NC_023928.1	nad4l/nad4	1	7	2	ATGTTAA	ATG	TAA
+NC_023943.1	atp8/atp6	1	0				
+NC_023943.1	nad4l/nad4	1	7	2	ATGTTAA	ATG	TAA
+NC_024653.1	atp8/atp6	1	0				
+NC_024653.1	nad4l/nad4	1	7	2	ATGCTAA	ATG	TAA
+NC_025292.1	atp8/atp6	1	0				
+NC_025292.1	nad4l/nad4	1	7	2	ATGTTAA	ATG	TAA
+NC_025561.1	atp8/atp6	1	0				
+NC_025561.1	nad4l/nad4	1	7	2	ATGCTAA	ATG	TAA
+NC_026833.1	atp8/atp6	1	0				
+NC_026833.1	nad4l/nad4	1	7	2	ATGTTAA	ATG	TAA
+NC_026855.1	atp8/atp6	1	0				
+NC_026855.1	nad4l/nad4	1	7	2	ATGTTAA	ATG	TAA
+NC_026856.1	atp8/atp6	1	0				
+NC_026856.1	nad4l/nad4	1	7	2	ATGCTAA	ATG	TAA
+NC_026857.1	atp8/atp6	1	0				
+NC_026857.1	nad4l/nad4	1	7	2	ATGTTAA	ATG	TAA
+NC_026858.1	atp8/atp6	1	0				
+NC_026858.1	nad4l/nad4	1	7	2	ATGCTAA	ATG	TAA
+NC_026859.1	atp8/atp6	1	0				
+NC_026859.1	nad4l/nad4	1	7	2	ATGCTAA	ATG	TAA
+NC_026860.1	atp8/atp6	1	0				
+NC_026860.1	nad4l/nad4	1	7	2	ATGCTAA	ATG	TAA
+NC_026861.1	atp8/atp6	1	0				
+NC_026861.1	nad4l/nad4	1	7	2	ATGCTAA	ATG	TAA
+NC_026862.1	atp8/atp6	1	0				
+NC_026862.1	nad4l/nad4	1	7	2	ATGTTAA	ATG	TAA
+NC_026995.1	atp8/atp6	1	0				
+NC_026995.1	nad4l/nad4	1	7	2	ATGCTAA	ATG	TAA
+NC_027257.1	atp8/atp6	1	0				
+NC_027257.1	nad4l/nad4	1	7	2	ATGTTAA	ATG	TAA
+NC_027258.1	atp8/atp6	1	0				
+NC_027258.1	nad4l/nad4	1	7	2	ATGCTAA	ATG	TAA
+NC_027699.1	atp8/atp6	1	skip_long				
+NC_027699.1	nad4l/nad4	1	7	2	ATGCTAA	ATG	TAA
+NC_027832.1	atp8/atp6	1	0				
+NC_027832.1	nad4l/nad4	1	0				
+NC_027854.1	atp8/atp6	1	0				
+NC_027854.1	nad4l/nad4	1	7	2	ATGCTAA	ATG	TAA
+NC_028050.1	atp8/atp6	1	0				
+NC_028050.1	nad4l/nad4	1	7	2	ATGTTAA	ATG	TAA
+NC_028711.1	atp8/atp6	1	0				
+NC_028711.1	nad4l/nad4	1	0				
+NC_028712.1	atp8/atp6	1	0				
+NC_028712.1	nad4l/nad4	1	0				
+NC_029863.1	atp8/atp6	1	0				
+NC_029863.1	nad4l/nad4	1	7	2	ATGTTAA	ATG	TAA

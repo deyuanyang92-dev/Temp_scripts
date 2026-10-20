@@ -178,6 +178,41 @@ def mitos_refdir(explicit: Optional[str] = None, ref: str = MITOS_REF) -> Option
     return None
 
 
+PCG_NAMES = ("ATP6", "ATP8", "COX1", "COX2", "COX3", "CYTB", "ND1", "ND2", "ND3", "ND4", "ND4L", "ND5", "ND6")
+
+
+def mitoz_profiles(src: Path, db_clade: str, dest_root: Path, as_clade: str = "Arthropoda") -> Path:
+    """MitoZ profiles dir in which clade name `as_clade` uses MitoZ's `db_clade` protein database.
+    MitoZ annotate uses the clade only for MT_database/<clade>_CDS_protein.fa and
+    CDS_HMM/<clade>_CDS_length_list (mitoz/annotate/annotation.py:590-591); rRNA models are global.
+    The length list (expected CDS length, nt) is the median protein length x 3 of the database, 0 when a
+    gene is absent (e.g. ATP8 in flatworms)."""
+    import re
+    import statistics
+    d = Path(dest_root) / db_clade
+    (d / "MT_database").mkdir(parents=True, exist_ok=True)
+    (d / "CDS_HMM").mkdir(exist_ok=True)
+    fa = Path(src) / "MT_database" / f"{db_clade}_CDS_protein.fa"
+    link = d / "MT_database" / f"{as_clade}_CDS_protein.fa"
+    if not link.exists():
+        link.symlink_to(fa)
+    if not (d / "rRNA_CM").exists():
+        (d / "rRNA_CM").symlink_to(Path(src) / "rRNA_CM", target_is_directory=True)
+    lengths: Dict[str, List[int]] = {}
+    name, n = None, 0
+    for line in fa.read_text().splitlines() + [">"]:
+        if line.startswith(">"):
+            if name:
+                lengths.setdefault(name, []).append(n)
+            m = re.match(r">gi_[A-Z]{2}_?\d+_([A-Za-z0-9]+)_", line)
+            name, n = (m.group(1).upper() if m else None), 0
+        else:
+            n += len(line.strip())
+    (d / "CDS_HMM" / f"{as_clade}_CDS_length_list").write_text(
+        "".join(f"{g}\t{int(statistics.median(lengths[g]) * 3) if g in lengths else 0}\n" for g in PCG_NAMES))
+    return d
+
+
 def doctor(write: bool = False) -> int:
     print(f"config: {config_path()}{'' if config_path().exists() else ' (not present)'}")
     print(f"conda/mamba: {', '.join(map(str, conda_roots())) or 'not found'}")

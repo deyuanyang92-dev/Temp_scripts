@@ -17,6 +17,14 @@ Settings (environment variables, set by batch_mitoz.py):
   YZZ_MITOS_REFDIR  MITOS2 reference directory (contains refseq89m)
   YZZ_MITOS_REF     reference name (default refseq89m)
   YZZ_CIRCOS        yes = keep the circos plot (default no)
+  YZZ_MITOS_MODE    sensitive (default: MITOS2's sensitive pass for missing tRNAs, run in parallel - same
+                    tRNAs as runmitos; fast mode missed 28/28 such tRNAs in the 2026-10-20 dev benchmark)
+                    | fast (skip that pass) | full (unmodified runmitos)
+  YZZ_PHASE1_FAST   1 = fast tRNA mode in batch_mitoz round 1 (01.mitoz_anno1), which only orients the
+                    sequence when round 2 re-annotates it
+  YZZ_CLADE_DB      protein database MitoZ ships but does not offer as --clade (Cnidaria,
+                    Platyhelminthes-flatworms, Chaetognatha-arrow-worms, Animal): MitoZ runs with
+                    --clade Arthropoda and a --profiles_dir that points that name at this database
   YZZ_TRNA_WRAP     file collecting MITOS2 tRNAs across the sequence origin (MiTFi's table cannot hold
                     them); batch_mitoz.py adds them to the final GenBank (mito_trna.add_wrapped)
 
@@ -43,6 +51,8 @@ MITOS_BIN = os.environ.get("YZZ_MITOS_BIN", "")
 MITOS_REFDIR = os.environ.get("YZZ_MITOS_REFDIR", "")
 MITOS_REF = os.environ.get("YZZ_MITOS_REF", "refseq89m")
 WRAP_FILE = os.environ.get("YZZ_TRNA_WRAP", "")
+MITOS_MODE = os.environ.get("YZZ_MITOS_MODE", "sensitive")
+CLADE_DB = os.environ.get("YZZ_CLADE_DB", "")
 
 
 def mitos2_ready() -> bool:
@@ -56,7 +66,7 @@ def mitos2_trna_annotation(workdir=None, mt_file=None, genetic_code=None, logger
     os.makedirs(workdir, exist_ok=True)
     mt_file_base = os.path.basename(mt_file)
     trna_out = os.path.join(workdir, mt_file_base + ".trna")
-    opts = types.SimpleNamespace(mitos_mode="fast", mitos_ref=MITOS_REF, mitos_refdir=MITOS_REFDIR)
+    opts = types.SimpleNamespace(mitos_mode=MITOS_MODE, mitos_ref=MITOS_REF, mitos_refdir=MITOS_REFDIR)
     rows = []
     try:
         for rec in SeqIO.parse(mt_file, "fasta"):
@@ -105,7 +115,26 @@ def gather_existing(*files, logger=None, result_wdir=None):
 
 ORIGINAL_GATHER = annotation.gather_result
 
+def use_clade_db(argv):
+    """--clade X (X in YZZ_CLADE_DB) -> --clade Arthropoda --profiles_dir <workdir>/mitom_profiles/X."""
+    import mito_env
+    work = Path(argv[argv.index("--workdir") + 1]) if "--workdir" in argv else Path.cwd()
+    src = Path(annotation.__file__).resolve().parents[1] / "profiles"
+    d = mito_env.mitoz_profiles(src, CLADE_DB, work / "mitom_profiles", as_clade="Arthropoda")
+    if "--clade" in argv:
+        argv[argv.index("--clade") + 1] = "Arthropoda"
+    else:
+        argv += ["--clade", "Arthropoda"]
+    argv += ["--profiles_dir", str(d)]
+
+
 if __name__ == "__main__":
+    # round 1 of batch_mitoz only orients the sequence (its tRNAs are discarded when round 2 runs): fast tRNAs
+    wd = sys.argv[sys.argv.index("--workdir") + 1] if "--workdir" in sys.argv else ""
+    if os.environ.get("YZZ_PHASE1_FAST") == "1" and "01.mitoz_anno1" in wd:
+        MITOS_MODE = "fast"
+    if CLADE_DB:
+        use_clade_db(sys.argv)
     if TRNA == "mitos2":
         if mitos2_ready():
             annotation.tRNA_annotation = mitos2_trna_annotation

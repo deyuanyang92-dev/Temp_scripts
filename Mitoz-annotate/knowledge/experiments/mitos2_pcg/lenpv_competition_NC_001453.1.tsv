@@ -1,0 +1,9 @@
+# NC_001453.1 (echinoid, code 9): genes whose MITOS2 5' end differs from RefSeq. Both boundary pairs were MITOS2 candidates; product = start_p*start_dend*stop_p*stop_dend*degmal*lenpv (blast/stst.dat of the run, 2026-10-20)
+gene	strand	refseq	ref_lenpv	ref_product	mitos	mitos_lenpv	mitos_product
+atp6	1	8634..9329	0.107	0.0533	8811..9329	0.970	0.3686
+nad4l	1	7418..7711	0.679	0.0544	7445..7711	0.893	0.2958
+nad4	1	10567..11955	0.260	0.1130	10597..11955	0.694	0.2949
+nad6	-1	13987..14484	0.130	0.0370	13987..14457	0.840	0.2247
+cox2	1	7711..8400	0.689	0.3207	7759..8400	0.817	0.3530
+cox3	1	9333..10115	0.710	0.3259	9405..10115	0.817	0.3399
+nad5	1	12082..13995	0.367	0.1876	12283..13995	0.686	0.3273

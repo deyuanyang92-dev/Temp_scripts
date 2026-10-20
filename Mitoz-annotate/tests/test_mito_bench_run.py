@@ -235,3 +235,14 @@ def test_recollect_keeps_tool_failures(tmp_path):
     mr.write_status(out, {"tool": "mitos2", "accession": "NC_1.1", "status": "failed", "seconds": 5.0,
                           "step_seconds": {}, "error": "runmitos: boom"})
     assert mr.run_one("mitos2", ROW, tmp_path, 1, 30, recollect=True)["error"] == "runmitos: boom"
+
+
+def test_mitom_runs_every_phylum(tmp_path):
+    """MitoM (engine mitom) covers phyla MitoZ lacks via the extended clades: never 'unsupported'."""
+    row = dict(ROW, mitoz_clade="", phylum="Cnidaria", genetic_code="4")
+    cmd = mr.build_cmd("mitom", row, tmp_path / "bare", tmp_path / "out", 2)
+    assert cmd[0][cmd[0].index("--clade") + 1] == "Cnidaria" and cmd[0][cmd[0].index("--genetic_code") + 1] == "4"
+    cmd = mr.build_cmd("mitom", dict(row, phylum="Rotifera"), tmp_path / "bare", tmp_path / "out", 2)
+    assert cmd[0][cmd[0].index("--clade") + 1] == "Animal"
+    cmd = mr.build_cmd("mitom", ROW, tmp_path / "bare", tmp_path / "out", 2)
+    assert cmd[0][cmd[0].index("--clade") + 1] == "Annelida-segmented-worms"

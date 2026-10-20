@@ -331,6 +331,13 @@ MITOZ_FAST = Path(__file__).resolve().parent / "scripts" / "mitoz_fast.py"
 # MitoZ 3.6 `annotate --clade` choices (checked before any job starts)
 MITOZ_CLADES = ("Chordata", "Arthropoda", "Echinodermata", "Annelida-segmented-worms", "Bryozoa", "Mollusca",
                 "Nematoda", "Nemertea-ribbon-worms", "Porifera-sponges")
+# MitoZ's genetic code per clade (mitoz/annotate/annotation.py genetic_code_dict)
+MITOZ_CODES = {"Chordata": 2, "Echinodermata": 9, "Porifera-sponges": 4}
+# Protein databases MitoZ ships (profiles/MT_database) but does not offer as --clade; "Animal" = all of them
+# (any other phylum). scripts/mitoz_fast.py maps them in with --profiles_dir (mito_env.mitoz_profiles).
+# 2026-10-20 dev benchmark, 48 records of these phyla: 48/48 annotated, PCG both ends exact 54 % (MITOS2 49 %).
+EXTRA_CLADES = ("Cnidaria", "Platyhelminthes-flatworms", "Chaetognatha-arrow-worms", "Animal")
+ALL_CLADES = MITOZ_CLADES + EXTRA_CLADES
 
 
 def fast_mitoz_cmd(cmd: List[str], fast: str) -> List[str]:
@@ -2656,6 +2663,7 @@ def workflow_annotate(args: argparse.Namespace) -> int:
     # no_{gene}_gene/ subdirectory records are also included in the merged
     # archive.  Use final_dir.glob("*.gbf") if you want only the top-level
     # (successfully-oriented) records.
+    run_rescue(args, final_dir, out_root)
     run_intron_fix(args, in_path, final_dir, out_root)
     add_wrapped_trnas(final_dir, out_root / "trna_wrap.tsv")
     all_final_gbs = sorted(
@@ -2746,9 +2754,20 @@ def resolve_tools(args: argparse.Namespace) -> str:
     if str(MITOZ_FAST.parents[1]) not in sys.path:
         sys.path.insert(0, str(MITOZ_FAST.parents[1]))
     import mito_env
-    if args.clade not in MITOZ_CLADES:
-        return (f"ERROR: --clade '{args.clade}' is not a MitoZ clade. Choose one of:\n  " + ", ".join(MITOZ_CLADES)
-                + "\n  (MitoZ has no clade for e.g. Cnidaria: choose the closest one and check the result.)")
+    if getattr(args, "engine", "mitom") == "mitoz":
+        if args.clade not in MITOZ_CLADES:
+            return f"ERROR: --engine mitoz needs a MitoZ clade ({', '.join(MITOZ_CLADES)}); use --engine mitom"
+        args.trna, args.rescue = "mitoz", "no"
+    if args.clade not in ALL_CLADES:
+        return (f"ERROR: --clade '{args.clade}' is not a supported clade. Choose one of:\n  " + ", ".join(ALL_CLADES)
+                + "\n  (Animal = all-animal protein database, for any phylum not listed.)")
+    if getattr(args, "genetic_code", 0) is None:
+        if args.clade in EXTRA_CLADES:
+            return (f"ERROR: --clade {args.clade} needs --genetic_code (e.g. 4 Cnidaria, 9 Platyhelminthes, "
+                    "5 most invertebrates; NCBI table of your taxon)")
+        args.genetic_code = MITOZ_CODES.get(args.clade, 5)
+    os.environ["YZZ_CLADE_DB"] = args.clade if args.clade in EXTRA_CLADES else ""
+    os.environ["YZZ_PHASE1_FAST"] = "1" if getattr(args, "if_reannotation_2", "no") == "yes" else ""
     if not args.conda_env_mitoz and not args.mitoz_path:
         args.conda_env_mitoz = mito_env.mitoz_env()
         if not args.conda_env_mitoz and mito_env.find("mitoz"):
@@ -2766,8 +2785,26 @@ def resolve_tools(args: argparse.Namespace) -> str:
     elif args.trna == "mitos2":
         print("[ENV] MITOS2 not found: MitoZ's own MiTFi tRNA step is used (slow). "
               "Install it: bash install.sh, or give --mitos_bin / --mitos_refdir", file=sys.stderr)
-    args.mitoz_fast = str(MITOZ_FAST) if (args.trna == "mitos2" or args.circos == "no") and MITOZ_FAST.exists() else ""
+    args.mitoz_fast = str(MITOZ_FAST) if (args.trna == "mitos2" or args.circos == "no" or args.clade in EXTRA_CLADES) \
+        and MITOZ_FAST.exists() else ""
     return ""
+
+
+def run_rescue(args: argparse.Namespace, final_dir: Path, out_root: Path) -> None:
+    """Add genes MitoZ missed from MITOS2 (mito_rescue.py), in place; report rescue_report.tsv."""
+    if getattr(args, "rescue", "no") == "no":
+        return
+    if not (args.mitos_bin and args.mitos_refdir):
+        msg = "[RESCUE] skipped: MITOS2 not found (--mitos_bin / --mitos_refdir)"
+        logging.error(msg) if args.rescue == "yes" else logging.info(msg)
+        return
+    import mito_rescue
+    rows = mito_rescue.rescue_dir(final_dir, int(args.genetic_code), mitos_bin=args.mitos_bin, refdir=args.mitos_refdir)
+    write_nonempty_table(out_root / "rescue_report.tsv", "file\trecord\tgene\tlocation\tstatus",
+                         ["\t".join(r[k] for k in ("file", "record", "gene", "location", "status")) for r in rows])
+    added = [f"{r['record']}:{r['gene']}" for r in rows if r["status"] == "added"]
+    failed = [r["record"] for r in rows if r["status"] != "added"]
+    logging.info(f"[RESCUE] {len(added)} gene(s) added from MITOS2 {added}" + (f"; MITOS2 failed: {failed}" if failed else ""))
 
 
 def add_wrapped_trnas(final_dir: Path, wrap_file: Path) -> None:
@@ -3083,6 +3120,7 @@ def workflow_run(args: argparse.Namespace) -> int:
 
     # Merge all final GBs including no_{gene}_gene/ subdirectory.
     # Use final_dir.glob("*.gbf") if you want only successfully-oriented records.
+    run_rescue(args, final_dir, out_root)
     run_intron_fix(args, in_path, final_dir, out_root)
     add_wrapped_trnas(final_dir, out_root / "trna_wrap.tsv")
     all_final_gbs = sorted(
@@ -3345,16 +3383,22 @@ def build_parser() -> argparse.ArgumentParser:
                        help="Conda env containing MitoZ (e.g. mitoz3.6).")
         g.add_argument("--mitoz_path",      default=None,
                        help="Path to MitoZ executable or directory.")
+        g.add_argument("--engine", choices=["mitom", "mitoz"], default="mitom",
+                       help="mitom (default): MitoZ protein genes / rRNAs (+ extended clades) with MITOS2 tRNAs and "
+                            "MITOS2 rescue of missed genes; mitoz: the original MitoZ path (--trna mitoz --rescue no).")
         g.add_argument("--trna", choices=["mitos2", "mitoz"], default="mitos2",
-                       help="tRNA step inside MitoZ: mitos2 (default) = MITOS2 fast mode, same MiTFi Metazoa "
-                            "models, ~10 s instead of ~140 s single-core MiTFi; falls back to MiTFi when MITOS2 "
-                            "is missing or fails. mitoz = original MiTFi.")
+                       help="tRNA step inside MitoZ: mitos2 (default) = MITOS2 with its sensitive pass run in "
+                            "parallel (same MiTFi Metazoa models and same tRNAs as runmitos); falls back to MiTFi "
+                            "when MITOS2 is missing or fails. mitoz = original single-core MiTFi.")
         g.add_argument("--mitos_bin", default=None,
                        help="MITOS2 environment bin (runmitos). Default: found automatically (mito_env.py).")
         g.add_argument("--mitos_refdir", default=None,
                        help="Directory containing MITOS2 refseq89m. Default: found automatically.")
         g.add_argument("--circos", choices=["no", "yes"], default="no",
                        help="Draw MitoZ's circos plot (default no: ~8 s per record, not used downstream).")
+        g.add_argument("--rescue", choices=["auto", "yes", "no"], default="auto",
+                       help="Add protein genes / rRNAs MitoZ missed from a MITOS2 annotation (mito_rescue.py; "
+                            "nothing MitoZ annotated is changed). auto = run when MITOS2 is found (default).")
         g.add_argument("--intron_fix", choices=["auto", "yes", "no"], default="auto",
                        help="Add introns MitoZ misses with mito_intron.py (MFannot method: Exonerate "
                             "protein2genome + MFannot boundary rules + Rfam intron type). "
@@ -3383,8 +3427,9 @@ def build_parser() -> argparse.ArgumentParser:
         g.add_argument("--clade",        default=_CLADE_DEFAULT,
                        help=f"MitoZ --clade value (default: '{_CLADE_DEFAULT}').\n"
                             "⚠ Change this for non-Annelida datasets.")
-        g.add_argument("--genetic_code", type=int, default=5,
-                       help="Genetic code (default: 5, invertebrate mitochondrial).")
+        g.add_argument("--genetic_code", type=int, default=None,
+                       help="Genetic code (default: MitoZ's code of the clade - 2 Chordata, 9 Echinodermata, "
+                            "4 Porifera, else 5; required for Cnidaria, Platyhelminthes, Chaetognatha, Animal).")
         g.add_argument("--species_name", default=None)
         g.add_argument("--mitoz_extra",  action="append", default=[],
                        metavar="ARG",

@@ -1,0 +1,15 @@
+# records compared: 22
+gene	ncbi_cds	mitoz_found	wrong_locus	five_prime_identical	three_prime_identical	both_identical
+atp8	22	22	0	22	22	22
+atp6	22	22	0	22	22	22
+nad4l	22	22	0	16	22	16
+nad4	22	22	0	15	20	13
+nad6	22	22	0	21	12	12
+cox1	22	22	0	22	12	12
+cox2	22	22	0	22	17	17
+cox3	22	22	0	22	22	22
+cob	21	21	0	20	12	11
+nad1	22	22	0	19	18	16
+nad2	22	22	0	18	6	6
+nad3	22	22	0	21	21	20
+nad5	22	22	0	14	6	4

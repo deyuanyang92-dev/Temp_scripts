@@ -1,0 +1,13 @@
+acc	pair	strand	overlap_nt	frame_offset	overlap_seq	down_first_codon	up_last_codon
+NC_000931.1	atp8/atp6	1	0				
+NC_000931.1	nad4l/nad4	1	7	2	ATGTTAA	ATG	TAA
+NC_012920.1	atp8/atp6	1	46	2	ATGAACGAAAATCTGTTCGCTTCATTCATTGCCCCCACAATCCTAG	ATG	TAG
+NC_012920.1	nad4l/nad4	1	7	2	ATGCTAA	ATG	TAA
+NC_024511.2	atp8/atp6	1	7	2	ATGATAA	ATG	TAA
+NC_024511.2	nad4l/nad4	-1	1		A	A	A
+NC_001328.1	atp8/atp6		missing				
+NC_001328.1	nad4l/nad4	1	0				
+NC_001566.1	atp8/atp6	1	19	2	ATGAAATTGATTTTGATAA	ATG	TAA
+NC_001566.1	nad4l/nad4	-1	0				
+NC_001453.1	atp8/atp6	1	10	2	ATGACTATAA	ATG	TAA
+NC_001453.1	nad4l/nad4	1	0				

@@ -71,10 +71,10 @@ def test_fast_cmd_conda_and_path():
 
 
 def test_wrong_clade_rejected_before_any_job(tmp_path):
-    # 2026-10-20: --clade Cnidaria only failed per sample after setup (MitoZ has no such clade)
+    # 2026-10-20: an unknown --clade only failed per sample after setup (Cnidaria is now an extended clade)
     r = subprocess.run([sys.executable, str(HERE.parent / "batch_mitoz.py"), "run", "-i", str(tmp_path),
-                        "-o", str(tmp_path / "out"), "--clade", "Cnidaria"], capture_output=True, text=True)
-    assert r.returncode == 2 and "not a MitoZ clade" in r.stderr and not (tmp_path / "out").exists()
+                        "-o", str(tmp_path / "out"), "--clade", "Cnidarians"], capture_output=True, text=True)
+    assert r.returncode == 2 and "not a supported clade" in r.stderr and not (tmp_path / "out").exists()
 
 
 @pytest.mark.skipif(not (MITOZ_PY.exists() and MITOS_BIN and MITOS_REF), reason="MitoZ / MITOS2 not available")
@@ -117,3 +117,41 @@ def test_wrapped_trna_added_to_final_gbf(tmp_path):
     out = SeqIO.read(str(tmp_path / "final" / "S1.gbf"), "genbank")
     t = [f for f in out.features if f.type == "tRNA"]
     assert len(t) == 1 and str(t[0].extract(out.seq)) == trna
+
+
+def _fake_mitoz_profiles(tmp_path):
+    src = tmp_path / "mitoz_profiles"
+    (src / "MT_database").mkdir(parents=True)
+    (src / "rRNA_CM").mkdir()
+    (src / "MT_database" / "Cnidaria_CDS_protein.fa").write_text(
+        ">gi_NC_1_COX1_Aa_bb_3_aa\nMAAAAAAAAA\n>gi_NC_2_COX1_Cc_dd_3_aa\nMAAAAAAAAAAA\n>gi_NC_2_ND6_Cc_dd_3_aa\nMAAAA\n")
+    return src
+
+
+def test_extended_clade_profiles(tmp_path):
+    """2026-10-20: MitoZ ships Cnidaria / flatworm / arrow-worm / all-animal protein databases its --clade
+    list does not offer; a profiles dir maps them to the name MitoZ is called with (dev benchmark: 48/48
+    records of MitoZ-unsupported phyla annotated, PCG both ends exact 54 % vs MITOS2 49 %)."""
+    d = mito_env.mitoz_profiles(_fake_mitoz_profiles(tmp_path), "Cnidaria", tmp_path / "out", as_clade="Arthropoda")
+    assert (d / "MT_database" / "Arthropoda_CDS_protein.fa").read_text().startswith(">gi_NC_1_COX1")
+    assert (d / "rRNA_CM").is_dir()
+    lengths = dict(line.split("\t") for line in (d / "CDS_HMM" / "Arthropoda_CDS_length_list").read_text().splitlines())
+    assert lengths["COX1"] == "33" and lengths["ND6"] == "15" and lengths["ATP8"] == "0"   # median aa x 3; absent 0
+
+
+def test_extended_clade_accepted_and_needs_code(tmp_path):
+    assert "Animal" in bm.ALL_CLADES and "Cnidaria" in bm.ALL_CLADES
+    r = subprocess.run([sys.executable, str(HERE.parent / "batch_mitoz.py"), "run", "-i", str(tmp_path), "-o", str(tmp_path / "o"),
+                        "--clade", "Cnidaria"], capture_output=True, text=True)
+    assert r.returncode != 0 and "--genetic_code" in (r.stdout + r.stderr)
+
+
+def test_engine_mitoz_is_plain_mitoz():
+    """--engine mitoz = the original MitoZ path (MiTFi tRNAs, no MITOS2 rescue); mitom (default) combines."""
+    p = bm.build_parser()
+    a = p.parse_args(["run", "-i", "x", "-o", "y", "--clade", "Mollusca", "--engine", "mitoz"])
+    assert bm.resolve_tools(a) == "" and (a.trna, a.rescue) == ("mitoz", "no")
+    a = p.parse_args(["run", "-i", "x", "-o", "y", "--clade", "Mollusca"])
+    assert bm.resolve_tools(a) == "" and (a.engine, a.trna, a.rescue) == ("mitom", "mitos2", "auto")
+    a = p.parse_args(["run", "-i", "x", "-o", "y", "--clade", "Animal", "--genetic_code", "5", "--engine", "mitoz"])
+    assert "MitoZ" in bm.resolve_tools(a)

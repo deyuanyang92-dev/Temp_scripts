@@ -35,12 +35,13 @@ HERE = Path(__file__).resolve().parent
 PIPE = HERE.parent
 sys.path.insert(0, str(PIPE))
 import mito_env  # noqa: E402
+from mito_rescue import mitos_to_record  # noqa: E402,F401  (used by collect(); tests import it from here)
 
-TOOLS = ("ours", "mitoz", "mitos2")
+TOOLS = ("ours", "mitoz", "mitos2", "mitom")
+# MitoM extended clades (batch_mitoz.EXTRA_CLADES) for phyla MitoZ lacks; any other phylum -> all-animal database
+EXTRA_CLADE = {"Cnidaria": "Cnidaria", "Platyhelminthes": "Platyhelminthes-flatworms",
+               "Chaetognatha": "Chaetognatha-arrow-worms"}
 ANCHOR = 50
-MITOS_TRNA = re.compile(r"^trn([A-Z])(\d?)(?:_(\d+))?(?:-([a-z]))?\(([a-z-]{3})\)", re.I)
-MITOS_GENE = re.compile(r"^(.+?)(?:_(\d+))?(?:-([a-z]))?$")       # nad5, nad5_1 (2nd copy), cox2-a (fragment)
-MITOS_SKIP = re.compile(r"^(OH|OL)", re.I)
 
 
 class LiftError(Exception):
@@ -102,44 +103,7 @@ def lift_to_ncbi(pred: SeqRecord, ncbi_seq: Seq) -> SeqRecord:
     return out
 
 
-# ── MITOS2 output ────────────────────────────────────────────────────────────
-def mitos_to_record(result_dir: Path, seq: Seq, acc: str) -> SeqRecord:
-    """GenBank-like record from MITOS2 result.bed (0-based). Copies (_0, _1) stay separate features of the
-    same gene; fragments (-a, -b) are joined in letter order; start > end wraps the origin; OH/OL skipped."""
-    n = len(seq)
-    groups: Dict[tuple, List[tuple]] = {}
-    for line in (result_dir / "result.bed").read_text().splitlines():
-        c = line.split("\t")
-        if len(c) < 6 or MITOS_SKIP.match(c[3]):
-            continue
-        strand = -1 if c[5].strip() == "-" else 1
-        m = MITOS_TRNA.match(c[3])
-        if m:
-            key = ("tRNA", f"trn{m.group(1).upper()}{m.group(2)}", m.group(5).lower().strip("-"), m.group(3) or "")
-            frag = m.group(4) or ""
-        else:
-            g = MITOS_GENE.match(c[3])
-            base = g.group(1) if g else c[3]
-            key = ("rRNA" if base.lower().startswith("rrn") else "CDS", base, "", (g.group(2) or "") if g else "")
-            frag = (g.group(3) or "") if g else ""
-        s0, e0 = int(c[1]), int(c[2])
-        if s0 <= e0:
-            parts = [FeatureLocation(s0, e0, strand)]
-        else:                                    # circular feature across the origin
-            a, b = FeatureLocation(s0, n, strand), FeatureLocation(0, e0, strand)
-            parts = [b, a] if strand == -1 else [a, b]
-        groups.setdefault(key, []).append((frag, parts))
-    r = SeqRecord(seq, id=acc)
-    r.annotations["molecule_type"] = "DNA"
-    for (kind, name, ac, _), frags in groups.items():
-        parts = [p for _, ps in sorted(frags, key=lambda x: x[0]) for p in ps]
-        loc = parts[0] if len(parts) == 1 else CompoundLocation(parts)
-        q = {"gene": [name]}
-        if kind == "tRNA":
-            q["anticodon"] = [ac]
-        r.features.append(SeqFeature(loc, type="gene", qualifiers={"gene": [name]}))
-        r.features.append(SeqFeature(loc, type=kind, qualifiers=q))
-    return r
+# ── MITOS2 output: parser shared with the pipeline (mito_rescue.mitos_to_record) ──
 
 
 # ── running ──────────────────────────────────────────────────────────────────
@@ -155,9 +119,10 @@ def build_cmd(tool: str, row: dict, bare: Path, out: Path, threads: int) -> Opti
     acc, code = row["accession"], str(row["genetic_code"])
     if tool in ("ours", "mitoz") and not row["mitoz_clade"]:
         return None
-    if tool == "ours":
+    if tool in ("ours", "mitom"):
+        clade = row["mitoz_clade"] or EXTRA_CLADE.get(row.get("phylum", ""), "Animal")
         return [[sys.executable, str(PIPE / "batch_mitoz.py"), "run", "-i", str(bare), "-o", str(out / "raw"),
-                 "--clade", row["mitoz_clade"], "--genetic_code", code, "--threads", str(threads), "--max_tasks", "1"],
+                 "--clade", clade, "--genetic_code", code, "--threads", str(threads), "--max_tasks", "1"],
                 [sys.executable, str(PIPE / "mito_curate.py"), "-i", str(out / "raw" / "04.final_gb"),
                  "-o", str(out / "curated"), "--genetic_code", code, "--no_validate"]]
     fa = str(out / "in.fa")
@@ -231,7 +196,7 @@ def collect(tool: str, out: Path, ncbi: SeqRecord) -> SeqRecord:
     """The tool's annotation of this record, before lift-over."""
     if tool == "mitos2":
         return mitos_to_record(out / "mitos", Seq(str(ncbi.seq)), str(ncbi.id))
-    pattern = {"ours": "curated/*.gbf", "mitoz": "w/**/*.gbf"}[tool]
+    pattern = {"ours": "curated/*.gbf", "mitom": "curated/*.gbf", "mitoz": "w/**/*.gbf"}[tool]
     files = sorted(out.glob(pattern), key=lambda p: p.stat().st_size, reverse=True)
     if not files:
         raise LiftError(f"no GenBank output ({pattern})")

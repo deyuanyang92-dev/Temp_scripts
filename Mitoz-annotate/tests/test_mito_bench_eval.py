@@ -109,3 +109,12 @@ def test_obvious_from_rows():
 def test_duplicate_gene():
     p = me.norm_features(rec([f("CDS", 100, 600, gene="nad1"), f("CDS", 2000, 2500, gene="nad1")]))
     assert me.duplicates(p) == ["nad1"]
+
+
+def test_ser_same_codon_box_matches():
+    """NC_009732.1: NCBI anticodon 'act' vs tools 'gct' - both read Ser AGN codons -> same gene, not a name error."""
+    t = [f("tRNA", 1000, 1062, product="tRNA-Ser", anticodon="(pos:1020..1022,aa:Ser,seq:act)")]
+    p = [f("tRNA", 1000, 1062, gene="trnS1", anticodon="gct")]
+    assert classes(t, p) == [("S", "exact")]
+    p = [f("tRNA", 1000, 1062, gene="trnS2", anticodon="tga")]
+    assert classes(t, p) == [("S", "name_error")]

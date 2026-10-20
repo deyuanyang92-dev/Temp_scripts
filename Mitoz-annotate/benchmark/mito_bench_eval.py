@@ -75,7 +75,9 @@ def _same_name(t: Feat, p: Feat) -> str:
         return "yes"
     if not t.anticodon or not p.anticodon:
         return "unverifiable"
-    return "yes" if t.anticodon == p.anticodon else "no"
+    # anticodon bases 2-3 pair with codon positions 2-1: they fix the codon box (Ser AGN vs UCN, Leu CUN vs UUR);
+    # the wobble base 1 may differ between annotations of the same gene (e.g. NCBI 'act' vs 'gct')
+    return "yes" if t.anticodon[1:] == p.anticodon[1:] else "no"
 
 
 def match(truth: List[Feat], pred: List[Feat]) -> List[dict]:

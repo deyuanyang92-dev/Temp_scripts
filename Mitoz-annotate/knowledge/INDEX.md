@@ -21,6 +21,11 @@
 
 | 文件 | 范围 |
 |---|---|
+| topics/genetic_codes_start_stop.md | 线粒体遗传密码表（2/4/5/9/13/14/21/24/33）、起止密码子、T/TA 不完整终止与 transl_except |
+| topics/trna_naming_anticodon.md | tRNA 命名：L1/L2、S1/S2 编号在 RefSeq 与 MITOS 中相反 → 只能按反密码子比较；/anticodon 常缺失 |
+| topics/ncbi_mito_submission_rules.md | NCBI 线粒体提交规则、RefSeq REVIEWED/PROVISIONAL 含义 |
+| topics/taxon_specific_mtdna.md | 22 个门的特殊结构：线性/多染色体、缺 atp8、缺 tRNA、无臂 tRNA、cox1 反式剪接、嵌套基因 |
+| topics/ml_trna_prediction.md | 机器学习 tRNA 预测调研：未发现优于 MiTFi/MITOS2 的线粒体方法；缺口在无臂 tRNA |
 
 ## 未确证问题 / Open questions
 

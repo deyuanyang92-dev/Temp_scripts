@@ -5,9 +5,24 @@ This document explains the purpose, inputs, subcommands, key options, outputs, a
 
 ## MitoM：声明、致谢与引用 / Statement, acknowledgements and citation
 
-**MitoM**（命令名 `mitom`；M = Merge / Metazoa）把多个优秀软件的长处整合成一条动物线粒体基因组注释流程：MitoZ 定位蛋白基因，MITOS2 注释 tRNA，MFannot 方法加内含子，并做端点校正和 NCBI 校验；每个环节选哪个软件，都以 benchmark 结果为依据（`benchmark/`）。
+**MitoM**（命令名 `mitom`；M = Merge / Metazoa）是一条动物线粒体基因组注释流程。流程本身（下表"MitoM 自有步骤"）是作者多年研究中逐步优化形成的；基因识别调用 MitoZ、MITOS2 等软件作为"注释核心"，每个环节用哪个核心，以 benchmark 结果为依据（`benchmark/`）。
 
-**MitoM** (command name `mitom`; M = Merge / Metazoa) combines the strengths of several excellent tools into one annotation workflow for animal mitochondrial genomes: MitoZ for protein-coding genes, MITOS2 for tRNAs, the MFannot method for introns, plus boundary curation and NCBI validation. Which tool handles each step is decided by benchmark results (`benchmark/`).
+| 环节 | 来源 |
+|---|---|
+| GenBank 输入去重、内部短 ID、批量与并行 | MitoM 自有步骤 |
+| 方向调整（cox1 起始、统一正链，cox1 缺失时依次用 cox2/cox3/cob/nad1） | MitoM 自有步骤 |
+| 方向调整后第二轮注释 | MitoM 自有步骤 |
+| 元数据迁回（原 GenBank header）、`/organism` 修复 | MitoM 自有步骤 |
+| 内含子（`mito_intron.py`，按 MFannot 方法实现） | MitoM 自有步骤（方法来自 MFannot） |
+| 跨序列起点 tRNA 修复、漏注基因从 MITOS2 救回（`mito_rescue.py`） | MitoM 自有步骤 |
+| 蛋白基因与 rRNA 端点校正（`mito_curate.py`）、NCBI table2asn 校验 | MitoM 自有步骤（规则依据 Fourdrilis 2018、Ghiselli 2021） |
+| 多方法 tRNA 比对（`mito_trna.py`） | MitoM 自有步骤 |
+| 蛋白基因、rRNA 识别 | 注释核心：MitoZ（含 MitoZ 自带但未开放的刺胞、扁形、毛颚、全动物蛋白库） |
+| tRNA 识别 | 注释核心：MITOS2（灵敏补搜，并行运行） |
+
+`--core hybrid`（默认）= MitoZ 蛋白基因/rRNA + MITOS2 tRNA + MITOS2 漏注救回；`--core mitoz` = 只用 MitoZ 作为核心。两者都运行全部 MitoM 自有步骤。
+
+**MitoM** (command name `mitom`; M = Merge / Metazoa) is an annotation workflow for animal mitochondrial genomes. The workflow itself (the "MitoM steps" above: input deduplication, reorientation, round-2 annotation, metadata transfer, introns, origin-spanning tRNA fix, rescue of missed genes, boundary curation, NCBI validation) was developed by the author over years of research. Gene finding calls MitoZ and MITOS2 as "annotation cores", chosen per step by benchmark results (`benchmark/`). `--core hybrid` (default) = MitoZ protein genes / rRNAs + MITOS2 tRNAs + MITOS2 rescue; `--core mitoz` = MitoZ alone. Both run every MitoM step.
 
 **声明 / Statement**
 
@@ -50,9 +65,9 @@ We thank the authors of MitoZ, MITOS2/MITOS, MiTFi, MFannot, Infernal, BLAST+, G
 
 ## 脚本定位 / What The Script Does
 
-`batch_mitoz.py` 是一个 MitoZ 批量线粒体注释和 GenBank 后处理管线。
+`batch_mitoz.py` 是 MitoM 流程的主程序：批量线粒体注释（MitoZ / MITOS2 作为注释核心）及作者设计的方向调整、元数据迁回、内含子等步骤。
 
-`batch_mitoz.py` is a batch MitoZ annotation and GenBank post-processing pipeline for mitochondrial sequences.
+`batch_mitoz.py` is the main program of the MitoM workflow: batch mitochondrial annotation (MitoZ / MITOS2 as annotation cores) plus the author's own steps - reorientation, metadata transfer, introns and more.
 
 它主要完成：
 

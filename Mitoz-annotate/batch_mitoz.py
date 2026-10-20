@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-# DESC: Integrated MitoZ batch annotation pipeline
+# DESC: MitoM - batch mitochondrial annotation workflow (MitoZ / MITOS2 as annotation cores)
 # VERSION: v4 (Added: 20260325_1556)
 # -*- coding: utf-8 -*-
 """
-Integrated MitoZ batch annotation pipeline — publication-grade.
+MitoM - batch mitochondrial annotation workflow (MitoZ / MITOS2 as annotation cores) — publication-grade.
 
 v0.28 over v0.27:
   BUG-V0.28-A  _acc_variants: return type changed from List[str] to
@@ -2754,9 +2754,9 @@ def resolve_tools(args: argparse.Namespace) -> str:
     if str(MITOZ_FAST.parents[1]) not in sys.path:
         sys.path.insert(0, str(MITOZ_FAST.parents[1]))
     import mito_env
-    if getattr(args, "engine", "mitom") == "mitoz":
+    if getattr(args, "core", "hybrid") == "mitoz":
         if args.clade not in MITOZ_CLADES:
-            return f"ERROR: --engine mitoz needs a MitoZ clade ({', '.join(MITOZ_CLADES)}); use --engine mitom"
+            return f"ERROR: --core mitoz needs a MitoZ clade ({', '.join(MITOZ_CLADES)}); use --core hybrid"
         args.trna, args.rescue = "mitoz", "no"
     if args.clade not in ALL_CLADES:
         return (f"ERROR: --clade '{args.clade}' is not a supported clade. Choose one of:\n  " + ", ".join(ALL_CLADES)
@@ -3315,7 +3315,8 @@ def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="batch_mitoz.py",
         description=(
-            "Integrated MitoZ batch annotation pipeline — publication-grade\n\n"
+            "MitoM - batch mitochondrial annotation workflow; MitoZ / MITOS2 are the annotation cores,\n"
+            "reorientation, metadata transfer, introns etc. are MitoM's own steps\n\n"
             "  annotate          — batch MitoZ annotation\n"
             "  reorient          — reorient .gbf to start at a target gene\n"
             "  run               — full pipeline (annotate → reorient → reanno → final GB)\n"
@@ -3383,9 +3384,11 @@ def build_parser() -> argparse.ArgumentParser:
                        help="Conda env containing MitoZ (e.g. mitoz3.6).")
         g.add_argument("--mitoz_path",      default=None,
                        help="Path to MitoZ executable or directory.")
-        g.add_argument("--engine", choices=["mitom", "mitoz"], default="mitom",
-                       help="mitom (default): MitoZ protein genes / rRNAs (+ extended clades) with MITOS2 tRNAs and "
-                            "MITOS2 rescue of missed genes; mitoz: the original MitoZ path (--trna mitoz --rescue no).")
+        g.add_argument("--core", choices=["hybrid", "mitoz"], default="hybrid",
+                       help="Annotation core only - every MitoM step (reorientation, round-2 annotation, metadata "
+                            "transfer, introns, tRNA origin fix) runs with either. hybrid (default): MitoZ protein "
+                            "genes / rRNAs (+ extended clades) with MITOS2 tRNAs and MITOS2 rescue of missed genes; "
+                            "mitoz: MitoZ alone (= --trna mitoz --rescue no).")
         g.add_argument("--trna", choices=["mitos2", "mitoz"], default="mitos2",
                        help="tRNA step inside MitoZ: mitos2 (default) = MITOS2 with its sensitive pass run in "
                             "parallel (same MiTFi Metazoa models and same tRNAs as runmitos); falls back to MiTFi "

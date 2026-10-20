@@ -238,7 +238,7 @@ def test_recollect_keeps_tool_failures(tmp_path):
 
 
 def test_mitom_runs_every_phylum(tmp_path):
-    """MitoM (engine mitom) covers phyla MitoZ lacks via the extended clades: never 'unsupported'."""
+    """MitoM (hybrid core) covers phyla MitoZ lacks via the extended clades: never 'unsupported'."""
     row = dict(ROW, mitoz_clade="", phylum="Cnidaria", genetic_code="4")
     cmd = mr.build_cmd("mitom", row, tmp_path / "bare", tmp_path / "out", 2)
     assert cmd[0][cmd[0].index("--clade") + 1] == "Cnidaria" and cmd[0][cmd[0].index("--genetic_code") + 1] == "4"

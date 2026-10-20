@@ -154,3 +154,59 @@ def test_timeout_kills_children(tmp_path):
     except ProcessLookupError:
         alive = False
     assert not alive
+
+
+def test_mitos_copies_kept(tmp_path):
+    """Review C1: MITOS2 names extra copies nad5_0 / nad5_1; both must stay nad5."""
+    (tmp_path / "result.bed").write_text("X\t100\t700\tnad5_0\t1\t+\nX\t1000\t1600\tnad5_1\t1\t+\n")
+    r = mr.mitos_to_record(tmp_path, NCBI, "X")
+    assert [f.qualifiers["gene"][0] for f in r.features if f.type == "CDS"] == ["nad5", "nad5"]
+
+
+def test_mitos_fragments_in_letter_order(tmp_path):
+    """Review C2: origin-spanning gene as cox2-b 1..268 + cox2-a 2700..3000 -> join(a, b)."""
+    (tmp_path / "result.bed").write_text("X\t0\t268\tcox2-b\t1\t+\nX\t2700\t3000\tcox2-a\t1\t+\n")
+    r = mr.mitos_to_record(tmp_path, NCBI, "X")
+    cds = next(f for f in r.features if f.type == "CDS")
+    assert [int(p.start) for p in cds.location.parts] == [2700, 0]
+    assert str(cds.extract(NCBI)) == str(NCBI[2700:] + NCBI[:268])
+
+
+def test_mitos_start_after_end_wraps(tmp_path):
+    """Review I5: MITOS circular features may be written with start > end."""
+    (tmp_path / "result.bed").write_text("X\t2900\t100\tcox1\t1\t+\n")
+    r = mr.mitos_to_record(tmp_path, NCBI, "X")
+    cds = next(f for f in r.features if f.type == "CDS")
+    assert str(cds.extract(NCBI)) == str(NCBI[2900:] + NCBI[:100])
+
+
+def test_run_one_unexpected_error_is_failed(tmp_path, monkeypatch):
+    """Review I3: an unexpected exception while collecting must give status failed, not abort the run."""
+    exe = tmp_path / "runmitos"
+    exe.write_text('#!/bin/sh\nexit 0\n')
+    exe.chmod(0o755)
+    monkeypatch.setattr(mr.mito_env, "find", lambda name, hint=None: str(exe))
+    monkeypatch.setattr(mr.mito_env, "mitos_refdir", lambda a=None, b=None: str(tmp_path))
+    monkeypatch.setattr(mr, "collect", lambda *a: (_ for _ in ()).throw(KeyError("boom")))
+    (tmp_path / "gb").mkdir()
+    from Bio import SeqIO
+    SeqIO.write(rec(NCBI, []), str(tmp_path / "gb" / "NC_1.1.gb"), "genbank")
+    st = mr.run_one("mitos2", ROW, tmp_path, 1, 30)
+    assert st["status"] == "failed" and "boom" in st["error"]
+
+
+def test_recollect_reuses_tool_output(tmp_path, monkeypatch):
+    """Review I6: --recollect rebuilds final.gbf from kept tool output without running the tool again."""
+    out = tmp_path / "runs" / "mitos2" / "NC_1.1"
+    (out / "mitos").mkdir(parents=True)
+    (out / "mitos" / "result.bed").write_text("X\t100\t700\tnad5_0\t1\t+\n")
+    mr.write_status(out, {"tool": "mitos2", "accession": "NC_1.1", "status": "ok", "seconds": 5.0,
+                          "step_seconds": {}, "error": ""})
+    (tmp_path / "gb").mkdir()
+    from Bio import SeqIO
+    SeqIO.write(rec(NCBI, []), str(tmp_path / "gb" / "NC_1.1.gb"), "genbank")
+    monkeypatch.setattr(mr, "run_steps", lambda *a, **k: pytest.fail("tool must not run"))
+    st = mr.run_one("mitos2", ROW, tmp_path, 1, 30, recollect=True)
+    assert st["status"] == "ok" and st["seconds"] == 5.0
+    genes = [f.qualifiers["gene"][0] for f in SeqIO.read(str(out / "final.gbf"), "genbank").features if f.type == "CDS"]
+    assert genes == ["nad5"]

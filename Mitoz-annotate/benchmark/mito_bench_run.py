@@ -11,6 +11,7 @@ NCBI record's orientation and origin (lift_to_ncbi). Records with a status.json 
 
 Usage: python3 mito_bench_run.py --set sets/mito_bench_2026-10.tsv --root projects/mito_benchmark
          [--split dev] [--tools ours,mitoz,mitos2] [--jobs 4] [--threads 4] [--timeout 3600] [--acc A,B]
+         [--recollect]
 """
 import argparse
 import csv
@@ -37,7 +38,8 @@ import mito_env  # noqa: E402
 
 TOOLS = ("ours", "mitoz", "mitos2")
 ANCHOR = 50
-MITOS_TRNA = re.compile(r"^trn([A-Z])(\d?)(?:_\d+)?\(([a-z-]{3})\)", re.I)
+MITOS_TRNA = re.compile(r"^trn([A-Z])(\d?)(?:_(\d+))?(?:-([a-z]))?\(([a-z-]{3})\)", re.I)
+MITOS_GENE = re.compile(r"^(.+?)(?:_(\d+))?(?:-([a-z]))?$")       # nad5, nad5_1 (2nd copy), cox2-a (fragment)
 MITOS_SKIP = re.compile(r"^(OH|OL)", re.I)
 
 
@@ -102,8 +104,10 @@ def lift_to_ncbi(pred: SeqRecord, ncbi_seq: Seq) -> SeqRecord:
 
 # ── MITOS2 output ────────────────────────────────────────────────────────────
 def mitos_to_record(result_dir: Path, seq: Seq, acc: str) -> SeqRecord:
-    """GenBank-like record from MITOS2 result.bed (0-based); fragments X-a/X-b joined, OH/OL skipped."""
-    groups: Dict[tuple, List[FeatureLocation]] = {}
+    """GenBank-like record from MITOS2 result.bed (0-based). Copies (_0, _1) stay separate features of the
+    same gene; fragments (-a, -b) are joined in letter order; start > end wraps the origin; OH/OL skipped."""
+    n = len(seq)
+    groups: Dict[tuple, List[tuple]] = {}
     for line in (result_dir / "result.bed").read_text().splitlines():
         c = line.split("\t")
         if len(c) < 6 or MITOS_SKIP.match(c[3]):
@@ -111,16 +115,24 @@ def mitos_to_record(result_dir: Path, seq: Seq, acc: str) -> SeqRecord:
         strand = -1 if c[5].strip() == "-" else 1
         m = MITOS_TRNA.match(c[3])
         if m:
-            key = ("tRNA", f"trn{m.group(1).upper()}{m.group(2)}", m.group(3).lower().strip("-"), c[3])
+            key = ("tRNA", f"trn{m.group(1).upper()}{m.group(2)}", m.group(5).lower().strip("-"), m.group(3) or "")
+            frag = m.group(4) or ""
         else:
-            base = re.sub(r"[-_][a-z0-9]+$", "", c[3]) if re.search(r"-[a-z]$", c[3]) else c[3]
-            kind = "rRNA" if base.lower().startswith("rrn") else "CDS"
-            key = (kind, base, "", base if re.search(r"-[a-z]$", c[3]) else c[3])
-        groups.setdefault(key, []).append(FeatureLocation(int(c[1]), int(c[2]), strand))
+            g = MITOS_GENE.match(c[3])
+            base = g.group(1) if g else c[3]
+            key = ("rRNA" if base.lower().startswith("rrn") else "CDS", base, "", (g.group(2) or "") if g else "")
+            frag = (g.group(3) or "") if g else ""
+        s0, e0 = int(c[1]), int(c[2])
+        if s0 <= e0:
+            parts = [FeatureLocation(s0, e0, strand)]
+        else:                                    # circular feature across the origin
+            a, b = FeatureLocation(s0, n, strand), FeatureLocation(0, e0, strand)
+            parts = [b, a] if strand == -1 else [a, b]
+        groups.setdefault(key, []).append((frag, parts))
     r = SeqRecord(seq, id=acc)
     r.annotations["molecule_type"] = "DNA"
-    for (kind, name, ac, _), parts in groups.items():
-        parts.sort(key=lambda p: int(p.start), reverse=parts[0].strand == -1)
+    for (kind, name, ac, _), frags in groups.items():
+        parts = [p for _, ps in sorted(frags, key=lambda x: x[0]) for p in ps]
         loc = parts[0] if len(parts) == 1 else CompoundLocation(parts)
         q = {"gene": [name]}
         if kind == "tRNA":
@@ -188,7 +200,8 @@ def run_steps(cmds: List[List[str]], out: Path, timeout: int) -> dict:
             log.flush()
             try:
                 # own process group, so a timeout also stops the tools it started (MitoZ -> perl -> tblastn)
-                p = subprocess.Popen(cmd, stdout=log, stderr=subprocess.PIPE, text=True, start_new_session=True,
+                p = subprocess.Popen(cmd, stdout=log, stderr=subprocess.PIPE, text=True, errors="replace",
+                                     start_new_session=True,
                                      env=_env_path(cmd[0] if os.sep in cmd[0] else None))
             except OSError as e:
                 st.update(status="failed", error=f"step {i + 1}: {e}")
@@ -225,25 +238,31 @@ def collect(tool: str, out: Path, ncbi: SeqRecord) -> SeqRecord:
     return SeqIO.read(str(files[0]), "genbank")
 
 
-def run_one(tool: str, row: dict, root: Path, threads: int, timeout: int) -> dict:
+def run_one(tool: str, row: dict, root: Path, threads: int, timeout: int, recollect: bool = False) -> dict:
+    """Run one tool on one record (skipped when status.json exists). recollect: rebuild final.gbf from the
+    kept tool output of an 'ok' run without running the tool again (after a parser fix)."""
     acc = row["accession"]
     out = root / "runs" / tool / acc
-    if (out / "status.json").exists():
-        return json.loads((out / "status.json").read_text())
+    old = json.loads((out / "status.json").read_text()) if (out / "status.json").exists() else None
+    if old and not (recollect and old["status"] == "ok"):
+        return old
     ncbi = SeqIO.read(str(root / "gb" / f"{acc}.gb"), "genbank")
     out.mkdir(parents=True, exist_ok=True)
-    (out / "in.fa").write_text(f">{acc}\n{ncbi.seq}\n")
-    cmds = build_cmd(tool, row, root / "bare" / acc, out, threads)
-    if cmds is None:
-        st = {"status": "unsupported", "seconds": 0.0, "step_seconds": {}, "error": "phylum not supported by MitoZ"}
+    if old:
+        st = {k: old[k] for k in ("status", "seconds", "step_seconds", "error")}
     else:
-        st = run_steps(cmds, out, timeout)
-        if st["status"] == "ok":
-            try:
-                lifted = lift_to_ncbi(collect(tool, out, ncbi), Seq(str(ncbi.seq)))
-                SeqIO.write(lifted, str(out / "final.gbf"), "genbank")
-            except (LiftError, ValueError, OSError) as e:
-                st.update(status="failed", error=f"collect/lift: {e}")
+        (out / "in.fa").write_text(f">{acc}\n{ncbi.seq}\n")
+        cmds = build_cmd(tool, row, root / "bare" / acc, out, threads)
+        if cmds is None:
+            st = {"status": "unsupported", "seconds": 0.0, "step_seconds": {}, "error": "phylum not supported by MitoZ"}
+        else:
+            st = run_steps(cmds, out, timeout)
+    if st["status"] == "ok":
+        try:
+            lifted = lift_to_ncbi(collect(tool, out, ncbi), Seq(str(ncbi.seq)))
+            SeqIO.write(lifted, str(out / "final.gbf"), "genbank")
+        except Exception as e:                   # any collect / lift problem is this record's failure, not the run's
+            st.update(status="failed", error=f"collect/lift: {type(e).__name__}: {e}")
     st = {"tool": tool, "accession": acc, **st}
     write_status(out, st)
     return st
@@ -259,6 +278,8 @@ def main(argv=None) -> int:
     p.add_argument("--threads", type=int, default=4)
     p.add_argument("--timeout", type=int, default=3600)
     p.add_argument("--acc", help="only these accessions (comma-separated)")
+    p.add_argument("--recollect", action="store_true",
+                   help="rebuild final.gbf of finished runs from their kept tool output (no tool is re-run)")
     a = p.parse_args(argv)
     rows = list(csv.DictReader(open(a.set, encoding="utf-8"), delimiter="\t"))
     rows = [r for r in rows if a.split == "all" or r["split"] == a.split]
@@ -267,7 +288,7 @@ def main(argv=None) -> int:
     tasks = [(t, r) for r in rows for t in a.tools.split(",")]
     root = Path(a.root)
     with ThreadPoolExecutor(a.jobs) as ex:
-        for st in ex.map(lambda tr: run_one(tr[0], tr[1], root, a.threads, a.timeout), tasks):
+        for st in ex.map(lambda tr: run_one(tr[0], tr[1], root, a.threads, a.timeout, a.recollect), tasks):
             print(f"{st['tool']:7s} {st['accession']:14s} {st['status']:11s} {st['seconds']:8.1f}s {st['error'][:100]}",
                   flush=True)
     return 0

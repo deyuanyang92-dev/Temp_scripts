@@ -36,35 +36,62 @@ AMBIGUOUS_AA = {"L", "S"}              # two tRNA genes each; told apart only by
 FOUND = ("exact", "le3", "gt3", "name_unverifiable")
 
 
+DEFAULT_CUTOFF = "2018-07-09"           # RefSeq release 89 (MITOS2 refseq89m), knowledge/tools/mitos2.md
+
+
 class Feat(NamedTuple):
     kind: str          # PCG, rRNA, tRNA, intron
     name: str          # cox1 / rrnL / amino acid letter / intron
     strand: int
-    start: int         # 0-based, end exclusive (span of all parts)
+    start: int         # 0-based; end exclusive and > n when the feature crosses the origin
     end: int
     anticodon: str
+    n: int = 0         # sequence length (circular arithmetic)
+
+
+def span(loc, n: int) -> tuple:
+    """(start, end) of a location; parts are in biological order, a wrap past the origin gives end > n."""
+    parts = list(loc.parts)
+    strand = loc.strand or 1
+    wrapped = any((int(b.start) < int(a.start)) if strand != -1 else (int(b.start) > int(a.start))
+                  for a, b in zip(parts, parts[1:]))
+    if not wrapped:
+        return int(loc.start), int(loc.end)
+    if strand != -1:
+        return int(parts[0].start), int(parts[-1].end) + n
+    return int(parts[-1].start), int(parts[0].end) + n
 
 
 def norm_features(rec: SeqRecord) -> List[Feat]:
     out = []
+    n = len(rec)
     for f in rec.features:
         strand = f.location.strand or 1
-        s, e = int(f.location.start), int(f.location.end)
+        s, e = span(f.location, n)
         if f.type in ("CDS", "rRNA"):
             g = gene_name(f.qualifiers, f.type)
             if g:
-                out.append(Feat("PCG" if g in PCG else "rRNA", g, strand, s, e, ""))
+                out.append(Feat("PCG" if g in PCG else "rRNA", g, strand, s, e, "", n))
         elif f.type == "tRNA":
             aa, ac = trna_name(f.qualifiers)
             if aa:
-                out.append(Feat("tRNA", aa, strand, s, e, ac))
+                out.append(Feat("tRNA", aa, strand, s, e, ac, n))
         elif f.type == "intron":
-            out.append(Feat("intron", "intron", strand, s, e, ""))
+            out.append(Feat("intron", "intron", strand, s, e, "", n))
     return out
 
 
+def _shifts(a: Feat) -> tuple:
+    return (-a.n, 0, a.n) if a.n else (0,)
+
+
 def _overlap(a: Feat, b: Feat) -> int:
-    return max(0, min(a.end, b.end) - max(a.start, b.start))
+    """Overlap on the circle (b moved by -n, 0, +n)."""
+    return max(max(0, min(a.end, b.end + k) - max(a.start, b.start + k)) for k in _shifts(a))
+
+
+def _delta(a: Feat, b: Feat) -> int:
+    return min(max(abs(b.start + k - a.start), abs(b.end + k - a.end)) for k in _shifts(a))
 
 
 def _same_name(t: Feat, p: Feat) -> str:
@@ -94,7 +121,7 @@ def match(truth: List[Feat], pred: List[Feat]) -> List[dict]:
             i, p = min(cands, key=rank)
             used.add(i)
             same = _same_name(t, p)
-            delta = max(abs(p.start - t.start), abs(p.end - t.end))
+            delta = _delta(t, p)
             row.update(pred=f"{p.start + 1}..{p.end}{'+' if p.strand > 0 else '-'}", delta=delta)
             if same == "no":
                 row["class"] = "name_error"
@@ -150,6 +177,15 @@ def pcg_checks(rec: SeqRecord, code: int) -> List[dict]:
     return out
 
 
+def record_rows(truth: List[Feat], pred, status: dict) -> List[dict]:
+    """Match rows of one tool on one record; a failed / timed-out run counts every NCBI feature as missed,
+    an unsupported or not-run record contributes nothing."""
+    st = status.get("status")
+    if st in ("unsupported", "not_run"):
+        return []
+    return match(truth, pred if st == "ok" and pred is not None else [])
+
+
 def obvious_errors(rows: List[dict], pcg_rows: List[dict], status: dict) -> List[dict]:
     st = status.get("status")
     if st == "unsupported":
@@ -180,10 +216,11 @@ def table2asn_errors(files: Dict[str, Path], work: Path) -> Dict[str, int]:
                    capture_output=True, text=True)
     n: Counter = Counter()
     val = work / "out" / "validation.tsv"
-    if val.exists():
-        for r in csv.DictReader(val.open(encoding="utf-8"), delimiter="\t"):
-            if r["severity"] in ("ERROR", "REJECT"):
-                n[r["record"].split(".")[0]] += 1
+    if not val.exists():                     # a validator crash must not read as "no errors"
+        raise RuntimeError(f"ncbi_validate.py wrote no {val}")
+    for r in csv.DictReader(val.open(encoding="utf-8"), delimiter="\t"):
+        if r["severity"] in ("ERROR", "REJECT"):
+            n[r["record"].split(".")[0]] += 1
     return {acc: n.get(acc.split(".")[0], 0) for acc in files}
 
 
@@ -213,7 +250,8 @@ def main(argv=None) -> int:
     p.add_argument("--root", required=True)
     p.add_argument("--split", default="dev")
     p.add_argument("--tools", default="ours,mitoz,mitos2")
-    p.add_argument("--refseq_cutoff", default="", help="records created after this date form the post_cutoff stratum")
+    p.add_argument("--refseq_cutoff", default=DEFAULT_CUTOFF,
+                   help=f"records created after this date form the post_cutoff stratum (default {DEFAULT_CUTOFF})")
     p.add_argument("--table2asn", action="store_true", help="also count NCBI validator ERROR/REJECT per record")
     a = p.parse_args(argv)
     root = Path(a.root)
@@ -238,15 +276,15 @@ def main(argv=None) -> int:
                            "steps": json.dumps(st.get("step_seconds", {}))})
             if st["status"] == "not_run":
                 continue
-            m, pc, dup = [], [], []
+            pc, dup, pred = [], [], None
             if st["status"] == "ok":
                 fp = root / "runs" / t / acc / "final.gbf"
                 finals[t][acc] = fp
                 pred_rec = SeqIO.read(str(fp), "genbank")
                 pred = norm_features(pred_rec)
-                m = match(truth, pred)
                 pc = pcg_checks(pred_rec, code)
                 dup = duplicates(pred)
+            m = record_rows(truth, pred, st)
             feats += [{"tool": t, "accession": acc, **x} for x in m]
             checks += [{"tool": t, "accession": acc, **c} for c in pc]
             errs = obvious_errors(m, pc, st) + [{"error": "duplicate_gene", "gene": g, "detail": ""} for g in dup]

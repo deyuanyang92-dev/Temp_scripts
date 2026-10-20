@@ -118,3 +118,38 @@ def test_ser_same_codon_box_matches():
     assert classes(t, p) == [("S", "exact")]
     p = [f("tRNA", 1000, 1062, gene="trnS2", anticodon="tga")]
     assert classes(t, p) == [("S", "name_error")]
+
+
+def test_wrapped_truth_boundary():
+    """Review C2: genes across the origin keep circular coordinates (no min..max span over the genome)."""
+    from Bio.SeqFeature import CompoundLocation
+    def w(a, b):
+        return SeqFeature(CompoundLocation([FeatureLocation(a, 5000, 1), FeatureLocation(0, b, 1)]), type="CDS",
+                          qualifiers={"gene": ["cox1"]})
+    t = [w(4000, 100)]
+    assert classes(t, [w(4040, 100)]) == [("cox1", "gt3")]
+    assert classes(t, [w(4000, 100)]) == [("cox1", "exact")]
+    rows = me.match(me.norm_features(rec(t)), me.norm_features(rec([f("CDS", 4000, 5000, gene="cox1")])))
+    assert [(r["class"], r["delta"]) for r in rows] == [("gt3", 100)]
+
+
+def test_failed_record_truth_counts_missed():
+    """Review I3: a failed run counts its NCBI features as missed (recall), unsupported counts nothing."""
+    truth = me.norm_features(rec([f("CDS", 100, 600, gene="nad1")]))
+    assert [r["class"] for r in me.record_rows(truth, None, {"status": "failed"})] == ["missed"]
+    assert me.record_rows(truth, None, {"status": "unsupported"}) == []
+
+
+def test_default_cutoff_is_refseq89():
+    """Review I4: post_cutoff stratum on by default (refseq89m = RefSeq release 89, 2018-07-09)."""
+    assert me.DEFAULT_CUTOFF == "2018-07-09"
+
+
+def test_table2asn_no_output_raises(tmp_path, monkeypatch):
+    """Review I7: a validator crash must not look like zero errors."""
+    import pytest
+    monkeypatch.setattr(me.subprocess, "run", lambda *a, **k: None)
+    p = tmp_path / "x.gbf"
+    p.write_text("x")
+    with pytest.raises(RuntimeError):
+        me.table2asn_errors({"NC_1.1": p}, tmp_path / "w")

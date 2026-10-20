@@ -53,9 +53,10 @@ import tempfile
 from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from Bio import SeqIO
+from Bio.Seq import Seq
 from Bio.SeqFeature import CompoundLocation, FeatureLocation, SeqFeature
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -296,6 +297,51 @@ def feature(p: Pred, ac: str, note: str, L: int) -> SeqFeature:
 
 
 # ── driver ───────────────────────────────────────────────────────────────────
+def split_wrapped(preds: List[Pred], seq: str) -> Tuple[List[Pred], List[Dict[str, str]]]:
+    """Separate tRNAs across the origin (start > end, or end beyond the sequence) from the others. MiTFi's
+    table (mitoz_fast.py) cannot hold them: a 980..40 tRNA there became 40..980. They are returned as
+    {aa, anticodon, seq} (tRNA sequence 5'->3') so add_wrapped() can put them back by sequence later."""
+    L, linear, wrapped = len(seq), [], []
+    for p in preds:
+        end = p.end + L if p.start > p.end else p.end
+        if end <= L:
+            linear.append(p)
+            continue
+        s = Seq((seq + seq)[p.start - 1:end])
+        wrapped.append({"aa": p.aa, "anticodon": p.anticodon,
+                        "seq": str(s if p.strand == 1 else s.reverse_complement()).upper()})
+    return linear, wrapped
+
+
+def add_wrapped(rec, rows: List[Dict[str, str]]) -> List[str]:
+    """Add the tRNAs from split_wrapped() to a circular record (gene + tRNA features) where the sequence occurs
+    exactly once (either strand) and no tRNA of the same amino acid overlaps it. Returns the names added."""
+    seq = str(rec.seq).upper()
+    L, added = len(seq), []
+    for row in rows:
+        n = len(row["seq"])
+        circ = seq + seq[:n - 1]
+        hits = [(m.start(), 1) for m in re.finditer(f"(?={row['seq']})", circ)] + \
+               [(m.start(), -1) for m in re.finditer(f"(?={Seq(row['seq']).reverse_complement()})", circ)]
+        if len(hits) != 1:
+            continue
+        i, strand = hits[0]
+        span = {(i + k) % L for k in range(n)}
+        product = f"tRNA-{ONE2THREE[row['aa']]}"
+        if any(f.type == "tRNA" and f.qualifiers.get("product") == [product]
+               and span & {int(x) % L for part in f.location.parts for x in range(part.start, part.end)}
+               for f in rec.features):
+            continue
+        t = feature(Pred("MITOS2", i + 1, i + n, strand, row["aa"], row["anticodon"]), row["anticodon"],
+                    "tRNA by MITOS2 across the sequence origin, added by mito_trna.add_wrapped", L)
+        g = SeqFeature(t.location, type="gene", qualifiers={"gene": list(t.qualifiers["gene"])})
+        at = next((k for k, f in enumerate(rec.features) if f.type != "source" and int(f.location.start) > i),
+                  len(rec.features))
+        rec.features[at:at] = [g, t]
+        added.append(t.qualifiers["gene"][0])
+    return added
+
+
 def find(name: str, bin_dir: Optional[str], mitos_bin: Optional[str]) -> Optional[str]:
     return mito_env.find(name, mitos_bin if name == "runmitos" else bin_dir)
 

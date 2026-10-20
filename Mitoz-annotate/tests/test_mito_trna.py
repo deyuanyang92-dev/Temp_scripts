@@ -141,3 +141,46 @@ def test_select_mitos2_refuses_unoriented_input(tmp_path):
         if not (MITOS_BIN / "runmitos").exists():
             pytest.skip("MITOS2 not available")
         assert r.returncode == 2 and "reoriented" in r.stderr
+
+
+def _circ(L=1000, seed=7):
+    import random
+    from Bio.Seq import Seq
+    from Bio.SeqRecord import SeqRecord
+    rnd = random.Random(seed)
+    r = SeqRecord(Seq("".join(rnd.choice("ACGT") for _ in range(L))), id="X")
+    r.annotations.update(molecule_type="DNA", topology="circular")
+    return r
+
+
+def test_wrapped_mitos2_trna_kept_out_of_mitfi_table():
+    """2026-10-20 benchmark: MITOS2 writes an origin-spanning tRNA as start > end (trnY just before cox1 after
+    the cox1-first rotation); fed to MiTFi's table it became an 8..16132 'tRNA' (4/41 records)."""
+    r = _circ()
+    p = mt.parse_mitos_bed("x\t979\t40\ttrnY(gta)\t1e-9\t-\nx\t100\t165\ttrnF(gaa)\t1e-9\t+\n")
+    linear, wrapped = mt.split_wrapped(p, str(r.seq))
+    assert [x.aa for x in linear] == ["F"]
+    assert wrapped == [{"aa": "Y", "anticodon": "gta",
+                        "seq": str((r.seq[979:] + r.seq[:40]).reverse_complement())}]
+
+
+def test_add_wrapped_trna_back_by_sequence():
+    r = _circ()
+    row = {"aa": "Y", "anticodon": "gta", "seq": str((r.seq[979:] + r.seq[:40]).reverse_complement())}
+    assert mt.add_wrapped(r, [row]) == ["trnY(gua)"]
+    f = next(x for x in r.features if x.type == "tRNA")
+    assert str(f.extract(r.seq)) == row["seq"] and f.qualifiers["product"] == ["tRNA-Tyr"]
+    assert len(f.location.parts) == 2
+    assert any(x.type == "gene" and x.qualifiers["gene"] == ["trnY(gua)"] for x in r.features)
+    assert mt.add_wrapped(r, [row]) == []                      # already present: not added twice
+
+
+def test_add_wrapped_trna_after_rotation():
+    """The final GenBank may be rotated / reverse-complemented again: match by sequence, not coordinates."""
+    r = _circ()
+    row = {"aa": "Y", "anticodon": "gta", "seq": str((r.seq[979:] + r.seq[:40]).reverse_complement())}
+    rot = r[300:] + r[:300]
+    rot.annotations.update(r.annotations)
+    assert mt.add_wrapped(rot, [row]) == ["trnY(gua)"]
+    f = next(x for x in rot.features if x.type == "tRNA")
+    assert (int(f.location.start), int(f.location.end), f.location.strand) == (679, 740, -1)

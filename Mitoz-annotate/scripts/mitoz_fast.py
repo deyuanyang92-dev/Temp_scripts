@@ -17,6 +17,8 @@ Settings (environment variables, set by batch_mitoz.py):
   YZZ_MITOS_REFDIR  MITOS2 reference directory (contains refseq89m)
   YZZ_MITOS_REF     reference name (default refseq89m)
   YZZ_CIRCOS        yes = keep the circos plot (default no)
+  YZZ_TRNA_WRAP     file collecting MITOS2 tRNAs across the sequence origin (MiTFi's table cannot hold
+                    them); batch_mitoz.py adds them to the final GenBank (mito_trna.add_wrapped)
 
 Usage: <MitoZ env>/bin/python mitoz_fast.py annotate <mitoz annotate arguments>
 """
@@ -40,6 +42,7 @@ TRNA = os.environ.get("YZZ_TRNA", "mitos2").lower()
 MITOS_BIN = os.environ.get("YZZ_MITOS_BIN", "")
 MITOS_REFDIR = os.environ.get("YZZ_MITOS_REFDIR", "")
 MITOS_REF = os.environ.get("YZZ_MITOS_REF", "refseq89m")
+WRAP_FILE = os.environ.get("YZZ_TRNA_WRAP", "")
 
 
 def mitos2_ready() -> bool:
@@ -62,10 +65,14 @@ def mitos2_trna_annotation(workdir=None, mt_file=None, genetic_code=None, logger
                 fa.write_text(f">{rec.id}\n{rec.seq}\n")
                 preds = mito_trna.mitos2(fa, int(genetic_code), {"runmitos": str(Path(MITOS_BIN) / "runmitos")},
                                          Path(td), opts)
+            preds, wrapped = mito_trna.split_wrapped(preds, str(rec.seq))
+            for w in wrapped:                     # MiTFi format cannot express a tRNA across the origin
+                logger.warning(f"[mitoz_fast] {rec.id}: tRNA {w['aa']} across the origin; "
+                               f"added to the final GenBank afterwards ({WRAP_FILE or 'YZZ_TRNA_WRAP not set: lost'})")
+                if WRAP_FILE:
+                    with open(WRAP_FILE, "a") as fh:
+                        print(rec.id, w["aa"], w["anticodon"], w["seq"], sep="\t", file=fh)
             for p in sorted(preds, key=lambda x: x.start):
-                if p.end > len(rec.seq):           # MiTFi format cannot express a tRNA across the origin
-                    logger.warning(f"[mitoz_fast] {rec.id}: tRNA {p.aa} across the origin skipped")
-                    continue
                 ac = p.anticodon.upper().replace("T", "U") or "---"      # MiTFi writes --- for an unreadable anticodon
                 # MiTFi columns: seqid start stop score evalue AC AA model strand (start < stop on both strands)
                 rows.append([rec.id, p.start, p.end, p.score or "NA", "NA", ac, p.aa,

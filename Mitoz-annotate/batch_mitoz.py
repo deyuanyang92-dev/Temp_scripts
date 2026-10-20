@@ -2598,6 +2598,9 @@ def workflow_annotate(args: argparse.Namespace) -> int:
     setup_root_logger(out_root / "pipeline.log")
     logging.info("[PARAMS]\n" + json.dumps(vars(args), indent=2, ensure_ascii=False))
     preflight(args)
+    wrap_file = out_root / "trna_wrap.tsv"         # MITOS2 tRNAs across the origin (scripts/mitoz_fast.py)
+    wrap_file.write_text("")
+    os.environ["YZZ_TRNA_WRAP"] = str(wrap_file)
 
     in_path     = Path(args.input).resolve()
     split_dir   = out_root / "00.internal_fasta"
@@ -2654,6 +2657,7 @@ def workflow_annotate(args: argparse.Namespace) -> int:
     # archive.  Use final_dir.glob("*.gbf") if you want only the top-level
     # (successfully-oriented) records.
     run_intron_fix(args, in_path, final_dir, out_root)
+    add_wrapped_trnas(final_dir, out_root / "trna_wrap.tsv")
     all_final_gbs = sorted(
         p for p in final_dir.rglob("*.gbf")
         if p.is_file() and p.stat().st_size > 0)
@@ -2766,6 +2770,23 @@ def resolve_tools(args: argparse.Namespace) -> str:
     return ""
 
 
+def add_wrapped_trnas(final_dir: Path, wrap_file: Path) -> None:
+    """Put MITOS2 tRNAs across the sequence origin into the final GenBank files (MiTFi's table, which MitoZ
+    turns into features, cannot hold them; scripts/mitoz_fast.py collects them in wrap_file). Matched by
+    sequence, so the final rotation / orientation does not matter (mito_trna.add_wrapped)."""
+    if not wrap_file.exists() or not wrap_file.read_text().strip():
+        return
+    import mito_trna
+    rows = [dict(zip(("id", "aa", "anticodon", "seq"), line.split("\t")))
+            for line in wrap_file.read_text().splitlines() if line.strip()]
+    for gbf in sorted(final_dir.rglob("*.gbf")):
+        recs = list(SeqIO.parse(str(gbf), "genbank"))
+        added = [f"{r.id}:{n}" for r in recs for n in mito_trna.add_wrapped(r, rows)]
+        if added:
+            SeqIO.write(recs, str(gbf), "genbank")
+            logging.info(f"[TRNA_WRAP] {gbf.name}: added {', '.join(added)} (across the sequence origin)")
+
+
 def run_intron_fix(args: argparse.Namespace, in_path: Path, final_dir: Path, out_root: Path) -> None:
     """Add introns to final GenBank files in place with mito_intron.py (MitoZ cannot).
     in_path is kept for the call signature; the protein library is MFannot's (--intron_lib)."""
@@ -2841,6 +2862,9 @@ def workflow_run(args: argparse.Namespace) -> int:
     setup_root_logger(out_root / "pipeline.log")
     logging.info("[PARAMS]\n" + json.dumps(vars(args), indent=2, ensure_ascii=False))
     preflight(args)
+    wrap_file = out_root / "trna_wrap.tsv"         # MITOS2 tRNAs across the origin (scripts/mitoz_fast.py)
+    wrap_file.write_text("")
+    os.environ["YZZ_TRNA_WRAP"] = str(wrap_file)
 
     in_path     = Path(args.input).resolve()
     split_dir   = out_root / "00.internal_fasta"
@@ -3060,6 +3084,7 @@ def workflow_run(args: argparse.Namespace) -> int:
     # Merge all final GBs including no_{gene}_gene/ subdirectory.
     # Use final_dir.glob("*.gbf") if you want only successfully-oriented records.
     run_intron_fix(args, in_path, final_dir, out_root)
+    add_wrapped_trnas(final_dir, out_root / "trna_wrap.tsv")
     all_final_gbs = sorted(
         p for p in final_dir.rglob("*.gbf")
         if p.is_file() and p.stat().st_size > 0

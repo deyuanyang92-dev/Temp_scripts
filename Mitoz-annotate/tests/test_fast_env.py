@@ -98,3 +98,22 @@ def test_mitoz_fast_platynereis_trnas_match_ncbi(tmp_path):
     ref = {(int(f.location.start), int(f.location.end), f.location.strand) for f in ncbi.features if f.type == "tRNA"}
     assert got == ref
     assert not list((tmp_path / "w").glob("*.result/circos.png"))           # circos skipped
+
+
+def test_wrapped_trna_added_to_final_gbf(tmp_path):
+    """2026-10-20 benchmark: trnY across the origin (cox1-first rotation) must reach the final GenBank."""
+    import random
+    from Bio import SeqIO
+    from Bio.Seq import Seq
+    from Bio.SeqRecord import SeqRecord
+    rnd = random.Random(3)
+    r = SeqRecord(Seq("".join(rnd.choice("ACGT") for _ in range(1000))), id="S1", description="")
+    r.annotations.update(molecule_type="DNA", topology="circular")
+    trna = str((r.seq[979:] + r.seq[:40]).reverse_complement())
+    (tmp_path / "final").mkdir()
+    SeqIO.write(r, str(tmp_path / "final" / "S1.gbf"), "genbank")
+    (tmp_path / "trna_wrap.tsv").write_text(f"S1\tY\tgta\t{trna}\n")
+    bm.add_wrapped_trnas(tmp_path / "final", tmp_path / "trna_wrap.tsv")
+    out = SeqIO.read(str(tmp_path / "final" / "S1.gbf"), "genbank")
+    t = [f for f in out.features if f.type == "tRNA"]
+    assert len(t) == 1 and str(t[0].extract(out.seq)) == trna

@@ -1,0 +1,13 @@
+tool	platform	method	steps	manual_downloads	conda_envs	disk_gb	minutes	result	notes
+ours	linux-x86_64	docker ubuntu:24.04 fresh	2	0	3	11.4	27.2	ok	log /mnt/n/yzz-分类工作流/temp_scripts/Mitoz-annotate/../../projects/mito_benchmark/install_logs/ours.linux.log
+ours	osx-64	dry-run (未实测)						solvable	log /mnt/n/yzz-分类工作流/temp_scripts/Mitoz-annotate/../../projects/mito_benchmark/install_logs/ours.osx-64.log
+ours	osx-arm64	dry-run (未实测)						unsolvable:     │  └─ tbl2asn =* *, which does not exist (perhaps a missing channel);	log /mnt/n/yzz-分类工作流/temp_scripts/Mitoz-annotate/../../projects/mito_benchmark/install_logs/ours.osx-arm64.log
+mitoz	linux-x86_64	docker ubuntu:24.04 fresh	2	0	1	7.6	14.7	ok	log /mnt/n/yzz-分类工作流/temp_scripts/Mitoz-annotate/../../projects/mito_benchmark/install_logs/mitoz.linux.log
+mitoz	osx-64	dry-run (未实测)						solvable	log /mnt/n/yzz-分类工作流/temp_scripts/Mitoz-annotate/../../projects/mito_benchmark/install_logs/mitoz.osx-64.log
+mitoz	osx-arm64	dry-run (未实测)						unsolvable:        └─ tbl2asn =* *, which does not exist (perhaps a missing channel).	log /mnt/n/yzz-分类工作流/temp_scripts/Mitoz-annotate/../../projects/mito_benchmark/install_logs/mitoz.osx-arm64.log
+mitos2	linux-x86_64	docker ubuntu:24.04 fresh	3	1	1	5.2	15.8	ok	log /mnt/n/yzz-分类工作流/temp_scripts/Mitoz-annotate/../../projects/mito_benchmark/install_logs/mitos2.linux.log
+mitos2	osx-64	dry-run (未实测)						unsolvable:        └─ viennarna <2 *, which does not exist (perhaps a missing channel).	log /mnt/n/yzz-分类工作流/temp_scripts/Mitoz-annotate/../../projects/mito_benchmark/install_logs/mitos2.osx-64.log
+mitos2	osx-arm64	dry-run (未实测)						unsolvable:        └─ viennarna <2 *, which does not exist (perhaps a missing channel).	log /mnt/n/yzz-分类工作流/temp_scripts/Mitoz-annotate/../../projects/mito_benchmark/install_logs/mitos2.osx-arm64.log
+mitofinder	linux-x86_64	docker ubuntu:24.04 fresh	2	0	1	4.0	8.0	ok	log /mnt/n/yzz-分类工作流/temp_scripts/Mitoz-annotate/../../projects/mito_benchmark/install_logs/mitofinder.linux.log
+mitofinder	osx-64	dry-run (未实测)						solvable	log /mnt/n/yzz-分类工作流/temp_scripts/Mitoz-annotate/../../projects/mito_benchmark/install_logs/mitofinder.osx-64.log
+mitofinder	osx-arm64	dry-run (未实测)						unsolvable:     └─ mitofinder =* * does not exist (perhaps a typo or a missing channel).	log /mnt/n/yzz-分类工作流/temp_scripts/Mitoz-annotate/../../projects/mito_benchmark/install_logs/mitofinder.osx-arm64.log; install.sh uses osx-64 packages under Rosetta 2 on Apple Silicon

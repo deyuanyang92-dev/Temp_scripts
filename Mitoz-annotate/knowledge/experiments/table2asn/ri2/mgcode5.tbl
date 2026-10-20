@@ -1,0 +1,61 @@
+>Feature mt1
+1	186	gene
+			gene	ND1
+1	90	CDS
+124	186
+			product	NADH dehydrogenase subunit 1
+			exception	RNA editing
+			transl_table	5
+227	410	gene
+			gene	ND2
+227	410	CDS
+			product	NADH dehydrogenase subunit 2
+			transl_table	5
+			note	TAA stop codon is completed by the addition of 3' A residues to the mRNA
+451	635	gene
+			gene	COX1
+451	635	CDS
+			product	cytochrome c oxidase subunit I
+			transl_table	5
+			note	TAA stop codon is completed by the addition of 3' A residues to the mRNA
+676	>858	gene
+			gene	COX2
+676	>858	CDS
+			product	cytochrome c oxidase subunit II
+			transl_table	5
+899	1084	gene
+			gene	COX3
+899	1084	CDS
+			product	cytochrome c oxidase subunit III
+			transl_table	5
+1125	1310	gene
+			gene	ATP6
+1125	1310	CDS
+			product	ATP synthase F0 subunit 6
+			transl_table	5
+1351	1536	gene
+			gene	ATP8
+1351	1536	CDS
+			product	ATP synthase F0 subunit 8
+			transl_table	5
+1577	1760	gene
+			gene	ND3
+1577	1760	CDS
+			product	NADH dehydrogenase subunit 3
+			transl_table	5
+			transl_except	(pos:1760..1760,aa:TERM)
+			note	TAA stop codon is completed by the addition of 3' A residues to the mRNA
+1801	1876	gene
+			gene	trnV(uac)
+1801	1876	tRNA
+			product	tRNA-Val
+1917	1988	gene
+			gene	trnX(gca)
+1917	1988	tRNA
+2029	2328	gene
+			gene	l-rRNA
+2029	2328	rRNA
+			product	16S ribosomal RNA
+2369	2668	gene
+			gene	s-rRNA
+2369	2668	rRNA

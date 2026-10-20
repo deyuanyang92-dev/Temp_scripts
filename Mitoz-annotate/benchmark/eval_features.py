@@ -14,14 +14,8 @@ from statistics import median
 
 from Bio import SeqIO
 
-ALIAS = {"coi": "cox1", "coii": "cox2", "coiii": "cox3", "co1": "cox1", "co2": "cox2", "co3": "cox3",
-         "cytb": "cob", "cyb": "cob", "nd1": "nad1", "nd2": "nad2", "nd3": "nad3", "nd4": "nad4", "nd4l": "nad4l",
-         "nd5": "nad5", "nd6": "nad6", "atpase6": "atp6", "atpase8": "atp8",
-         "rrns": "rrnS", "srrna": "rrnS", "12s": "rrnS", "12srrna": "rrnS", "rns": "rrnS", "rrn12": "rrnS",
-         "rrnl": "rrnL", "lrrna": "rrnL", "16s": "rrnL", "16srrna": "rrnL", "rnl": "rrnL", "rrn16": "rrnL"}
-PRODUCT = {"12s ribosomal rna": "rrnS", "small subunit ribosomal rna": "rrnS", "s-rrna": "rrnS",
-           "16s ribosomal rna": "rrnL", "large subunit ribosomal rna": "rrnL", "l-rrna": "rrnL"}
-PCG = {"cox1", "cox2", "cox3", "cob", "atp6", "atp8", "nad1", "nad2", "nad3", "nad4", "nad4l", "nad5", "nad6"}
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from mito_names import ALIAS, PCG, PRODUCT  # noqa: E402
 
 
 def norm(f):

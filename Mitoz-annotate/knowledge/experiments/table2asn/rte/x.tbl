@@ -1,0 +1,36 @@
+>Feature mt1
+1	155	gene
+			gene	A_plusTA
+1	155	CDS
+			product	A_plusTA protein
+			transl_table	5
+			transl_except	(pos:154..155,aa:TERM)
+			note	TAA stop codon is completed by the addition of 3' A residues to the mRNA
+192	345	gene
+			gene	B_plusT
+192	345	CDS
+			product	B_plusT protein
+			transl_table	5
+			transl_except	(pos:345..345,aa:TERM)
+			note	TAA stop codon is completed by the addition of 3' A residues to the mRNA
+536	382	gene
+			gene	C_minusTA
+536	382	CDS
+			product	C_minusTA protein
+			transl_table	5
+			transl_except	(pos:complement(382..383),aa:TERM)
+			note	TAA stop codon is completed by the addition of 3' A residues to the mRNA
+726	573	gene
+			gene	D_minusT
+726	573	CDS
+			product	D_minusT protein
+			transl_table	5
+			transl_except	(pos:complement(573..573),aa:TERM)
+			note	TAA stop codon is completed by the addition of 3' A residues to the mRNA
+763	917	gene
+			gene	E_plusTA_wrongpos
+763	917	CDS
+			product	E_plusTA_wrongpos protein
+			transl_table	5
+			transl_except	(pos:915..916,aa:TERM)
+			note	TAA stop codon is completed by the addition of 3' A residues to the mRNA

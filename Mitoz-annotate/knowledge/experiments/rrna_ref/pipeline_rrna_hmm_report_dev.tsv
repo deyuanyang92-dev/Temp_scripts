@@ -1,0 +1,9 @@
+acc	record	phylum	gene	location	status
+NC_010484.1	NC_010484.1	Rotifera	s-rRNA		not found
+NC_010484.1	NC_010484.1	Rotifera	l-rRNA		skipped: no model for this gene
+NC_016117.1	NC_016117.1	Ctenophora	s-rRNA	3200..3510+	added
+NC_016117.1	NC_016117.1	Ctenophora	l-rRNA	4062..4397+	added
+NC_045069.1	NC_045069.1		s-rRNA		skipped: no library for this phylum
+NC_036308.1	NC_036308.1	Nematoda	l-rRNA	2771..3715+	added
+NC_045864.1	NC_045864.1	Ctenophora	s-rRNA	5185..5404+	rejected: short (220 nt < 300)
+NC_045864.1	NC_045864.1	Ctenophora	l-rRNA	4470..5049+	added

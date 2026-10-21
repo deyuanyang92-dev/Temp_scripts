@@ -1,0 +1,11 @@
+# dev split, 93 records, 186 NCBI rRNAs; mitom_v2 = MitoM re-curated; mitom_hmm = same + mito_rrna_hmm search (library without any benchmark genus) before mito_curate
+     59 mitom_hmm exact
+     10 mitom_hmm fp
+     92 mitom_hmm gt3
+     21 mitom_hmm le3
+     14 mitom_hmm missed
+     59 mitom_v2 exact
+      9 mitom_v2 fp
+     89 mitom_v2 gt3
+     21 mitom_v2 le3
+     17 mitom_v2 missed

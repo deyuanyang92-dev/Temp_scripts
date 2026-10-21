@@ -2664,6 +2664,7 @@ def workflow_annotate(args: argparse.Namespace) -> int:
     # archive.  Use final_dir.glob("*.gbf") if you want only the top-level
     # (successfully-oriented) records.
     run_rescue(args, final_dir, out_root)
+    run_rrna_hmm(args, final_dir, out_root)
     run_intron_fix(args, in_path, final_dir, out_root)
     add_wrapped_trnas(final_dir, out_root / "trna_wrap.tsv")
     merge_dir = run_curate_and_submit(args, final_dir, out_root)
@@ -2758,7 +2759,7 @@ def resolve_tools(args: argparse.Namespace) -> str:
     if getattr(args, "core", "hybrid") == "mitoz":
         if args.clade not in MITOZ_CLADES:
             return f"ERROR: --core mitoz needs a MitoZ clade ({', '.join(MITOZ_CLADES)}); use --core hybrid"
-        args.trna, args.rescue = "mitoz", "no"
+        args.trna, args.rescue, args.rrna_hmm = "mitoz", "no", "no"
     if args.clade not in ALL_CLADES:
         return (f"ERROR: --clade '{args.clade}' is not a supported clade. Choose one of:\n  " + ", ".join(ALL_CLADES)
                 + "\n  (Animal = all-animal protein database, for any phylum not listed.)")
@@ -2852,6 +2853,26 @@ def run_rescue(args: argparse.Namespace, final_dir: Path, out_root: Path) -> Non
     added = [f"{r['record']}:{r['gene']}" for r in rows if r["status"] == "added"]
     failed = [r["record"] for r in rows if r["status"] != "added"]
     logging.info(f"[RESCUE] {len(added)} gene(s) added from MITOS2 {added}" + (f"; MITOS2 failed: {failed}" if failed else ""))
+
+
+def run_rrna_hmm(args: argparse.Namespace, final_dir: Path, out_root: Path) -> None:
+    """Last-resort 12S/16S search with per-phylum profile HMMs for rRNAs still missing after the cores and
+    the MITOS2 rescue (mito_rrna_hmm.py), in place; report rrna_hmm_report.tsv."""
+    mode = getattr(args, "rrna_hmm", "no")
+    if mode == "no":
+        return
+    import mito_env
+    import mito_rrna_hmm
+    lib = Path(args.rrna_hmm_lib) if getattr(args, "rrna_hmm_lib", None) else mito_rrna_hmm.LIB
+    if not (mito_rrna_hmm.read_manifest(lib) and mito_env.find("nhmmer")):
+        msg = f"[RRNA_HMM] skipped: no HMM library in {lib} or nhmmer not found"
+        logging.error(msg) if mode == "yes" else logging.info(msg)
+        return
+    rows = mito_rrna_hmm.search_dir(final_dir, lib, getattr(args, "phylum", None))
+    write_nonempty_table(out_root / "rrna_hmm_report.tsv", "file\trecord\tphylum\tgene\tlocation\tstatus",
+                         ["\t".join(r[k] for k in ("file", "record", "phylum", "gene", "location", "status")) for r in rows])
+    added = [f"{r['record']}:{r['gene']}" for r in rows if r["status"] == "added"]
+    logging.info(f"[RRNA_HMM] {len(added)} rRNA(s) added from per-phylum HMMs {added}")
 
 
 def add_wrapped_trnas(final_dir: Path, wrap_file: Path) -> None:
@@ -3168,6 +3189,7 @@ def workflow_run(args: argparse.Namespace) -> int:
     # Merge all final GBs including no_{gene}_gene/ subdirectory.
     # Use final_dir.glob("*.gbf") if you want only successfully-oriented records.
     run_rescue(args, final_dir, out_root)
+    run_rrna_hmm(args, final_dir, out_root)
     run_intron_fix(args, in_path, final_dir, out_root)
     add_wrapped_trnas(final_dir, out_root / "trna_wrap.tsv")
     merge_dir = run_curate_and_submit(args, final_dir, out_root)
@@ -3456,6 +3478,14 @@ def build_parser() -> argparse.ArgumentParser:
         g.add_argument("--rescue", choices=["auto", "yes", "no"], default="auto",
                        help="Add protein genes / rRNAs MitoZ missed from a MITOS2 annotation (mito_rescue.py; "
                             "nothing MitoZ annotated is changed). auto = run when MITOS2 is found (default).")
+        g.add_argument("--rrna_hmm", choices=["auto", "yes", "no"], default="auto",
+                       help="Last-resort 12S/16S search for rRNAs still missing after the cores and the rescue, "
+                            "with per-phylum profile HMMs built from NCBI rRNAs (mito_rrna_hmm.py; only missing "
+                            "rRNAs are searched). auto = run when the library and nhmmer are found (default).")
+        g.add_argument("--rrna_hmm_lib", default=None,
+                       help="Per-phylum rRNA HMM library (mito_rrna_hmm.py build). Default: models/rrna_hmm.")
+        g.add_argument("--phylum", default=None,
+                       help="Phylum of all input records for --rrna_hmm (default: from each record's taxonomy).")
         g.add_argument("--intron_fix", choices=["auto", "yes", "no"], default="auto",
                        help="Add introns MitoZ misses with mito_intron.py (MFannot method: Exonerate "
                             "protein2genome + MFannot boundary rules + Rfam intron type). "

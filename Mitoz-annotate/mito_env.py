@@ -38,6 +38,7 @@ TOOLS = {
     "cmsearch":    ("intron typing (mito_intron.py)", "mitotools"),
     "blastp":      ("intron homolog search (mito_intron.py)", "mitotools"),
     "table2asn":   ("NCBI validation (mito_curate.py, ncbi_validate.py)", "mitotools"),
+    "nhmmer":      ("rRNA HMM fallback (mito_rrna_hmm.py search)", "mitos"),
     "arwen":       ("optional extra tRNA method (mito_trna.py)", "mitotools"),
     "aragorn":     ("optional extra tRNA method (mito_trna.py)", "mitotools"),
     "tRNAscan-SE": ("optional extra tRNA method (mito_trna.py)", "mitotools"),

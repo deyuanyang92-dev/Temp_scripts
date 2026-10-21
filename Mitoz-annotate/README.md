@@ -15,6 +15,7 @@ This document explains the purpose, inputs, subcommands, key options, outputs, a
 | 元数据迁回（原 GenBank header）、`/organism` 修复 | MitoM 自有步骤 |
 | 内含子（`mito_intron.py`，按 MFannot 方法实现） | MitoM 自有步骤（方法来自 MFannot） |
 | 跨序列起点 tRNA 修复、漏注基因从 MITOS2 救回（`mito_rescue.py`） | MitoM 自有步骤 |
+| 仍缺的 12S/16S 用按门建立的 rRNA HMM 补搜（`mito_rrna_hmm.py`，库 `models/rrna_hmm/`，nhmmer；只在常规方法找不到时启用） | MitoM 自有步骤（思路参考 EMMA 的 nhmmer rRNA 模型） |
 | 蛋白基因与 rRNA 端点校正（`mito_curate.py`）、NCBI table2asn 校验 | MitoM 自有步骤（规则依据 Fourdrilis 2018、Ghiselli 2021） |
 | 多方法 tRNA 比对（`mito_trna.py`） | MitoM 自有步骤 |
 | 蛋白基因、rRNA 识别 | 注释核心：MitoZ（含 MitoZ 自带但未开放的刺胞、扁形、毛颚、全动物蛋白库） |
@@ -22,7 +23,7 @@ This document explains the purpose, inputs, subcommands, key options, outputs, a
 
 `--core hybrid`（默认）= MitoZ 蛋白基因/rRNA + MITOS2 tRNA + MITOS2 漏注救回；`--core mitoz` = 只用 MitoZ 作为核心。两者都运行全部 MitoM 自有步骤。
 
-**MitoM** (command name `mitom`; M = Merge / Metazoa) is an annotation workflow for animal mitochondrial genomes. The workflow itself (the "MitoM steps" above: input deduplication, reorientation, round-2 annotation, metadata transfer, introns, origin-spanning tRNA fix, rescue of missed genes, boundary curation, NCBI validation) was developed by the author over years of research. Gene finding calls MitoZ and MITOS2 as "annotation cores", chosen per step by benchmark results (`benchmark/`). `--core hybrid` (default) = MitoZ protein genes / rRNAs + MITOS2 tRNAs + MITOS2 rescue; `--core mitoz` = MitoZ alone. Both run every MitoM step.
+**MitoM** (command name `mitom`; M = Merge / Metazoa) is an annotation workflow for animal mitochondrial genomes. The workflow itself (the "MitoM steps" above: input deduplication, reorientation, round-2 annotation, metadata transfer, introns, origin-spanning tRNA fix, rescue of missed genes, per-phylum rRNA HMM fallback, boundary curation, NCBI validation) was developed by the author over years of research. Gene finding calls MitoZ and MITOS2 as "annotation cores", chosen per step by benchmark results (`benchmark/`). `--core hybrid` (default) = MitoZ protein genes / rRNAs + MITOS2 tRNAs + MITOS2 rescue; `--core mitoz` = MitoZ alone. Both run every MitoM step.
 
 **声明 / Statement**
 

@@ -193,6 +193,12 @@ Negative results (do not repeat without a new angle)
 - Rule [inference]: after the core and the MITOS2 rescue, for an rRNA still missing, search the gap regions with a per-phylum `nhmmer` HMM built from NCBI rRNAs (library shipped with MitoM, rebuilt by a command), merge hits within 300 nt, require >= 300 nt and a clade length window, then let R1 snap the ends; record the source in the note; skip when the phylum has < 3 references (knowledge/experiments/rrna_ref/rr_detect_summary_dev.txt:1-14)
 - Expected gain: +9 rRNAs on the dev split at search level (166 -> 175 of 186), mostly divergent phyla; test-split confirmation required before it becomes default [our run] [inference] (knowledge/experiments/rrna_ref/rr_detect_summary_dev.txt:1-14)
 
+### 6.4 Inside the pipeline (mito_rrna_hmm.py, offline A/B on the dev split)
+- Implementation: `mito_rrna_hmm.py` searches only rRNAs absent after the cores and the MITOS2 rescue, joins hits only when they cover disjoint, consecutive model columns in genome order (copies over the same columns are never joined), requires >= 300 nt, <= 1.5 x phylum median length and no > 50 % overlap with an existing CDS/rRNA; runs before mito_curate.py so R1 sets the ends [code] (mito_rrna_hmm.py:1-30)
+- Library for the A/B: references with every benchmark genus removed (stricter than per-query leave-genus-out); 33 models in 17 phyla, 6.2 MB [our run] (knowledge/experiments/rrna_ref/pipeline_ab_dev.txt:1)
+- Result: rRNA missed 17 -> 14 of 186 (NC_016117.1 rrnS, NC_045864.1 rrnL, NC_036308.1 rrnL added), false positives 9 -> 10 (NC_016117.1 rrnL hit covers < 50 % of the NCBI gene), exact 59 -> 59; no other feature changed [our run] (knowledge/experiments/rrna_ref/pipeline_ab_dev.txt:1-11) (knowledge/experiments/rrna_ref/pipeline_rrna_hmm_report_dev.tsv:1-9)
+- Why +3 and not +9 as at search level: in the other divergent genomes the pipeline already has a partial rRNA (< 50 % of the NCBI gene), so the gene is not missing and the HMM is not run; extending partial rRNAs is a separate, untested rule [our run] [inference] (knowledge/experiments/rrna_ref/pipeline_rrna_hmm_report_dev.tsv:1-9)
+
 ## References
 - Bernt M et al. 2013. MITOS: improved de novo metazoan mitochondrial genome annotation. Mol Phylogenet Evol 69:313-319 (doi:10.1016/j.ympev.2012.08.023)
 - Bernt M et al. 2013. Bioinformatics methods for the comparative analysis of metazoan mitochondrial genome sequences. Mol Phylogenet Evol 69:320-327 (doi:10.1016/j.ympev.2012.09.019)

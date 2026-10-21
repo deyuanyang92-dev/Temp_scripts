@@ -1071,9 +1071,12 @@ def counts_from_genbank(gb_path: Path) -> Tuple[int, int, int]:
     pcg = trna = rrna = 0
     for rec in SeqIO.parse(str(gb_path), "genbank"):
         for feat in rec.features:
-            if feat.type == "CDS":    pcg  += 1
-            elif feat.type == "tRNA": trna += 1
-            elif feat.type == "rRNA": rrna += 1
+            if feat.type == "CDS":
+                pcg  += 1
+            elif feat.type == "tRNA":
+                trna += 1
+            elif feat.type == "rRNA":
+                rrna += 1
     return pcg, trna, rrna
 
 
@@ -1113,9 +1116,12 @@ def rewrite_genbank_record_ids(gb_in: Path, gb_out: Path, new_base_id: str) -> T
         )
         out_recs.append(rr)
         for feat in r.features:
-            if feat.type == "CDS":    pcg  += 1
-            elif feat.type == "tRNA": trna += 1
-            elif feat.type == "rRNA": rrna += 1
+            if feat.type == "CDS":
+                pcg  += 1
+            elif feat.type == "tRNA":
+                trna += 1
+            elif feat.type == "rRNA":
+                rrna += 1
     gb_out.parent.mkdir(parents=True, exist_ok=True)
     SeqIO.write(out_recs, str(gb_out), "genbank")
     return pcg, trna, rrna
@@ -1415,7 +1421,9 @@ def reorient_one_gb(
         try:
             feat, used = find_orientation_feature(rec, which_gene_first)
             if feat is None:
-                no_gene.append(rec); no_gene_ids.append(rec.id); continue
+                no_gene.append(rec)
+                no_gene_ids.append(rec.id)
+                continue
             first = which_gene_first.split(",")[0].strip()
             if used != first:
                 ORIENTATION_FALLBACK[rec.id] = used
@@ -1426,11 +1434,14 @@ def reorient_one_gb(
                 work_rec = reverse_complement_record(rec)
                 feat, _ = find_orientation_feature(work_rec, used)
                 if feat is None:
-                    no_gene.append(rec); no_gene_ids.append(rec.id); continue
+                    no_gene.append(rec)
+                    no_gene_ids.append(rec.id)
+                    continue
             ok.append(rotate_record(work_rec, feature_start_pos(feat)))
         except Exception as exc:
             logging.warning(f"[REORIENT_REC_FAIL] record={rec.id}: {exc}")
-            no_gene.append(rec); no_gene_ids.append(rec.id)
+            no_gene.append(rec)
+            no_gene_ids.append(rec.id)
     gb_out.parent.mkdir(parents=True, exist_ok=True)
     gb_no_gene.parent.mkdir(parents=True, exist_ok=True)
     if ok:
@@ -1510,7 +1521,8 @@ def _acc_variants(acc: Optional[str]) -> Tuple[str, ...]:
     # if m and norm:
     if m and norm and norm != clean:
         ver = m.group(1)
-        _add(f"{norm}.{ver}"); _add(f"{norm}_{ver}")
+        _add(f"{norm}.{ver}")
+        _add(f"{norm}_{ver}")
     return tuple(seen)
 
 
@@ -1633,11 +1645,14 @@ def diagnose_unmatched(acc: str, exact_dict: Dict) -> Tuple[List[str], List[Tupl
             continue
         seen.add(ck)
         orig_norm = _normalize_acc(ck) or ck
-        score = 0; reason: Optional[str] = None
+        score = 0
+        reason: Optional[str] = None
         if ck.upper() == acc_up and ck != acc_cl:
-            score = 90; reason = f"[case mismatch] orig='{k}' new='{acc}'"
+            score = 90
+            reason = f"[case mismatch] orig='{k}' new='{acc}'"
         elif orig_norm == acc_norm and ck != acc_cl:
-            score = 88; reason = f"[version/style mismatch] orig='{k}' new='{acc}'"
+            score = 88
+            reason = f"[version/style mismatch] orig='{k}' new='{acc}'"
         else:
             sim = _similarity(acc_norm, orig_norm)
             if sim > 0.78:
@@ -1678,7 +1693,8 @@ def interactive_resolve(acc: str, candidates: List[Tuple[int, str]],
         try:
             choice = input("choose: ").strip().lower()
         except (EOFError, KeyboardInterrupt):
-            print(); return None, None
+            print()
+            return None, None
         if choice == "q":
             sys.exit(0)
         if choice == "s":
@@ -1711,7 +1727,8 @@ def replace_metadata_in_text(
         acc = _get_record_accession(rec)
         if not acc:
             stats["no_accession"] += 1
-            out_records.append(rec); continue
+            out_records.append(rec)
+            continue
         meta, match_type = find_metadata_from_index(acc, exact_dict, clean_dict, norm_dict)
         if meta is not None:
             _, body = _split_meta_body(rec)
@@ -1723,9 +1740,11 @@ def replace_metadata_in_text(
                 meta = _LOCUS_BPCOUNT_RE.sub(rf"\g<1>{real_len}\g<2>", meta, count=1)
             out_records.append(meta + body if body else rec)
             if match_type == "exact":
-                stats["exact"] += 1; stats["exact_list"].append(acc)
+                stats["exact"] += 1
+                stats["exact_list"].append(acc)
             else:
-                stats["compat"] += 1; stats["compat_list"].append((acc, match_type))
+                stats["compat"] += 1
+                stats["compat_list"].append((acc, match_type))
             continue
         hints, candidates = diagnose_unmatched(acc, exact_dict)
         if smart and candidates:
@@ -2774,7 +2793,8 @@ def workflow_annotate(args: argparse.Namespace) -> int:
         r       = results.get(si.internal_id, {})
         best_gb = Path(r["best_gb"]) if r.get("best_gb") else None
         if not r.get("ok") or not best_gb or not best_gb.exists():
-            summary.annotation_failed.append(si.sample_name); continue
+            summary.annotation_failed.append(si.sample_name)
+            continue
         dest = final_dir / f"{si.sample_name}.gbf"
         try:
             pcg, trna, rrna, mode, orient_ok = finalize_genbank_output(
@@ -2880,7 +2900,8 @@ def workflow_reorient(args: argparse.Namespace) -> int:
     write_nonempty_table(out_root / "annotation-summary.tsv",
                          "sample_name\tPCG\ttRNA\trRNA\tcox1_orientation_ok",
                          summary_rows)
-    summary.log(); logging.info("[DONE]")
+    summary.log()
+    logging.info("[DONE]")
     return 0
 
 
@@ -3386,9 +3407,11 @@ def workflow_transfer_metadata(args: argparse.Namespace) -> int:
     metadata_files = collect_genbank_files(Path(args.metadata).resolve())
     body_files     = collect_genbank_files(Path(args.new_body).resolve())
     if not metadata_files:
-        logging.error(f"[ERROR] No metadata GB files: {args.metadata}"); return 2
+        logging.error(f"[ERROR] No metadata GB files: {args.metadata}")
+        return 2
     if not body_files:
-        logging.error(f"[ERROR] No body GB files: {args.new_body}"); return 2
+        logging.error(f"[ERROR] No body GB files: {args.new_body}")
+        return 2
 
     out_dir = out_root / "transferred_gb"
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -3449,9 +3472,11 @@ def workflow_transfer_metadata(args: argparse.Namespace) -> int:
         out_file = bf if args.overwrite_new_body == "yes" else (out_dir / bf.name)
         try:
             status = _process(bf, matched, out_file)
-            if status == "ok": n_ok += 1
-            else:              n_skip += 1
-        except Exception as exc:
+            if status == "ok":
+                n_ok += 1
+            else:
+                n_skip += 1
+        except Exception:
             if args.overwrite_new_body == "no":
                 _safe_copy(bf, out_file)
             n_fail += 1
@@ -3481,15 +3506,18 @@ def workflow_replace_organism(args: argparse.Namespace) -> int:
     meta_files = collect_genbank_files(Path(args.metadata).resolve())
     body_files = collect_genbank_files(Path(args.new_body).resolve())
     if not meta_files:
-        logging.error(f"[ERROR] No metadata GB files: {args.metadata}"); return 2
+        logging.error(f"[ERROR] No metadata GB files: {args.metadata}")
+        return 2
     if not body_files:
-        logging.error(f"[ERROR] No body GB files: {args.new_body}"); return 2
+        logging.error(f"[ERROR] No body GB files: {args.new_body}")
+        return 2
 
     logging.info(f"[ORG_INDEX] Building organism+source index from {len(meta_files)} file(s)…")
     org_index = build_organism_index(meta_files)
     logging.info(f"[ORG_INDEX] {len(org_index)} accession variant(s) indexed.")
     if not org_index:
-        logging.error("[ERROR] Organism index is empty — check metadata GB files."); return 2
+        logging.error("[ERROR] Organism index is empty — check metadata GB files.")
+        return 2
 
     out_dir = out_root / "replaced_organism"
     out_dir.mkdir(parents=True, exist_ok=True)

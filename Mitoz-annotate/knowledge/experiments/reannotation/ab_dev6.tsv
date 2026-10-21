@@ -1,0 +1,10 @@
+# --if_reannotation_2 yes (mitom) vs auto (mitom_auto), 6 dev records, 2026-10-21, same code (b4c1b93), 4 jobs x 4 threads in parallel
+# accuracy (benchmark eval classes over the 6 records): identical, 0 differing features
+# PCG n78 exact66 le3 6 gt3 5 fp1; rRNA n12 exact6 le3 3 gt3 3; tRNA n133 exact85 le3 20 gt3 6 missed1 (both tools)
+accession	phylum	decision	reasons	sec_yes	sec_auto
+NC_026995.1	Annelida	shifted_round1		293.8	169.0
+NC_035061.1	Arthropoda	reannotate	S00001: gene(s) at the end of the round-1 sequence, may be cut: trnI(gau); S00001: gene sequence differs after the shift: trnY(gua); S00001: feature(s) across the new origin: trnY(gua)	320.5	320.3
+NC_011820.2	Bryozoa	shifted_round1		233.8	183.2
+NC_002082.1	Chordata	reannotate	S00001: gene(s) at the end of the round-1 sequence, may be cut: trnF(gaa)	251.5	262.2
+NC_001627.1	Echinodermata	reannotate	S00001: gene(s) at the end of the round-1 sequence, may be cut: COX3	147.1	150.9
+NC_006886.2	Mollusca	reannotate	S00001: gene(s) at the end of the round-1 sequence, may be cut: l-rRNA	280.5	397.6

@@ -1,0 +1,282 @@
+# EMMA rRNA HMM probe, dev split; coverage = fraction of the NCBI rRNA (same strand) covered by union of nhmmer hits of the matching model
+# cols: phylum n_truth detected(cov>=0.5 at E<1e-10) detected(E<1e-5) detected(E<10) median_cov(E<1e-10) mean_nhits
+## rrnS
+Nematoda	7	5	5	5	0.99	1.0
+Annelida	6	6	6	6	1.00	1.0
+Chordata	6	6	6	6	1.00	1.0
+Cnidaria	6	6	6	6	0.91	1.0
+Echinodermata	6	6	6	6	1.00	1.0
+Mollusca	6	6	6	6	1.00	1.0
+Platyhelminthes	6	5	5	5	0.97	0.8
+Arthropoda	5	5	5	5	1.00	1.0
+Acanthocephala	4	4	4	4	1.00	1.0
+Brachiopoda	4	2	4	4	0.50	0.5
+Bryozoa	3	3	3	3	1.00	1.0
+Chaetognatha	3	3	3	3	0.97	1.0
+Hemichordata	3	3	3	3	1.00	1.0
+Nemertea	3	3	3	3	1.00	1.0
+Placozoa	2	1	1	1	0.45	0.5
+Porifera	3	3	3	3	0.91	1.0
+Ctenophora	2	0	0	0	0.00	0.0
+Gnathostomulida	2	1	1	1	0.45	0.5
+Kinorhyncha	2	1	1	1	0.50	0.5
+Onychophora	2	2	2	2	0.98	1.0
+Tardigrada	2	2	2	2	1.00	1.0
+Xenacoelomorpha	2	1	1	1	0.50	0.5
+Entoprocta	1	1	1	1	0.97	1.0
+Gastrotricha	1	1	1	1	1.00	1.0
+Nematomorpha	1	1	1	1	1.00	1.0
+Orthonectida	1	0	0	0	0.00	0.0
+Phoronida	1	1	1	1	1.00	1.0
+Priapulida	1	1	1	1	1.00	1.0
+Rotifera	1	1	1	1	1.00	1.0
+ALL	92	80	82	82	1.00
+## rrnL
+Nematoda	7	2	3	4	0.00	0.3
+Annelida	6	6	6	6	1.00	1.0
+Chordata	6	6	6	6	1.00	1.0
+Cnidaria	6	6	6	6	0.91	1.0
+Echinodermata	6	6	6	6	1.00	1.0
+Mollusca	6	6	6	6	1.00	1.0
+Platyhelminthes	6	6	6	6	1.00	1.0
+Arthropoda	5	5	5	5	0.98	1.0
+Acanthocephala	4	4	4	4	1.00	1.0
+Brachiopoda	4	4	4	4	0.99	1.0
+Bryozoa	3	3	3	3	1.00	1.0
+Chaetognatha	3	3	3	3	0.95	1.0
+Hemichordata	3	3	3	3	1.00	1.3
+Nemertea	3	3	3	3	1.00	1.0
+Placozoa	4	0	1	2	0.00	0.0
+Porifera	3	3	3	3	0.62	1.0
+Ctenophora	2	0	0	0	0.00	0.0
+Gnathostomulida	2	2	2	2	0.91	1.0
+Kinorhyncha	2	1	2	2	0.50	0.5
+Onychophora	2	2	2	2	0.91	1.0
+Tardigrada	2	1	1	1	0.53	1.0
+Xenacoelomorpha	2	1	1	1	0.46	0.5
+Entoprocta	1	1	1	1	0.99	1.0
+Gastrotricha	1	1	1	1	1.00	1.0
+Nematomorpha	1	1	1	1	1.00	1.0
+Orthonectida	1	0	0	0	0.00	0.0
+Phoronida	1	1	1	1	0.98	1.0
+Priapulida	1	1	1	1	1.00	1.0
+Rotifera	1	1	1	1	1.00	1.0
+ALL	94	79	82	84	0.99
+## both
+Nematoda	14	7	8	9	0.47	0.6
+Annelida	12	12	12	12	1.00	1.0
+Chordata	12	12	12	12	1.00	1.0
+Cnidaria	12	12	12	12	0.91	1.0
+Echinodermata	12	12	12	12	1.00	1.0
+Mollusca	12	12	12	12	1.00	1.0
+Platyhelminthes	12	11	11	11	1.00	0.9
+Arthropoda	10	10	10	10	0.99	1.0
+Acanthocephala	8	8	8	8	1.00	1.0
+Brachiopoda	8	6	8	8	0.99	0.8
+Bryozoa	6	6	6	6	1.00	1.0
+Chaetognatha	6	6	6	6	0.96	1.0
+Hemichordata	6	6	6	6	1.00	1.2
+Nemertea	6	6	6	6	1.00	1.0
+Placozoa	6	1	2	3	0.00	0.2
+Porifera	6	6	6	6	0.75	1.0
+Ctenophora	4	0	0	0	0.00	0.0
+Gnathostomulida	4	3	3	3	0.86	0.8
+Kinorhyncha	4	2	3	3	0.50	0.5
+Onychophora	4	4	4	4	0.94	1.0
+Tardigrada	4	3	3	3	0.80	1.0
+Xenacoelomorpha	4	2	2	2	0.46	0.5
+Entoprocta	2	2	2	2	0.98	1.0
+Gastrotricha	2	2	2	2	1.00	1.0
+Nematomorpha	2	2	2	2	1.00	1.0
+Orthonectida	2	0	0	0	0.00	0.0
+Phoronida	2	2	2	2	0.99	1.0
+Priapulida	2	2	2	2	1.00	1.0
+Rotifera	2	2	2	2	1.00	1.0
+ALL	186	159	164	166	1.00
+## per-record (phylum acc gene truth_len bestE cov1e-10 cov1e-5 covE10 nhits1e-10 n_wrong_model_hits)
+Acanthocephala	NC_016754.1	rrnL	950	1.2e-18	1	1	1	1	1
+Acanthocephala	NC_016754.1	rrnS	553	5.7e-16	1	1	1	1	1
+Acanthocephala	NC_026516.1	rrnL	918	1.7e-16	1	1	1	1	1
+Acanthocephala	NC_026516.1	rrnS	582	7.4e-11	1	1	1	1	1
+Acanthocephala	NC_060482.1	rrnL	902	3.1e-19	1	1	1	1	1
+Acanthocephala	NC_060482.1	rrnS	758	2.3e-15	0.827	0.827	0.827	1	1
+Acanthocephala	NC_060484.1	rrnL	899	1.8e-18	1	1	1	1	1
+Acanthocephala	NC_060484.1	rrnS	607	1e-12	1	1	1	1	1
+Annelida	NC_026995.1	rrnL	1274	7.5e-38	1	1	1	1	1
+Annelida	NC_026995.1	rrnS	816	2.3e-40	1	1	1	1	1
+Annelida	NC_044092.1	rrnL	1233	1.4e-33	0.968	0.968	0.968	1	1
+Annelida	NC_044092.1	rrnS	855	2.3e-33	1	1	1	1	1
+Annelida	NC_046790.1	rrnL	1255	1.6e-37	1	1	1	1	1
+Annelida	NC_046790.1	rrnS	804	1.5e-37	1	1	1	1	1
+Annelida	NC_069206.1	rrnL	1148	9.6e-34	1	1	1	1	1
+Annelida	NC_069206.1	rrnS	732	5.1e-36	1	1	1	1	1
+Annelida	NC_072223.1	rrnL	976	1.1e-31	1	1	1	1	1
+Annelida	NC_072223.1	rrnS	749	2.8e-30	1	1	1	1	1
+Annelida	NC_082192.1	rrnL	1303	3.3e-38	1	1	1	1	1
+Annelida	NC_082192.1	rrnS	836	2.5e-41	1	1	1	1	1
+Arthropoda	NC_035061.1	rrnL	1267	1.8e-27	0.991	0.991	0.991	1	1
+Arthropoda	NC_035061.1	rrnS	746	2.4e-30	1	1	1	1	1
+Arthropoda	NC_046851.1	rrnL	1284	2.5e-32	0.983	0.983	0.983	1	1
+Arthropoda	NC_046851.1	rrnS	779	3.2e-31	0.976	0.976	0.976	1	1
+Arthropoda	NC_066979.1	rrnL	1205	1.3e-28	0.977	0.977	0.977	1	1
+Arthropoda	NC_066979.1	rrnS	743	1.3e-29	1	1	1	1	1
+Arthropoda	NC_067797.1	rrnL	1338	1.1e-29	0.976	0.976	0.976	1	1
+Arthropoda	NC_067797.1	rrnS	804	1.7e-28	0.999	0.999	0.999	1	1
+Arthropoda	NC_067900.1	rrnL	1204	2.7e-25	1	1	1	1	1
+Arthropoda	NC_067900.1	rrnS	785	2.7e-27	0.94	0.94	0.94	1	1
+Brachiopoda	NC_002322.1	rrnL	1142	1e-33	0.974	0.974	0.974	1	1
+Brachiopoda	NC_002322.1	rrnS	768	1.4e-37	1	1	1	1	1
+Brachiopoda	NC_036679.1	rrnL	1463	3.6e-24	0.989	0.989	0.989	1	0
+Brachiopoda	NC_036679.1	rrnS	1271	5.6e-09	0	0.826	0.826	0	1
+Brachiopoda	NC_039685.1	rrnL	1122	6.2e-34	1	1	1	1	1
+Brachiopoda	NC_039685.1	rrnS	774	3.1e-39	1	1	1	1	1
+Brachiopoda	NC_085563.1	rrnL	1434	3.1e-26	0.992	0.992	0.992	1	0
+Brachiopoda	NC_085563.1	rrnS	1264	6e-07	0	0.827	0.827	0	1
+Bryozoa	NC_011820.2	rrnL	1132	5.5e-32	1	1	1	1	1
+Bryozoa	NC_011820.2	rrnS	770	4.7e-37	1	1	1	1	1
+Bryozoa	NC_018355.1	rrnL	1273	4.7e-28	1	1	1	1	1
+Bryozoa	NC_018355.1	rrnS	871	6.9e-33	0.99	0.99	0.99	1	1
+Bryozoa	NC_038192.1	rrnL	1344	1.4e-42	0.968	0.968	0.968	1	1
+Bryozoa	NC_038192.1	rrnS	809	1.8e-44	1	1	1	1	1
+Chaetognatha	NC_006083.1	rrnL	936	1.5e-12	0.926	0.926	0.926	1	1
+Chaetognatha	NC_006083.1	rrnS	527	2.3e-15	0.985	0.985	0.985	1	1
+Chaetognatha	NC_013811.1	rrnL	895	5.9e-14	0.973	0.973	0.973	1	1
+Chaetognatha	NC_013811.1	rrnS	523	2e-13	0.969	0.969	0.969	1	1
+Chaetognatha	NC_013814.1	rrnL	1109	2e-13	0.95	0.95	0.95	1	1
+Chaetognatha	NC_013814.1	rrnS	620	6e-13	0.818	0.818	0.818	1	1
+Chordata	NC_002082.1	rrnL	1558	5.7e-55	1	1	1	1	1
+Chordata	NC_002082.1	rrnS	951	1.2e-58	1	1	1	1	1
+Chordata	NC_009732.1	rrnL	1586	9.7e-50	0.999	0.999	0.999	1	1
+Chordata	NC_009732.1	rrnS	980	1.3e-46	0.996	0.996	0.996	1	1
+Chordata	NC_011638.1	rrnL	1566	5.8e-58	1	1	1	1	1
+Chordata	NC_011638.1	rrnS	956	3.1e-60	1	1	1	1	1
+Chordata	NC_028416.1	rrnL	1886	2.4e-45	0.83	0.83	0.83	1	1
+Chordata	NC_028416.1	rrnS	958	2.8e-61	0.999	0.999	0.999	1	1
+Chordata	NC_049998.1	rrnL	1555	2.4e-48	0.999	0.999	0.999	1	1
+Chordata	NC_049998.1	rrnS	956	1.1e-54	1	1	1	1	1
+Chordata	NC_088493.1	rrnL	1558	4.4e-57	0.999	0.999	0.999	1	1
+Chordata	NC_088493.1	rrnS	958	2.6e-57	1	1	1	1	1
+Cnidaria	NC_006902.1	rrnL	2266	2.4e-17	0.815	0.815	0.815	1	1
+Cnidaria	NC_006902.1	rrnS	1172	2.5e-25	0.832	0.832	0.832	1	1
+Cnidaria	NC_022829.1	rrnL	2260	3.5e-19	0.82	0.82	0.82	1	1
+Cnidaria	NC_022829.1	rrnS	1176	9.2e-25	0.828	0.828	0.828	1	1
+Cnidaria	NC_031213.1	rrnL	1766	8.9e-25	0.92	0.92	0.92	1	1
+Cnidaria	NC_031213.1	rrnS	907	2.8e-31	0.992	0.992	0.992	1	1
+Cnidaria	NC_046775.1	rrnL	1677	2.1e-28	1	1	1	1	1
+Cnidaria	NC_046775.1	rrnS	965	7.2e-32	1	1	1	1	1
+Cnidaria	NC_062009.1	rrnL	1928	3.7e-27	0.892	0.892	0.892	1	1
+Cnidaria	NC_062009.1	rrnS	1050	1.3e-30	0.907	0.907	0.907	1	1
+Cnidaria	NC_080956.1	rrnL	1575	1.2e-19	1	1	1	1	1
+Cnidaria	NC_080956.1	rrnS	920	1.8e-23	0.904	0.904	0.904	1	1
+Ctenophora	NC_016117.1	rrnL	878	nan	0	0	0	0	0
+Ctenophora	NC_016117.1	rrnS	368	nan	0	0	0	0	0
+Ctenophora	NC_045864.1	rrnL	933	nan	0	0	0	0	0
+Ctenophora	NC_045864.1	rrnS	587	nan	0	0	0	0	0
+Echinodermata	NC_001627.1	rrnL	1531	2.6e-38	0.981	0.981	0.981	1	1
+Echinodermata	NC_001627.1	rrnS	897	2e-42	0.999	0.999	0.999	1	1
+Echinodermata	NC_013878.1	rrnL	1475	3.2e-34	0.934	0.934	0.934	1	1
+Echinodermata	NC_013878.1	rrnS	894	1.3e-33	0.99	0.99	0.99	1	1
+Echinodermata	NC_054230.1	rrnL	1603	1.1e-33	1	1	1	1	1
+Echinodermata	NC_054230.1	rrnS	892	1.9e-41	1	1	1	1	1
+Echinodermata	NC_061414.1	rrnL	1564	1.7e-43	1	1	1	1	1
+Echinodermata	NC_061414.1	rrnS	890	1.5e-46	1	1	1	1	1
+Echinodermata	NC_065088.1	rrnL	1343	6.1e-41	1	1	1	1	1
+Echinodermata	NC_065088.1	rrnS	823	1.9e-41	1	1	1	1	1
+Echinodermata	NC_083273.1	rrnL	959	3e-42	1	1	1	1	1
+Echinodermata	NC_083273.1	rrnS	880	1e-43	1	1	1	1	1
+Entoprocta	NC_010431.1	rrnL	1225	1.7e-33	0.994	0.994	0.994	1	1
+Entoprocta	NC_010431.1	rrnS	879	1.5e-37	0.969	0.969	0.969	1	1
+Gastrotricha	NC_026985.1	rrnL	952	2.1e-30	1	1	1	1	1
+Gastrotricha	NC_026985.1	rrnS	748	7.1e-28	1	1	1	1	1
+Gnathostomulida	NC_026983.1	rrnL	505	2.9e-13	1	1	1	1	0
+Gnathostomulida	NC_026983.1	rrnS	733	nan	0	0	0	0	1
+Gnathostomulida	NC_026984.1	rrnL	1397	1.8e-13	0.817	0.817	0.817	1	1
+Gnathostomulida	NC_026984.1	rrnS	725	1.8e-11	0.905	0.905	0.905	1	1
+Hemichordata	NC_007438.1	rrnL	1504	3.3e-43	0.979	0.979	0.979	1	1
+Hemichordata	NC_007438.1	rrnS	851	9.3e-41	1	1	1	1	1
+Hemichordata	NC_040108.1	rrnL	1424	3.7e-44	1	1	1	1	1
+Hemichordata	NC_040108.1	rrnS	818	8.8e-43	1	1	1	1	1
+Hemichordata	NC_040109.1	rrnL	1508	5.1e-43	1	1	1	2	1
+Hemichordata	NC_040109.1	rrnS	817	2.3e-42	1	1	1	1	2
+Kinorhyncha	NC_031873.1	rrnL	1014	7e-23	1	1	1	1	1
+Kinorhyncha	NC_031873.1	rrnS	766	3.5e-18	1	1	1	1	1
+Kinorhyncha	NC_045069.1	rrnL	1112	5.4e-10	0	1	1	0	0
+Kinorhyncha	NC_045069.1	rrnS	766	nan	0	0	0	0	0
+Mollusca	NC_006886.2	rrnL	1244	5.6e-32	1	1	1	1	1
+Mollusca	NC_006886.2	rrnS	947	9.6e-16	0.987	0.987	0.987	1	1
+Mollusca	NC_018362.1	rrnL	1147	9.5e-30	1	1	1	1	1
+Mollusca	NC_018362.1	rrnS	788	3.4e-25	0.994	0.994	0.994	1	1
+Mollusca	NC_065650.1	rrnL	1359	1.2e-30	0.992	0.992	0.992	1	1
+Mollusca	NC_065650.1	rrnS	932	2.8e-28	1	1	1	1	1
+Mollusca	NC_072228.1	rrnL	1406	2.2e-40	0.997	0.997	0.997	1	1
+Mollusca	NC_072228.1	rrnS	962	4.9e-41	0.918	0.918	0.918	1	1
+Mollusca	NC_084457.1	rrnL	1110	5.3e-31	1	1	1	1	1
+Mollusca	NC_084457.1	rrnS	728	5e-35	1	1	1	1	1
+Mollusca	NC_086642.1	rrnL	986	1.2e-26	1	1	1	1	1
+Mollusca	NC_086642.1	rrnS	716	1.3e-28	1	1	1	1	1
+Nematoda	NC_008047.1	rrnL	846	0.0033	0	0	0	0	2
+Nematoda	NC_008047.1	rrnL	846	0.0033	0	0	0	0	2
+Nematoda	NC_008047.1	rrnS	672	2.3e-14	1	1	1	2	0
+Nematoda	NC_008047.1	rrnS	672	2.3e-14	1	1	1	2	0
+Nematoda	NC_013831.1	rrnL	962	6.3e-09	0	1	1	0	0
+Nematoda	NC_013831.1	rrnS	700	nan	0	0	0	0	0
+Nematoda	NC_017750.1	rrnL	1011	8.9e-19	0.939	0.939	0.939	1	1
+Nematoda	NC_017750.1	rrnS	698	7.1e-23	1	1	1	1	1
+Nematoda	NC_028229.1	rrnL	948	nan	0	0	0	0	1
+Nematoda	NC_028229.1	rrnS	719	1.2e-19	0.993	0.993	0.993	1	0
+Nematoda	NC_033868.1	rrnL	720	2.7e-13	1	1	1	1	1
+Nematoda	NC_033868.1	rrnS	606	1.1e-17	0.941	0.941	0.941	1	1
+Nematoda	NC_036308.1	rrnL	938	3.4	0	0	0.993	0	0
+Nematoda	NC_036308.1	rrnS	714	nan	0	0	0	0	0
+Nematomorpha	NC_044095.1	rrnL	1135	4.4e-23	1	1	1	1	1
+Nematomorpha	NC_044095.1	rrnS	705	4.9e-24	1	1	1	1	1
+Nemertea	NC_023929.1	rrnL	1098	5.3e-29	1	1	1	1	1
+Nemertea	NC_023929.1	rrnS	777	4.6e-36	1	1	1	1	1
+Nemertea	NC_023931.1	rrnL	1107	5.9e-29	1	1	1	1	1
+Nemertea	NC_023931.1	rrnS	776	1e-34	1	1	1	1	1
+Nemertea	NC_042687.1	rrnL	1257	1.1e-28	0.993	0.993	0.993	1	1
+Nemertea	NC_042687.1	rrnS	846	1.3e-32	0.998	0.998	0.998	1	1
+Onychophora	NC_009082.1	rrnL	1205	9e-25	0.92	0.92	0.92	1	1
+Onychophora	NC_009082.1	rrnS	604	2.7e-19	0.95	0.95	0.95	1	1
+Onychophora	NC_015890.1	rrnL	1106	1.5e-23	0.901	0.901	0.901	1	1
+Onychophora	NC_015890.1	rrnS	676	4.3e-19	1	1	1	1	1
+Orthonectida	NC_060553.1	rrnL	1228	nan	0	0	0	0	0
+Orthonectida	NC_060553.1	rrnS	685	nan	0	0	0	0	0
+Phoronida	NC_018761.1	rrnL	1395	7.4e-33	0.981	0.981	0.981	1	1
+Phoronida	NC_018761.1	rrnS	757	1.3e-40	1	1	1	1	1
+Placozoa	NC_008151.3	rrnL	896	nan	0	0	0	0	0
+Placozoa	NC_008151.3	rrnL	1810	nan	0	0	0	0	0
+Placozoa	NC_008151.3	rrnS	1176	nan	0	0	0	0	0
+Placozoa	NC_041549.1	rrnL	742	2.6e-06	0	0.0782	0.639	0	1
+Placozoa	NC_041549.1	rrnL	1689	2e-10	0	0.796	0.796	0	1
+Placozoa	NC_041549.1	rrnS	1215	3.9e-26	0.9	0.9	0.9	1	0
+Platyhelminthes	NC_002545.1	rrnL	1055	2.6e-20	1	1	1	1	1
+Platyhelminthes	NC_002545.1	rrnS	752	2.4e-26	0.983	0.983	0.983	1	1
+Platyhelminthes	NC_017613.1	rrnL	962	1.7e-25	1	1	1	1	1
+Platyhelminthes	NC_017613.1	rrnS	730	8e-23	0.962	0.962	0.962	1	1
+Platyhelminthes	NC_048467.1	rrnL	990	3.7e-19	1	1	1	1	1
+Platyhelminthes	NC_048467.1	rrnS	734	7.9e-23	0.973	0.973	0.973	1	1
+Platyhelminthes	NC_061205.1	rrnL	964	4.2e-24	1	1	1	1	1
+Platyhelminthes	NC_061205.1	rrnS	737	2.5e-24	0.965	0.965	0.965	1	1
+Platyhelminthes	NC_062047.1	rrnL	968	4.5e-20	1	1	1	1	1
+Platyhelminthes	NC_062047.1	rrnS	730	5e-21	1	1	1	1	1
+Platyhelminthes	NC_085462.1	rrnL	1002	2.1e-14	1	1	1	1	0
+Platyhelminthes	NC_085462.1	rrnS	728	nan	0	0	0	0	1
+Porifera	NC_010209.1	rrnL	2442	2.1e-16	0.618	0.636	0.636	1	1
+Porifera	NC_010209.1	rrnS	1243	8.2e-24	0.858	0.858	0.858	1	1
+Porifera	NC_021422.1	rrnL	2230	1e-18	0.646	0.646	0.646	1	1
+Porifera	NC_021422.1	rrnS	807	3e-30	1	1	1	1	1
+Porifera	NC_025335.1	rrnL	2418	2.6e-16	0.597	0.6	0.6	1	1
+Porifera	NC_025335.1	rrnS	1265	4e-25	0.907	0.907	0.907	1	1
+Priapulida	NC_008557.1	rrnL	1360	6.7e-33	1	1	1	1	1
+Priapulida	NC_008557.1	rrnS	796	5.9e-41	1	1	1	1	1
+Rotifera	NC_010472.1	rrnL	1107	5e-26	1	1	1	1	1
+Rotifera	NC_010472.1	rrnS	716	5.9e-23	1	1	1	1	1
+Tardigrada	NC_014848.1	rrnL	1912	6e-24	0.601	0.601	0.601	1	1
+Tardigrada	NC_014848.1	rrnS	734	4.5e-18	1	1	1	1	1
+Tardigrada	NC_015829.1	rrnL	2283	1.1e-20	0.459	0.459	0.459	1	1
+Tardigrada	NC_015829.1	rrnS	685	5.2e-17	1	1	1	1	1
+Xenacoelomorpha	NC_014578.1	rrnL	942	nan	0	0	0	0	0
+Xenacoelomorpha	NC_014578.1	rrnS	764	nan	0	0	0	0	0
+Xenacoelomorpha	NC_034948.1	rrnL	1433	6.4e-14	0.929	0.929	0.929	1	1
+Xenacoelomorpha	NC_034948.1	rrnS	926	5.8e-14	1	1	1	1	1

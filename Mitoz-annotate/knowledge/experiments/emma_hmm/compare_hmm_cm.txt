@@ -1,0 +1,9 @@
+keys 184 184 (features collapsed by duplicate keys: 2 )
+E<1e-10 all: n=184 HMM=83 CM=158 both=83 HMM_only=0 CM_only=75
+E<1e-10 target8: n=44 HMM=1 CM=23 both=1 HMM_only=0 CM_only=22
+E<1e-5 all: n=184 HMM=87 CM=163 both=87 HMM_only=0 CM_only=76
+E<1e-5 target8: n=44 HMM=2 CM=26 both=2 HMM_only=0 CM_only=24
+E<10 all: n=184 HMM=94 CM=165 both=94 HMM_only=0 CM_only=71
+E<10 target8: n=44 HMM=3 CM=28 both=3 HMM_only=0 CM_only=25
+target-8 features missed by the CMs at E<1e-10, by phylum:
+{'Ctenophora': 4, 'Gnathostomulida': 1, 'Kinorhyncha': 2, 'Nematoda': 6, 'Placozoa': 5, 'Tardigrada': 1, 'Xenacoelomorpha': 2}

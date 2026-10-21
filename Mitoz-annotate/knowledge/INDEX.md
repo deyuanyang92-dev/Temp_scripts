@@ -15,6 +15,11 @@
 | tools/trnascan-se.md | tRNAscan-SE 2.x organellar mode -O, -M vert, genetic-code flag -g |
 | tools/mfannot.md | MFannot intron workflow (exonerate, RNAweasel), .mfannotrc defaults; basis of mito_intron.py |
 | tools/mitofinder.md | MitoFinder: reference-based annotation, py2.7 bioconda, needs related reference GenBank |
+| tools/emma.md | EMMA (Julia, HMMER + Infernal, vertebrate/fish models): rRNA = nhmmer profile HMM + snapping to flanking tRNAs (100/50 nt); our probe: its HMMs find 1 of 46 rRNAs in 8 divergent phyla vs 24 for MITOS2 CMs; experiments in experiments/emma_hmm |
+| tools/mitopilot.md | MitoPilot (R): MITOS2 --best, rRNA rescue rerun with --trna 0, tRNA snapping capped at 1000/1850 nt |
+| tools/hifimitie.md | HiFiMiTie: local cmsearch --noF4b -E 0.01 with MITOS rrnS/rrnL models, first hit kept |
+| tools/degeci.md | DeGeCI: reference-graph k-mer annotator, rRNA ends projected from references; no divergent phyla in benchmark |
+| tools/mt_genome_benchmark.md | Baikal amphipod annotator benchmark: one truth genome, RNA-seq coverage, per-tool rRNA behaviour |
 | tools/table2asn.md | NCBI table2asn validator: messages relevant to mitogenomes, transl_except for T/TA stops; experiments in experiments/table2asn |
 
 ## topics/

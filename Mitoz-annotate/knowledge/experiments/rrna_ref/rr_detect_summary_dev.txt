@@ -1,0 +1,14 @@
+# leave-species-out
+cm        found 165/186  exact 19  <=3 35  <=10 56
+cm_merge  found 166/186  exact 19  <=3 35  <=10 56
+hmm       found 153/186  exact 12  <=3 37  <=10 62
+blast     found 145/186  exact 1  <=3 26  <=10 44
+cm+hmm    found 175/186  exact 19  <=3 35  <=10 58
+cm+blast  found 172/186  exact 19  <=3 36  <=10 58
+# leave-genus-out
+cm        found 165/186  exact 19  <=3 35  <=10 56
+cm_merge  found 166/186  exact 19  <=3 35  <=10 56
+hmm       found 150/186  exact 11  <=3 33  <=10 56
+blast     found 141/186  exact 2  <=3 21  <=10 38
+cm+hmm    found 175/186  exact 19  <=3 35  <=10 58
+cm+blast  found 172/186  exact 19  <=3 35  <=10 57

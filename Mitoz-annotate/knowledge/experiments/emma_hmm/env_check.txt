@@ -1,0 +1,20 @@
+# environment check 2026-10-21 (nothing installed or run)
+which julia: (not found)
+which nhmmer (PATH): (not found)
+which cmsearch (PATH): (not found)
+env mitos:
+# HMMER 3.4 (Aug 2023); http://hmmer.org/
+# INFERNAL 1.1.5 (Sep 2023)
+env mitoz3.6:
+# HMMER 3.1b2 (February 2015); http://hmmer.org/
+# INFERNAL 1.1.1 (July 2014)
+nhmmer -h (mitos env, HMMER 3.4): defaults
+  -E <x> : report sequences <= this E-value threshold in output  [10.0]  (x>0)
+  --max    : Turn all heuristic filters off (less speed, more power)
+  --F1 <x> : Stage 1 (SSV) threshold: promote hits w/ P <= F1
+  --watson           : only search the top strand
+  --crick            : only search the bottom strand
+cmsearch -h (mitos env, Infernal 1.1.5): defaults
+  -g        : configure CM for glocal alignment [default: local]
+  -E <x> : report sequences <= this E-value threshold in output  [10.0]  (x>0)
+  --nohmm    : skip all HMM filter stages, use only CM (slow)

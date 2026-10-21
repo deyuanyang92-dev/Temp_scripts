@@ -31,7 +31,8 @@ import mito_env  # noqa: E402  (finds external programs: config, PATH, conda env
 
 GB_EXT = {".gb", ".gbk", ".gbf", ".genbank", ".gbff"}
 SKIP_QUALS = {"translation", "db_xref", "protein_id", "locus_tag_old"}
-IGNORE_CODES = re.compile(r"SEQ_DESCR\.(NoPubFound|NoSourceDescriptor|MissingLineage|NoTaxonID|BadOrgMod)|"
+INTERNAL_NOTE = re.compile(r"check .* manually|mito_\w+\.py")   # e.g. mito_rescue.py / mito_intron.py notes
+IGNORE_CODES =re.compile(r"SEQ_DESCR\.(NoPubFound|NoSourceDescriptor|MissingLineage|NoTaxonID|BadOrgMod)|"
                           r"GENERIC\.MissingPubRequirement|SEQ_PKG\.|SEQ_DESCR\.TitleNotAppropriateForSet")
 MSG_RE = re.compile(r"^(INFO|WARNING|ERROR|REJECT|FATAL):\s+valid\s+\[([A-Z_]+\.[A-Za-z0-9_]+)\]\s+(.*)$", re.I)
 
@@ -46,8 +47,8 @@ def feature_lines(rec) -> List[str]:
             s, e = int(p.start) + 1, int(p.end)
             lo = "<" if isinstance(p.start, BeforePosition) else ""
             hi = ">" if isinstance(p.end, AfterPosition) else ""
-            if p.strand == -1:
-                a, b = f"{hi}{e}", f"{lo}{s}"
+            if p.strand == -1:      # '<' always on the first column, '>' on the second (table2asn: '>150<TAB>40' = Bad interval)
+                a, b = ("<" if hi else "") + str(e), (">" if lo else "") + str(s)
             else:
                 a, b = f"{lo}{s}", f"{hi}{e}"
             out.append(f"{a}\t{b}" + (f"\t{f.type}" if i == 0 else ""))
@@ -55,6 +56,8 @@ def feature_lines(rec) -> List[str]:
             if k in SKIP_QUALS:
                 continue
             for v in vals:
+                if k == "note" and INTERNAL_NOTE.search(str(v)):     # tool hints for the curator, not for the database
+                    continue
                 out.append(f"\t\t\t{k}\t{' '.join(str(v).split())}")
     return out
 

@@ -46,7 +46,7 @@ for d in sorted((B / OURS).glob("*/")):
         continue
     ours, ncbi = SeqIO.read(str(gbf[0]), "genbank"), SeqIO.read(str(ncbi_f), "genbank")
     for f in ours.features:
-        if f.type != "CDS" or not any("mito_intron" in n for n in f.qualifiers.get("note", [])):
+        if f.type != "CDS" or not any("MFannot method" in n for n in f.qualifiers.get("note", [])):
             continue
         code = int(f.qualifiers.get("transl_table", ["4"])[0])
         op = parts(f.location)

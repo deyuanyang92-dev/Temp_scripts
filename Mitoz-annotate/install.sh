@@ -28,7 +28,7 @@ while [ $# -gt 0 ]; do
     --force) FORCE=1 ;;
     --refdir) REFDIR="$2"; shift ;;
     --envs) ENVS="$2"; shift ;;
-    -h|--help) sed -n '2,17p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,16p' "$0"; exit 0 ;;
     *) echo "unknown option: $1" >&2; exit 2 ;;
   esac
   shift
@@ -118,7 +118,7 @@ ln -sf "$HERE/mitom" "$HOME/.local/bin/mitom"
 chmod +x "$HERE/mitom"
 case ":$PATH:" in
   *":$HOME/.local/bin:"*) say "command installed: mitom" ;;
-  *) say "command installed: $HOME/.local/bin/mitom - add it to PATH: echo 'export PATH=\$HOME/.local/bin:\$PATH' >> ~/.bashrc" ;;
+  *) say "command installed: $HOME/.local/bin/mitom - add it to PATH: echo 'export PATH=\$HOME/.local/bin:\$PATH' >> ~/.bashrc   (zsh, the macOS default shell: ~/.zshrc instead of ~/.bashrc)" ;;
 esac
 
 # ── record what was found ────────────────────────────────────────────────────

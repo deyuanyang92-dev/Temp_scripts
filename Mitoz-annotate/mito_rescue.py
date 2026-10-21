@@ -6,16 +6,25 @@ MITOS2 finds. 2026-10-20 dev benchmark (NCBI NC_ annotation as reference, offlin
   MitoZ-supported phyla (45 records): protein genes found 579 -> 580 (atp8), rRNA 81 -> 87, no new FP.
   Other phyla (48 records, MitoZ with a borrowed protein database): protein genes 525 -> 548, rRNA 75 -> 82.
 MITOS2 boundaries are less exact (52 % vs 80 % both ends exact), so nothing MitoZ annotated is changed:
-only genes absent from the record are added, each with a note to check it.
+only genes absent from the record are added (each listed in rescue_report.tsv with a hint to check it).
 
-Rules (each from the benchmark):
+Rules (each from the benchmark and from the 2026-10-21 review):
   - protein gene: added when no CDS of that gene exists and the MITOS2 gene does not lie mostly
-    (> 50 %) on an existing CDS or rRNA (that is a naming disagreement, not a missed gene);
-    An existing CDS/rRNA that wholly contains >= 2 MITOS2 genes of other names does not block them: it
-    spans an intron or merges genes (NC_006902.1: MitoZ nad5 over its 11 kb group I intron, 10 genes inside).
-  - rRNA: MITOS2 often splits a divergent rRNA into short pieces (29-200 nt); only the longest piece of
-    each rRNA, and only when >= 300 nt, is added (rescued-rRNA FP 13 -> 3 on the other phyla).
+    (> 50 %) on an existing CDS, rRNA or tRNA, or on a gene added earlier in the same call (longest first;
+    that is a naming disagreement, not a missed gene).
+    Containment release: an existing CDS/rRNA stops blocking only when it looks like an intron-spanning or
+    merged call: it is longer than 1.5 x MAX_LEN of its own gene (MAX_LEN = longest expected length in nt)
+    AND wholly contains >= 2 MITOS2 genes of other names that are absent from the record (NC_006902.1:
+    MitoZ nad5 over its 11 kb group I intron, 10 genes inside). A normal-length gene never releases, so
+    homologue fragments (nad4 / nad2 inside nad5) are not added as bogus CDS.
+  - rRNA: MITOS2 often splits a divergent rRNA into short pieces (29-200 nt); the pieces (-a/-b) are not
+    joined, only the longest piece of each rRNA, and only when >= 300 nt, is added (rescued-rRNA FP 13 -> 3
+    on the other phyla). CDS fragments (-a/-b) are joined only on the same strand with a gap of 0-3000 nt.
+  - /translation of a rescued CDS: trimmed to whole codons, first codon M if it is a start codon of the
+    table, trailing stop removed; omitted when an internal stop remains.
   - tRNAs are not handled here (MITOS2 already annotates them in the default pipeline).
+  - The feature /note is neutral (NOTE); the advice to check the boundaries is the "hint" column of
+    rescue_report.tsv.
 
 MITOS2: Donath et al. 2019, Nucleic Acids Res 47:10543 (doi:10.1093/nar/gkz833). It runs through
 scripts/runmitos_fast.py (Infernal searches in parallel, same results as runmitos).
@@ -31,9 +40,10 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
-from typing import Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from Bio import SeqIO
+from Bio.Data import CodonTable
 from Bio.Seq import Seq
 from Bio.SeqFeature import CompoundLocation, FeatureLocation, SeqFeature
 from Bio.SeqRecord import SeqRecord
@@ -57,15 +67,51 @@ MITOZ_NAMES = {
     "nad6": ("ND6", "NADH dehydrogenase subunit 6"),
     "rrnS": ("s-rRNA", "12S ribosomal RNA"), "rrnL": ("l-rRNA", "16S ribosomal RNA"),
 }
-NOTE = "missed by MitoZ; added from MITOS2 by mito_rescue.py - check boundaries manually"
+# longest expected gene length (nt), by MITOS2 name; a CDS/rRNA is a possible intron-spanning / merged call
+# only when longer than 1.5 x this value
+MAX_LEN = {
+    "cox1": 1700, "cox2": 800, "cox3": 850, "cob": 1250, "nad1": 1050, "nad2": 1150, "nad3": 420,
+    "nad4": 1450, "nad4l": 320, "nad5": 2000, "nad6": 600, "atp6": 750, "atp8": 250, "rrnS": 1100, "rrnL": 1900,
+}
+CONTAINER_FACTOR = 1.5
+MAX_FRAG_GAP = 3000      # CDS fragments (-a/-b) further apart than this are not joined
+NOTE = "annotated by similarity to a MITOS2 prediction (not found by the primary annotation)"
+HINT = "MITOS2 boundaries are less exact than MitoZ's (52 % vs 80 % both ends exact): check the ends manually"
+_MAX_LEN_BY_NAME = {n.lower(): MAX_LEN[g] for g, (n, _) in MITOZ_NAMES.items()}
+_MAX_LEN_BY_NAME.update({g.lower(): v for g, v in MAX_LEN.items()})
+
+
+def max_len(gene: str) -> Optional[int]:
+    """Longest expected length (nt) of a gene given by its MitoZ or MITOS2 name; None when unknown."""
+    return _MAX_LEN_BY_NAME.get(gene.lower())
+
+
+def _gap(a: FeatureLocation, b: FeatureLocation) -> int:
+    """Nucleotides between two intervals (< 0 when they overlap)."""
+    return max(int(b.start) - int(a.end), int(a.start) - int(b.end))
+
+
+def _chains(frags: List[tuple]) -> List[List[FeatureLocation]]:
+    """Fragments (-a, -b ...) in letter order -> chains of parts to join: only parts on the same strand
+    with a gap of 0..MAX_FRAG_GAP nt to the previous part are joined; others start a new feature."""
+    chains: List[List[FeatureLocation]] = []
+    for _, parts in sorted(frags, key=lambda x: x[0]):
+        last = chains[-1][-1] if chains else None
+        if last is not None and last.strand == parts[0].strand and 0 <= _gap(last, parts[0]) <= MAX_FRAG_GAP:
+            chains[-1].extend(parts)
+        else:
+            chains.append(list(parts))
+    return chains
 
 
 def mitos_to_record(result_dir: Path, seq: Seq, acc: str) -> SeqRecord:
     """GenBank-like record from MITOS2 result.bed (0-based). Copies (_0, _1) stay separate features of the
-    same gene; fragments (-a, -b) are joined in letter order; start > end wraps the origin; OH/OL skipped."""
+    same gene; CDS fragments (-a, -b) are joined in letter order when on the same strand and at most
+    MAX_FRAG_GAP nt apart (otherwise separate features); rRNA fragments are never joined (rescue then takes
+    the longest piece); start > end wraps the origin; OH/OL skipped."""
     n = len(seq)
     groups: Dict[tuple, List[tuple]] = {}
-    for line in (result_dir / "result.bed").read_text().splitlines():
+    for i, line in enumerate((result_dir / "result.bed").read_text().splitlines()):
         c = line.split("\t")
         if len(c) < 6 or MITOS_SKIP.match(c[3]):
             continue
@@ -77,7 +123,9 @@ def mitos_to_record(result_dir: Path, seq: Seq, acc: str) -> SeqRecord:
         else:
             g = MITOS_GENE.match(c[3])
             base = g.group(1) if g else c[3]
-            key = ("rRNA" if base.lower().startswith("rrn") else "CDS", base, "", (g.group(2) or "") if g else "")
+            kind = "rRNA" if base.lower().startswith("rrn") else "CDS"
+            # rRNA pieces are separate features: the line number makes each key unique
+            key = (kind, base, "", f"line{i}" if kind == "rRNA" else (g.group(2) or "") if g else "")
             frag = (g.group(3) or "") if g else ""
         s0, e0 = int(c[1]), int(c[2])
         if s0 <= e0:
@@ -89,13 +137,13 @@ def mitos_to_record(result_dir: Path, seq: Seq, acc: str) -> SeqRecord:
     r = SeqRecord(seq, id=acc)
     r.annotations["molecule_type"] = "DNA"
     for (kind, name, ac, _), frags in groups.items():
-        parts = [p for _, ps in sorted(frags, key=lambda x: x[0]) for p in ps]
-        loc = parts[0] if len(parts) == 1 else CompoundLocation(parts)
-        q = {"gene": [name]}
-        if kind == "tRNA":
-            q["anticodon"] = [ac]
-        r.features.append(SeqFeature(loc, type="gene", qualifiers={"gene": [name]}))
-        r.features.append(SeqFeature(loc, type=kind, qualifiers=q))
+        for parts in _chains(frags):
+            loc = parts[0] if len(parts) == 1 else CompoundLocation(parts)
+            q = {"gene": [name]}
+            if kind == "tRNA":
+                q["anticodon"] = [ac]
+            r.features.append(SeqFeature(loc, type="gene", qualifiers={"gene": [name]}))
+            r.features.append(SeqFeature(loc, type=kind, qualifiers=q))
     return r
 
 
@@ -103,22 +151,46 @@ def _positions(f: SeqFeature, n: int) -> set:
     return {i % n for p in f.location.parts for i in range(int(p.start), int(p.end))}
 
 
+def _translation(f: SeqFeature, seq: Any, code: int) -> Optional[str]:
+    """Protein of a rescued CDS: whole codons only, first codon M when it is a start codon of the table,
+    one trailing stop removed. None when an internal stop remains (the call is doubtful: no /translation)."""
+    nt = f.extract(seq)
+    nt = nt[: len(nt) - len(nt) % 3]
+    if not len(nt):
+        return None
+    aa = str(nt.translate(table=code))
+    if aa.endswith("*"):
+        aa = aa[:-1]
+    if not aa or "*" in aa:
+        return None
+    try:
+        starts = CodonTable.unambiguous_dna_by_id[code].start_codons
+    except KeyError:
+        starts = []
+    return "M" + aa[1:] if str(nt[:3]).upper() in starts else aa
+
+
 def rescue(rec: SeqRecord, mitos: SeqRecord, code: int) -> List[str]:
     """Add to rec (MitoZ annotation) the protein genes and rRNAs of mitos (mitos_to_record) that rec lacks.
     Returns the MitoZ-style names added."""
     n = len(rec)
     have = {f.qualifiers.get("gene", [""])[0] for f in rec.features if f.type in ("CDS", "rRNA")}
-    others = [(f.qualifiers["gene"][0], _positions(f, n)) for f in mitos.features
+    others = [(MITOZ_NAMES[f.qualifiers["gene"][0]][0], _positions(f, n)) for f in mitos.features
               if f.type in ("CDS", "rRNA") and f.qualifiers["gene"][0] in MITOZ_NAMES]
     taken = []
     for f in rec.features:
-        if f.type not in ("CDS", "rRNA"):
+        if f.type not in ("CDS", "rRNA", "tRNA"):
             continue
         pos = _positions(f, n)
         name = f.qualifiers.get("gene", [""])[0]
-        inside = {g for g, p in others if MITOZ_NAMES[g][0] != name and p <= pos}
-        if len(inside) < 2:      # >= 2 whole other genes inside: CDS spans an intron or merged genes
-            taken.append(pos)
+        limit = max_len(name)
+        if f.type != "tRNA" and limit is not None and len(pos) > CONTAINER_FACTOR * limit:
+            # far longer than the gene can be: may span an intron or merge genes; releases the genes inside
+            # it that are absent from the record, when there are >= 2 of them
+            inside = {g for g, p in others if g != name and g not in have and p <= pos}
+            if len(inside) >= 2:
+                continue
+        taken.append(pos)
     best: Dict[str, SeqFeature] = {}
     for f in mitos.features:
         if f.type not in ("CDS", "rRNA") or f.qualifiers["gene"][0] not in MITOZ_NAMES:
@@ -129,16 +201,24 @@ def rescue(rec: SeqRecord, mitos: SeqRecord, code: int) -> List[str]:
             continue
         if f.type == "rRNA" and len(pos) < MIN_RRNA:
             continue
-        if name not in best or len(pos) > len(best[name].location):
+        if name not in best or len(pos) > len(_positions(best[name], n)):
             best[name] = f
     added = []
-    for name, f in best.items():
+    # longest first; every accepted gene blocks later candidates lying mostly on it
+    for name, f in sorted(best.items(), key=lambda kv: -len(_positions(kv[1], n))):
+        pos = _positions(f, n)
+        if any(len(pos & t) > 0.5 * len(pos) for t in taken):
+            continue
+        taken.append(pos)
         mname = f.qualifiers["gene"][0]
         product = MITOZ_NAMES[mname][1]
         q = {"gene": [name], "product": [product], "note": [NOTE]}
         if f.type == "CDS":
             q = {"gene": [name], "codon_start": ["1"], "transl_table": [str(code)], "product": [product],
-                 "note": [NOTE], "translation": [str(f.extract(rec.seq).translate(table=code)).rstrip("*")]}
+                 "note": [NOTE]}
+            tr = _translation(f, rec.seq, code)
+            if tr:
+                q["translation"] = [tr]
         rec.features += [SeqFeature(f.location, type="gene", qualifiers={"gene": [name]}),
                          SeqFeature(f.location, type=f.type, qualifiers=q)]
         added.append(name)
@@ -187,12 +267,14 @@ def rescue_dir(final_dir: Path, code: int, run: Optional[Callable] = None, **kw)
                 try:
                     res = run(fa, code, Path(td) / "mitos", rec.annotations.get("topology") == "linear")
                 except RuntimeError as e:
-                    rows.append({"file": gbf.name, "record": rec.id, "gene": "", "location": "", "status": f"failed: {e}"})
+                    rows.append({"file": gbf.name, "record": rec.id, "gene": "", "location": "", "status": f"failed: {e}",
+                                 "hint": ""})
                     continue
                 added = rescue(rec, mitos_to_record(res, rec.seq, rec.id), code)
             for name in added:
                 f = next(x for x in rec.features if x.type != "gene" and x.qualifiers.get("gene") == [name])
-                rows.append({"file": gbf.name, "record": rec.id, "gene": name, "location": str(f.location), "status": "added"})
+                rows.append({"file": gbf.name, "record": rec.id, "gene": name, "location": str(f.location), "status": "added",
+                             "hint": HINT})
             changed = changed or bool(added)
         if changed:
             SeqIO.write(recs, str(gbf), "genbank")
@@ -212,7 +294,7 @@ def main(argv=None) -> int:
     rows = rescue_dir(Path(a.input), a.genetic_code, mitos_bin=a.mitos_bin, refdir=a.mitos_refdir)
     rep = Path(a.input) / "rescue_report.tsv"
     with open(rep, "w", newline="") as fh:
-        w = csv.DictWriter(fh, fieldnames=["file", "record", "gene", "location", "status"], delimiter="\t",
+        w = csv.DictWriter(fh, fieldnames=["file", "record", "gene", "location", "status", "hint"], delimiter="\t",
                            lineterminator="\n")
         w.writeheader()
         w.writerows(rows)

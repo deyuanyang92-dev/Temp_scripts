@@ -7,7 +7,7 @@ message: >-
 type: software
 authors:
   - alias: deyuanyang92-dev
-repository-code: "https://github.com/deyuanyang92-dev/Temp_scripts"
+repository-code: "https://github.com/deyuanyang92-dev/Mitom"
 license: CC0-1.0
 keywords: [mitochondrial genome, annotation, MitoZ, MITOS2, GenBank, Metazoa]
 references:

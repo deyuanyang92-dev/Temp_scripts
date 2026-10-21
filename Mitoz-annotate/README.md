@@ -8,7 +8,7 @@ This document explains installation, inputs, subcommands, key options, outputs, 
 **1. 安装（一条命令）/ Install (one command)** — Linux 或 Windows WSL2；macOS 见 `install.sh` 开头说明，或用 Docker：
 
 ```bash
-git clone <this repository> MitoM && cd MitoM
+git clone https://github.com/deyuanyang92-dev/Mitom.git MitoM && cd MitoM
 bash install.sh            # conda 环境 mitoz / mitos / mitotools + MITOS2 参考数据 + 命令 mitom
 mitom doctor               # 检查：所有必需程序都应显示 OK
 ```
@@ -21,14 +21,14 @@ Docker：`docker build -t mitom . && docker run --rm -v "$PWD":/data mitom mitom
 # GenBank 输入（推荐）：类群库、遗传密码、门都从 GenBank 分类信息自动判断（一次一个门）
 mitom run -i genomes.gb -o out
 
-# FASTA 输入：需写明类群库和遗传密码
+# FASTA 输入（没有分类信息）：不写 --clade 时沿用 Annelida 蛋白库并警告；其他类群请写明类群库和遗传密码
 mitom run -i contigs.fasta -o out --clade Mollusca --genetic_code 5
 ```
 
 `--clade` 可选：`Chordata Arthropoda Echinodermata Annelida-segmented-worms Bryozoa Mollusca Nematoda
 Nemertea-ribbon-worms Porifera-sponges Cnidaria Platyhelminthes-flatworms Chaetognatha-arrow-worms Animal`
 （`Animal` = 全动物蛋白库，用于其他门）。常用：`--threads 8 --max_tasks 4`（每个任务线程数 / 同时任务数）、
-`--sbt template.sbt`（NCBI 提交者模板）。
+`--sbt template.sbt`（NCBI 提交者模板）。`--threads` 默认 `min(8, CPU 数)`，`--max_tasks` 默认 `CPU 数 // threads`；`--clade auto` 遇到分类信息里没有已知门名（只有纲级名如 `Vertebrata`、`Gastropoda` 会按所属门处理）、含多个门、或各条记录 CDS 的 `transl_table` 不一致时报错（给 `--clade` / `--genetic_code` 即可）。
 
 **3. 结果 / Results**（`out/`）
 
@@ -93,7 +93,7 @@ We thank the authors of MitoZ, MITOS2/MITOS, MiTFi, MFannot, Infernal, BLAST+, G
 
 引用本软件的同时，请一并引用实际用到的软件 / When citing this software, please also cite the tools it ran:
 
-- 本软件 / This software: https://github.com/deyuanyang92-dev/Temp_scripts (`CITATION.cff`)
+- 本软件 / This software: https://github.com/deyuanyang92-dev/Mitom (`CITATION.cff`)
 - MitoZ: Meng G, et al. 2019. Nucleic Acids Res. doi:10.1093/nar/gkz173
 - MITOS2: Donath A, et al. 2019. Nucleic Acids Res. doi:10.1093/nar/gkz833
 - MITOS: Bernt M, et al. 2013. Mol Phylogenet Evol. doi:10.1016/j.ympev.2012.08.023
@@ -196,7 +196,7 @@ Supported FASTA extensions are `.fa`, `.fasta`, `.fna`, and `.fas`. If no topolo
 支持扩展名：
 
 ```text
-.gb .gbk .genbank .gbf
+.gb .gbk .genbank .gbf .gbff
 ```
 
 GenBank 输入会先执行：
@@ -582,17 +582,23 @@ Outputs and matching:
 | `--conda_exe` | `run`, `annotate` | Conda 可执行文件名，默认 `conda` | Conda executable, default `conda` |
 | `--conda_env_mitoz` | `run`, `annotate` | 含 MitoZ 的 Conda 环境名 | Conda environment containing MitoZ |
 | `--mitoz_path` | `run`, `annotate` | MitoZ 可执行文件或目录 | Path to MitoZ executable or directory |
-| `--threads` | `run`, `annotate` | 每个 MitoZ 任务线程数，必须为正整数 | Threads per MitoZ job, positive integer |
-| `--max_tasks` | `run`, `annotate` | 同时运行的任务数，必须为正整数 | Maximum concurrent jobs, positive integer |
-| `--clade` | `run`, `annotate` | MitoZ clade，必须按物种设置 | MitoZ clade, set for your taxa |
-| `--genetic_code` | `run`, `annotate` | 遗传密码表，默认 5 | Genetic code, default 5 |
+| `--threads` | `run`, `annotate` | 每个 MitoZ 任务线程数，必须为正整数；默认 `min(8, CPU 数)` | Threads per MitoZ job, positive integer; default `min(8, CPUs)` |
+| `--max_tasks` | `run`, `annotate` | 同时运行的任务数，必须为正整数；默认 `max(1, CPU 数 // threads)` | Maximum concurrent jobs, positive integer; default `max(1, CPUs // threads)` |
+| `--clade` | `run`, `annotate` | 类群蛋白库，默认 `auto`：从 GenBank 分类信息判断（一次一个门；纲级名按所属门处理；分类信息里没有已知门名、含多个门、或各条记录 CDS `transl_table` 不一致时报错；**完全没有分类信息**（FASTA、无 lineage 的 GenBank）时沿用 Annelida 并警告）；可选值见"快速上手" | Taxon protein database, default `auto` (from the GenBank taxonomy, one phylum per run; class names count for their phylum; a taxonomy without a known phylum, several phyla, or differing CDS transl_tables are errors; input with NO taxonomy at all - FASTA, GenBank without lineage - falls back to Annelida with a warning) |
+| `--genetic_code` | `run`, `annotate` | 遗传密码表，无默认固定值：`--clade auto` 时取输入各记录 CDS 的 transl_table（记录间不一致则报错），无则该门常用码；显式 `--clade` 时取 MitoZ 对该类群的密码（Chordata 2、Echinodermata 9、Porifera 4，其余 5；Cnidaria、Platyhelminthes、Chaetognatha、Animal 必须显式给出）；显式给出时优先 | Genetic code (no fixed default): with `--clade auto` from the per-record CDS transl_table (differing records are an error), else the phylum's usual code; with an explicit `--clade` MitoZ's code of that clade (2 Chordata, 9 Echinodermata, 4 Porifera, else 5; required for Cnidaria, Platyhelminthes, Chaetognatha, Animal); an explicit value wins |
+| `--core` | `run`, `annotate` | `hybrid`（默认：MitoZ 蛋白/rRNA + MITOS2 tRNA + MITOS2 补漏）/ `mitoz`（只用 MitoZ 核心，等于 `--trna mitoz --rescue no --rrna_hmm no`，会覆盖显式给出的 `--rescue` / `--rrna_hmm` 并在日志里说明） | Annotation core: `hybrid` (default) or `mitoz` (= `--trna mitoz --rescue no --rrna_hmm no`; overrides explicit `--rescue` / `--rrna_hmm` and says so) |
+| `--trna` | `run`, `annotate` | `mitos2`（默认，灵敏补搜并行）/ `mitoz`（MiTFi） | tRNA step: `mitos2` (default) or `mitoz` |
+| `--rescue` | `run`, `annotate` | 从 MITOS2 补回 MitoZ 漏注的蛋白基因/rRNA：`auto`（默认，找到 MITOS2 即运行）/ `yes` / `no` | Rescue genes MitoZ missed from MITOS2: `auto` (default) / `yes` / `no` |
+| `--rrna_hmm`, `--rrna_hmm_lib`, `--phylum` | `run`, `annotate` | 仍缺的 12S/16S 用按门 HMM 补搜：`auto`（默认）/ `yes` / `no`；库默认 `models/rrna_hmm`；`--phylum` 默认取 `--clade auto` 判出的门、显式 `--clade` 对应的门（`--clade Animal` 时不确定，FASTA 输入请自己给 `--phylum`），都没有时才用记录自己的分类信息；没有可用模型的记录会在日志和屏幕上提示 | Per-phylum rRNA HMM fallback for rRNAs still missing: `auto` (default) / `yes` / `no`; `--phylum` defaults to the phylum found by `--clade auto` or that of an explicit `--clade` (unknown for `--clade Animal`: give it for FASTA input), then to the record's own taxonomy; records without a model are reported on screen and in the log |
+| `--intron_fix` | `run`, `annotate` | 内含子（MFannot 方法）：`auto`（默认，找到 exonerate 即运行）/ `yes` / `no` | Introns (MFannot method): `auto` (default) / `yes` / `no` |
+| `--curate`, `--sbt` | `run`, `annotate` | 端点校正 + NCBI 命名 + 提交文件（默认 `yes`）；`--sbt` 为 NCBI 提交者模板 | Curation + NCBI names + submission files (default `yes`); `--sbt` submitter template |
 | `--species_name` | `run`, `annotate` | 传给 MitoZ annotate 的物种名 | Species name passed to MitoZ annotate |
 | `--mitoz_extra ARG` | `run`, `annotate` | 追加传给 MitoZ annotate 的参数，可重复 | Extra MitoZ annotate arguments, repeatable |
 | `--infq`, `--fq_position`, `--suffix_fq` | `run`, `annotate` | 可选双端 FASTQ；`--suffix_fq` 必须有两个逗号分隔后缀 | Optional paired FASTQ; suffix list must contain two comma-separated values |
 | `--scheduler_backend` | `run`, `annotate` | `auto` / `threads` / `snakemake`，默认 `auto` | Scheduler backend, default `auto` |
 | `--snakemake_bin`, `--smk_cores`, `--smk_mem_mb`, `--smk_latency_wait`, `--smk_extra` | `run`, `annotate` | Snakemake 后端参数；数值项必须为正整数 | Snakemake backend options; numeric values must be positive integers |
-| `--if_reannotation_2` | `run` | 是否运行第二轮注释，默认 `yes` | Enable phase-2 re-annotation, default `yes` |
-| `--keep_intermediate` | `run`, `annotate` | 是否保留内部 ID 中间文件（`00.*`、`01.*`、`03.*`、`04.final_body_merged`、`id_map.tsv`），默认 `no`：最终输出写完后删除以节约空间；`dedup_report.tsv` 移到输出根目录，问题样本的 MitoZ 日志复制到 `failed_logs/` | Keep internal-ID intermediates; default `no` deletes them after final output (dedup report moved to root, problem-sample logs kept in `failed_logs/`) |
+| `--if_reannotation_2` | `run` | 第二轮注释：`yes`（默认，每条都重注）/ `auto`（第一轮用灵敏 tRNA 模式，平移后检查——原序列两端 50 nt 内有**看起来被截断**的基因（CDS 长度非 3 的倍数且无 T/TA 终止尾、靠序列端的一侧缺起始/终止密码子，按所用遗传密码判断；tRNA 不在 55–95 nt；s-rRNA < 600 nt、l-rRNA < 900 nt）、缺标准基因（COX1-3、CYTB、ND1-6、ND4L、两个 rRNA；ATP6/ATP8 在整个门中可能缺失，不算）、平移前后基因序列不一致、基因跨新起点——只重注未通过的；决定写 `reannotation_decision.tsv`；6 条 A/B 结果完全一致）/ `no` | Phase-2 re-annotation: `yes` (default, every record) / `auto` (only records failing the post-shift check: truncated-looking genes at the ends of the round-1 sequence, missing standard genes (not ATP6/ATP8), changed gene sequences, genes across the new origin; decisions in `reannotation_decision.tsv`) / `no` |
+| `--keep_intermediate` | `run`, `annotate` | 是否保留内部 ID 中间文件（`00.*`、`01.*`、`03.*`、`04.final_body_merged`、`04.trna_resensitised`、`id_map.tsv`），默认 `no`：最终输出写完后删除以节约空间；`dedup_report.tsv` 移到输出根目录，问题样本的 MitoZ 日志复制到 `failed_logs/` | Keep internal-ID intermediates; default `no` deletes them after final output (dedup report moved to root, problem-sample logs kept in `failed_logs/`) |
 | `--preserve_phase1_metadata` | `run`, `annotate` | `run` 默认 `yes`；`annotate` 默认 `no` | Defaults to `yes` for `run`, `no` for `annotate` |
 | `--smart_metadata` | `run`, `transfer_metadata` | 开启模糊 metadata 匹配 | Enable fuzzy metadata matching |
 | `--auto_accept_metadata` | `run`, `transfer_metadata` | 自动接受最佳模糊匹配；必须配合 `--smart_metadata yes` | Auto-accept best fuzzy match; requires `--smart_metadata yes` |
@@ -652,6 +658,7 @@ mitoz_run_out/
 ├── 00.reoriented_fasta_internal/
 ├── 01.mitoz_anno1/
 ├── 03.mitoz_anno2_reoriented/
+├── 04.trna_resensitised/       # 第一轮（快速 tRNA 模式）直接定稿的样本重跑 MITOS2 灵敏 tRNA（中间文件，默认删除）
 ├── 04.final_gb/
 │   ├── SAMPLE.gbf
 │   └── no_{which_gene_first}_gene/
@@ -665,7 +672,11 @@ mitoz_run_out/
 │   └── validation_messages.tsv
 ├── rescue_report.tsv           # 从 MITOS2 补回的漏注基因（需人工检查）
 ├── rrna_hmm_report.tsv         # 按门 HMM 补搜的 12S/16S（只在仍缺失时搜索；需人工检查边界）
-├── annotation-summary.tsv
+├── intron_report.tsv           # 内含子：每个候选及其证据、是否写入
+├── intron_fix.log              # mito_intron.py 运行日志
+├── reannotation_decision.tsv   # --if_reannotation_2 auto：每个样本重注/沿用第一轮及原因
+├── trna_wrap.tsv               # 跨序列起点的 MITOS2 tRNA（每次运行开始时创建，可能为空）
+├── annotation-summary.tsv      # body_source: phase2_mitoz / shifted_round1（auto 判定不必重注）/ phase1b_reoriented（第二轮失败或关闭）/ phase1_raw
 ├── metadata_transfer_log.tsv
 ├── all.final.gbf
 ├── annotation_failed.txt
@@ -685,7 +696,7 @@ mitoz_run_out/
 - `annotation-summary.tsv`: 最终 PCG / tRNA / rRNA 统计。
 - `metadata_transfer_log.tsv`: metadata 转移审计。
 - `04.final_gb/*.gbf`: MitoM 注释结果（方向调整、元数据迁回、内含子、tRNA、漏注救回之后，端点校正之前）。
-- `05.curated/*.gbf`: **最终 GenBank**：端点校正（mito_curate.py）并统一为 NCBI 命名——CDS `COX1…CYTB`、`ND1…ND6`、`ND4L`；rRNA `rrnS`/`rrnL`（12S/16S ribosomal RNA）；tRNA `/gene` 只写符号（`trnL1`/`trnL2`、`trnS1`/`trnS2` 按反密码子），反密码子写在 `/note`；非法起始密码子按 NCBI 惯例标 5′ partial（"start codon not determined"）。
+- `05.curated/*.gbf`: **最终 GenBank**：端点校正（mito_curate.py）并统一为 NCBI 命名——CDS `COX1…CYTB`、`ND1…ND6`、`ND4L`；rRNA `rrnS`/`rrnL`（12S/16S ribosomal RNA）；tRNA `/gene` 只写符号（`trnL1`/`trnL2`、`trnS1`/`trnS2` 按反密码子，沿用 MITOS 约定 L1 = CUN、L2 = UUR、S1 = AGN、S2 = UCN；脊椎动物 HGNC/RefSeq 的 L1/L2 编号相反，请按投稿类群核对），反密码子写在 `/note`；非法起始密码子按 NCBI 惯例标 5′ partial（"start codon not determined"）。
 - `06.ncbi_submission/`: 每条记录的 NCBI 提交文件和校验报告。`submission_summary.tsv` 中 ERROR 为 0 的记录可直接提交；GenBank 平面文件（.gbf）本身不能直接提交给 NCBI。
 - `all.final.gbf`: 合并后的最终 GenBank（来自 `05.curated/`；`--curate no` 时来自 `04.final_gb/`）。
 - `*_failed.txt`, `*_mismatch.txt`: 问题样本列表。
@@ -706,6 +717,11 @@ annotate_out/
 │   └── dedup_report.tsv
 ├── 01.mitoz_anno1/
 ├── 04.final_gb/
+├── 05.curated/                 # --curate yes（默认）：端点校正 + NCBI 命名
+├── 06.ncbi_submission/         # NCBI 提交文件（需 table2asn）
+├── rescue_report.tsv           # --rescue（auto：找到 MITOS2 即运行）
+├── rrna_hmm_report.tsv         # --rrna_hmm（auto：找到模型库和 nhmmer 即运行）
+├── intron_report.tsv           # --intron_fix
 ├── annotation-summary.tsv
 ├── all.final.gbf
 ├── annotation_failed.txt
@@ -875,8 +891,8 @@ python3 -m pytest -q tests          # Metridium / Nematostella / Platynereis，�
 
 ## 注意事项 / Practical Notes
 
-1. `--clade` 默认 `auto`：从 GenBank 分类信息判断（一次运行只能一个门；FASTA 输入需显式给 `--clade` 和 `--genetic_code`）。
-2. `--genetic_code` 默认是 5，即无脊椎动物线粒体密码表；请按物种确认。
+1. `--clade` 默认 `auto`：从 GenBank 分类信息判断（一次运行只能一个门；分类信息里没有已知门名、含多个门或各条记录 `transl_table` 不一致时报错）。完全没有分类信息的输入（FASTA、无 lineage 的 GenBank）沿用 `Annelida-segmented-worms` 并给出警告；其他类群请显式给 `--clade` 和 `--genetic_code`。
+2. `--genetic_code` 没有固定默认值：`--clade auto` 时取输入 CDS 的 `transl_table`，否则按 `--clade`（Chordata 2、Echinodermata 9、Porifera 4，其余 5）；请按物种确认。
 3. `--id_maxlen` 不能小于 6，否则内部 ID 会冲突；脚本现在会拒绝这种参数。
 4. 线性序列重定向后会保留 `linear` topology，不会被强制改成 `circular`。
 5. 多 contig 样本中缺少目标基因的 contig 会合并回最终结果，不会静默丢弃。
@@ -885,8 +901,8 @@ python3 -m pytest -q tests          # Metridium / Nematostella / Platynereis，�
 
 Notes:
 
-1. The default `--clade` is `auto` (from the GenBank taxonomy, one phylum per run); FASTA input needs `--clade` and `--genetic_code`.
-2. The default `--genetic_code` is 5; verify it for your dataset.
+1. The default `--clade` is `auto` (from the GenBank taxonomy, one phylum per run; a taxonomy without a known phylum, several phyla, or differing CDS `transl_table` values are errors). Input with no taxonomy at all (FASTA, GenBank without a lineage) falls back to `Annelida-segmented-worms` with a warning; for any other taxon give `--clade` and `--genetic_code`.
+2. `--genetic_code` has no fixed default: with `--clade auto` it is the CDS `transl_table` of the input, else MitoZ's code of the `--clade` (2 Chordata, 9 Echinodermata, 4 Porifera, else 5); verify it for your dataset.
 3. `--id_maxlen` must be at least 6.
 4. Linear records keep linear topology after reorientation.
 5. Partial no-target-gene contigs are merged back into final outputs.
@@ -919,7 +935,7 @@ flowchart TD
     D["生成内部 FASTA<br/>S00001...；记录 id_map.tsv"]
     E["第一轮 MitoZ 注释<br/>输出 01.mitoz_anno1/ 和 sample.log"]
     F["按目标基因重定向<br/>默认 cox1；保留 linear / circular"]
-    G["可选第二轮重注释<br/>if_reannotation_2=yes 时运行"]
+    G["可选第二轮重注释<br/>if_reannotation_2=yes 时每条运行；auto 时只对未通过平移检查的运行"]
     H["最终 GenBank 生成<br/>ID 重写、metadata 恢复、/organism= 同步"]
     I["统计与问题清单<br/>annotation-summary.tsv、failed/mismatch 列表"]
     J["合并最终结果<br/>04.final_gb/*.gbf 与 all.final.gbf"]
@@ -936,7 +952,7 @@ flowchart TD
     D["Create internal FASTA files<br/>S00001... plus id_map.tsv"]
     E["MitoZ annotation, phase 1<br/>Writes 01.mitoz_anno1/ and sample.log files"]
     F["Reorient by target gene<br/>Default cox1; preserve linear / circular topology"]
-    G["Optional phase-2 re-annotation<br/>Runs when if_reannotation_2=yes"]
+    G["Optional phase-2 re-annotation<br/>if_reannotation_2=yes: every record; auto: only records failing the shift check"]
     H["Build final GenBank files<br/>Rewrite IDs, restore metadata, synchronize /organism="]
     I["Write statistics and problem lists<br/>annotation-summary.tsv and failed/mismatch files"]
     J["Merge final outputs<br/>04.final_gb/*.gbf and all.final.gbf"]

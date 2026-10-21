@@ -136,7 +136,86 @@ def test_extended_clade_profiles(tmp_path):
     assert (d / "MT_database" / "Arthropoda_CDS_protein.fa").read_text().startswith(">gi_NC_1_COX1")
     assert (d / "rRNA_CM").is_dir()
     lengths = dict(line.split("\t") for line in (d / "CDS_HMM" / "Arthropoda_CDS_length_list").read_text().splitlines())
-    assert lengths["COX1"] == "33" and lengths["ND6"] == "15" and lengths["ATP8"] == "0"   # median aa x 3; absent 0
+    # MitoZ uses the list as a MINIMUM gene length: int(0.5 x median aa x 3); absent gene 0
+    assert lengths["COX1"] == "16" and lengths["ND6"] == "7" and lengths["ATP8"] == "0"
+
+
+def test_profiles_header_regex_and_warning(tmp_path, capsys):
+    """A (mito_env.py:209): headers with letters after NC_ or a version suffix were skipped silently."""
+    src = tmp_path / "mitoz_profiles"
+    (src / "MT_database").mkdir(parents=True)
+    (src / "rRNA_CM").mkdir()
+    (src / "MT_database" / "Cnidaria_CDS_protein.fa").write_text(
+        ">gi_NC_KU507297_ATP6_Bolocera_sp._229_aa\n" + "M" * 200 + "\n"
+        ">gi_NC_011820.2_ATP6_Foo_bar_228_aa\n" + "M" * 100 + "\n"
+        ">gi_NC_011820.2_ND4L_Foo_bar_98_aa\n" + "M" * 50 + "\n"
+        ">gi_NC_0123_ND4_Foo_bar_400_aa\n" + "M" * 400 + "\n"
+        ">something_unparsable\n" + "M" * 10 + "\n")
+    d = mito_env.mitoz_profiles(src, "Cnidaria", tmp_path / "out", as_clade="Arthropoda")
+    lengths = dict(line.split("\t") for line in (d / "CDS_HMM" / "Arthropoda_CDS_length_list").read_text().splitlines())
+    assert lengths["ATP6"] == str(int(0.5 * 150 * 3))          # both ATP6 headers parsed: median of 200, 100
+    assert lengths["ND4L"] == str(int(0.5 * 50 * 3)) and lengths["ND4"] == str(int(0.5 * 400 * 3))
+    err = capsys.readouterr().err
+    assert "1 of 5" in err and "mitoz_profiles" in err           # one header did not match
+
+
+def test_profiles_missing_database_is_a_clear_error_and_leaves_no_link(tmp_path):
+    """A (mito_env.py:198-204): a typo in the clade left a dangling symlink, the next call raised FileExistsError."""
+    src = _fake_mitoz_profiles(tmp_path)
+    for _ in range(2):
+        with pytest.raises(FileNotFoundError, match="Cnidaria_typo"):
+            mito_env.mitoz_profiles(src, "Cnidaria_typo", tmp_path / "out", as_clade="Arthropoda")
+    assert not list((tmp_path / "out").rglob("*_CDS_protein.fa"))
+
+
+def test_profiles_dangling_symlink_is_replaced(tmp_path):
+    src = _fake_mitoz_profiles(tmp_path)
+    link = tmp_path / "out" / "Cnidaria" / "MT_database" / "Arthropoda_CDS_protein.fa"
+    link.parent.mkdir(parents=True)
+    link.symlink_to(tmp_path / "gone.fa")                          # dangling from an earlier failed run
+    mito_env.mitoz_profiles(src, "Cnidaria", tmp_path / "out", as_clade="Arthropoda")
+    assert link.read_text().startswith(">gi_NC_1_COX1")
+
+
+SHIPPED = next(iter(sorted((MITOZ_PY.parent.parent / "lib").glob("python*/site-packages/mitoz/profiles"))), None)
+
+
+@pytest.mark.skipif(SHIPPED is None or not SHIPPED.is_dir(), reason="MitoZ profiles not available")
+def test_profile_minimum_lengths_stay_below_mitoz_shipped_lists(tmp_path):
+    """A (mito_env.py:186-216): MitoZ drops a genome from control-region detection when a PCG is shorter than
+    the list value, so a computed list must not exceed the lists MitoZ ships (they are 0.6-1.0 of the median x 3)."""
+    n = 0
+    for shipped in sorted((SHIPPED / "CDS_HMM").glob("*_CDS_length_list")):
+        clade = shipped.name[:-len("_CDS_length_list")]
+        if not (SHIPPED / "MT_database" / f"{clade}_CDS_protein.fa").exists():
+            continue
+        d = mito_env.mitoz_profiles(SHIPPED, clade, tmp_path / clade, as_clade="Zed")
+        mine = dict(line.split("\t") for line in (d / "CDS_HMM" / "Zed_CDS_length_list").read_text().splitlines())
+        for line in shipped.read_text().splitlines():
+            gene, value = line.split()
+            assert int(mine[gene]) <= int(value), (clade, gene, mine[gene], value)
+        n += 1
+    assert n >= 5
+
+
+def test_mitos_mode_is_lowercased_and_validated(capsys):
+    """C18 (scripts/mitoz_fast.py:54): YZZ_MITOS_MODE=Fast was treated as 'sensitive' without a word."""
+    assert mito_env.mitos_mode("Fast") == "fast" and mito_env.mitos_mode(" FULL ") == "full"
+    assert mito_env.mitos_mode("sensitive") == "sensitive" and mito_env.mitos_mode(None) == "sensitive"
+    assert mito_env.mitos_mode("") == "sensitive"
+    assert capsys.readouterr().err == ""
+    assert mito_env.mitos_mode("sensetive") == "sensitive"            # unknown -> warning + sensitive
+    err = capsys.readouterr().err
+    assert "YZZ_MITOS_MODE" in err and "sensetive" in err and "sensitive" in err
+
+
+def test_mito_trna_rejects_unknown_mitos_mode(tmp_path):
+    """C18: any unknown mode silently behaved as 'sensitive'."""
+    import types
+    import mito_trna
+    with pytest.raises(ValueError, match="mitos_mode"):
+        mito_trna.mitos2(tmp_path / "g.fa", 5, {"runmitos": "/x/runmitos"}, tmp_path,
+                         types.SimpleNamespace(mitos_mode="sensetive", mitos_ref="r", mitos_refdir="d"))
 
 
 def test_extended_clade_accepted_and_needs_code(tmp_path):
@@ -178,3 +257,34 @@ def test_run_ends_with_curated_and_submission_files(tmp_path):
     assert all((sub / f"{rid}{ext}").exists() for ext in (".fsa", ".tbl", ".sqn", ".val"))
     head = (sub / "submission_summary.tsv").read_text().splitlines()
     assert head[0].startswith("record\tERROR\tWARNING") and head[1].startswith(rid)
+
+
+def test_doctor_has_required_biopython_row(capsys, monkeypatch):
+    """B1: the doctor said `All required programs found` although the scripts could not import Biopython."""
+    import Bio
+    mito_env.doctor()
+    out = capsys.readouterr().out
+    assert any(line.lstrip().startswith("OK") and "Biopython" in line and Bio.__version__ in line
+               for line in out.splitlines())
+    monkeypatch.setitem(sys.modules, "Bio", None)               # import Bio -> ImportError
+    assert mito_env.doctor() == 1
+    out = capsys.readouterr().out
+    assert any(line.lstrip().startswith("!!") and "Biopython" in line for line in out.splitlines())
+    assert "pip install biopython" in out and "All required programs found" not in out
+
+
+@pytest.mark.parametrize("cpus,threads,tasks", [(4, 4, 1), (32, 8, 4), (2, 2, 1), (8, 8, 1), (None, 8, 1)])
+def test_default_threads_follow_the_machine(monkeypatch, cpus, threads, tasks):
+    """B22: 16 threads x 16 jobs regardless of the machine; now threads = min(8, CPUs), jobs = CPUs // threads."""
+    monkeypatch.setattr(bm.os, "cpu_count", lambda: cpus)
+    a = bm.build_parser().parse_args(["run", "-i", "x", "-o", "y"])
+    assert (a.threads, a.max_tasks) == (threads, tasks)
+    a = bm.build_parser().parse_args(["run", "-i", "x", "-o", "y", "--threads", "3", "--max_tasks", "5"])
+    assert (a.threads, a.max_tasks) == (3, 5)
+
+
+def test_prog_name_follows_the_launcher(monkeypatch):
+    monkeypatch.delenv("MITOM_LAUNCHER", raising=False)
+    assert bm.build_parser().prog == "batch_mitoz.py"
+    monkeypatch.setenv("MITOM_LAUNCHER", "1")
+    assert bm.build_parser().prog == "mitom"

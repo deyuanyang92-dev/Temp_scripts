@@ -15,7 +15,8 @@ to automatic annotation (e.g. MitoZ / MITOS output):
       immediately before the downstream same-strand tRNA, completed by polyadenylation
       (criterion iii; tRNA punctuation model, Ojala et al. 1981). /transl_except + note added.
   O1  circular record: a CDS that ends <= 2 nt before the transcript end without a stop is continued
-      across the origin to its first in-frame stop (join; genes cut by the cox1-first rotation).
+      across the origin to its first in-frame stop (join; genes cut by the cox1-first rotation); at most 60 nt
+      where another feature starts at the origin (genuine overlaps are <= ~50 nt), else 300 nt.
   P5/P6  illegal start / no stop codon: CDS marked 5'- / 3'-partial with 'start / stop codon not
       determined' (NCBI practice; table2asn SEQ_FEAT.StartCodon / NoStop otherwise).
   R1  rRNA (12S rrnS, 16S rrnL) must not overlap flanking genes; boundaries are trimmed to the
@@ -35,6 +36,7 @@ Usage: python3 mito_curate.py -i gbf_file_or_dir -o out_dir --genetic_code 5 [--
 from __future__ import annotations
 
 import argparse
+import copy
 import csv
 import re
 import sys
@@ -42,6 +44,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 from Bio import SeqIO
+from Bio.Seq import Seq
 from Bio.Data import CodonTable
 from Bio.SeqFeature import AfterPosition, BeforePosition, CompoundLocation, ExactPosition, FeatureLocation, SeqFeature
 
@@ -74,6 +77,9 @@ SPACERS = (0, 1, 2, 3, -1)  # nt from an abbreviated stop to the downstream tRNA
 NO_START_NOTE = "start codon not determined"
 NO_STOP_NOTE = "stop codon not determined"
 MAX_ORIGIN_EXT = 300        # O1: nt searched past the origin for the stop of a CDS cut at the record end
+MAX_INSIDE_TRIM = 250       # R1: an rRNA end may be cut back this far for a gene lying inside it (NC_023929.1: trnV 199 nt
+                            # inside MitoZ's l-rRNA overhang); larger losses are logged (R3), not trimmed
+MAX_ORIGIN_OVERLAP = 60     # O1: ... when another feature starts there (cox1-first rotation): genuine overlaps are <= ~50 nt
 POLYA_NOTE = "TAA stop codon is completed by the addition of 3' A residues to the mRNA"
 
 
@@ -83,6 +89,12 @@ def key(name: str) -> str:
 
 def span(f: SeqFeature) -> Tuple[int, int]:
     return int(f.location.start) + 1, int(f.location.end)
+
+
+def spans(f: SeqFeature) -> List[Tuple[int, int]]:
+    """1-based (start, end) of every part. span() is the hull of a join: an origin-spanning feature
+    join(L-29..L,1..35) is not a feature ending at L (review C finding 6)."""
+    return [(int(p.start) + 1, int(p.end)) for p in f.location.parts]
 
 
 def simple(f: SeqFeature) -> bool:
@@ -113,9 +125,11 @@ class Curator:
         self.rec, self.a = rec, a
         self.seq = str(rec.seq).upper()
         self.L = len(self.seq)
+        self.code = code
         t = CodonTable.unambiguous_dna_by_id[code]
         self.starts, self.stops = set(t.start_codons), set(t.stop_codons)
         self.rows: List[Dict[str, str]] = []
+        self.noted: set = set()
 
     # ── helpers in transcript orientation ──
     def log(self, f: SeqFeature, rule: str, old: Tuple[int, int], new: Tuple[int, int], why: str) -> None:
@@ -128,6 +142,13 @@ class Curator:
                 and (not same_strand or g.location.strand == f.location.strand)
                 and gene_feature(self.rec, g) is not gene_feature(self.rec, f)]
 
+    def frame_differs(self, f: SeqFeature, other: Tuple[int, int]) -> bool:
+        """Reading frames of two same-strand CDS: anchored at the genome start on +, at the genome END on -
+        (NC_015829.1 nad4L/nad4 on -: 7-nt overlap, starts 297 nt apart = 'same frame' by starts, but different)."""
+        s, e = span(f)
+        gs, ge = other
+        return ((gs - s) if f.location.strand == 1 else (ge - e)) % 3 != 0
+
     def upstream_end(self, f: SeqFeature) -> int:
         """Transcript-order end of the nearest preceding same-strand feature that the start may not
         overlap: tRNA, rRNA, or a PCG in the same frame. PCGs in a different frame may overlap
@@ -135,13 +156,13 @@ class Curator:
         s, e = span(f)
         best = 0
         for g in self.others(f, same_strand=True):
-            gs, ge = span(g)
-            if g.type == "CDS" and (gs - s) % 3 != 0:
-                continue
-            if f.location.strand == 1 and gs < s:
-                best = max(best, ge)
-            if f.location.strand == -1 and ge > e:
-                best = max(best, self.L + 1 - gs)          # in reverse coordinates
+            for gs, ge in spans(g):                        # per part: a join is several features here
+                if g.type == "CDS" and len(g.location.parts) == 1 and self.frame_differs(f, (gs, ge)):
+                    continue                               # (the frame of a join's part is not given by its own start)
+                if f.location.strand == 1 and gs < s:
+                    best = max(best, ge)
+                if f.location.strand == -1 and ge > e:
+                    best = max(best, self.L + 1 - gs)      # in reverse coordinates
         return best
 
     def downstream_trna_start(self, f: SeqFeature) -> Optional[int]:
@@ -149,11 +170,11 @@ class Curator:
         s, e = span(f)
         cand = []
         for g in self.others(f, types=("tRNA",), same_strand=True):
-            gs, ge = span(g)
-            if f.location.strand == 1 and gs > s:
-                cand.append(gs)
-            if f.location.strand == -1 and ge < e:
-                cand.append(self.L + 1 - ge)
+            for gs, ge in spans(g):
+                if f.location.strand == 1 and gs > s:
+                    cand.append(gs)
+                if f.location.strand == -1 and ge < e:
+                    cand.append(self.L + 1 - ge)
         return min(cand) if cand else None
 
     def tx(self, f: SeqFeature) -> Tuple[int, int]:
@@ -257,7 +278,9 @@ class Curator:
             return
         if (b - a + 1) % 3 == 0 and s[b - 3:b] in self.stops:
             return
-        ss = s + s[:MAX_ORIGIN_EXT]
+        first = 1 if f.location.strand == 1 else self.L          # genome position where the continuation starts
+        covered = any(gs <= first <= ge for g in self.others(f) for gs, ge in spans(g))
+        ss = s + s[:MAX_ORIGIN_OVERLAP if covered else MAX_ORIGIN_EXT]
         end = next((c + 3 for c in range(b - (b - a + 1) % 3, len(ss) - 2, 3) if ss[c:c + 3] in self.stops), None)
         if end is None or end <= self.L:
             return
@@ -297,7 +320,11 @@ class Curator:
             self.log(f, "P5", span(f), span(f), f"first codon {nt[:3]} is not a start codon of table "
                      f"{self.a.genetic_code}: CDS marked 5'-partial, 'start codon not determined' (NCBI practice)")
         tail = len(nt) % 3
-        if not n_stop and nt[len(nt) - 3:] not in self.stops and not (tail and nt[-tail:] in ("T", "TA")):
+        has_stop = nt[-3:] in self.stops if not tail else nt[-tail:] in ("T", "TA")   # last 3 nt are out of frame if tail
+        if tail and not has_stop:
+            self.log(f, "P4", span(f), span(f), f"length {len(nt)} is not a multiple of 3 and there is no T/TA tail - "
+                     "frameshift, wrong end or unannotated intron - check manually")
+        if not n_stop and not has_stop:
             # P6: no complete or abbreviated stop -> table2asn SEQ_FEAT.NoStop; written 3'-partial like P5
             loc = f.location
             f.location = FeatureLocation(loc.start, AfterPosition(loc.end), 1) if loc.strand == 1 else \
@@ -305,6 +332,24 @@ class Curator:
             f.qualifiers["note"] = [n for n in f.qualifiers.get("note", []) if n != NO_STOP_NOTE] + [NO_STOP_NOTE]
             self.log(f, "P6", span(f), span(f), "no complete or abbreviated stop codon: CDS marked 3'-partial, "
                      "'stop codon not determined' (NCBI practice) - check manually")
+
+    def translation(self, f: SeqFeature) -> None:
+        """Review C finding 9: /translation of every CDS (simple or join) recomputed from its final location, never
+        dropped (a record is always rewritten). A start codon of the table gives M unless the CDS is 5'-partial
+        (NCBI convention). Not written when an internal stop remains (P4 reports it)."""
+        f.qualifiers.pop("translation", None)
+        nt = str(f.extract(self.rec.seq)).upper()[int(f.qualifiers.get("codon_start", ["1"])[0]) - 1:]
+        nt = nt[: len(nt) - len(nt) % 3]
+        if not nt:
+            return
+        prot = str(Seq(nt).translate(table=self.code))
+        prot = prot[:-1] if prot.endswith("*") else prot
+        p5 = f.location.parts[0]                       # 5'-most part (transcript order)
+        partial5 = isinstance(p5.end, AfterPosition) if f.location.strand == -1 else isinstance(p5.start, BeforePosition)
+        if nt[:3] in self.starts and not partial5:
+            prot = "M" + prot[1:]
+        if "*" not in prot:
+            f.qualifiers["translation"] = [prot]
 
     def pcg_overlaps(self) -> None:
         cds = [f for f in self.rec.features if f.type == "CDS" and simple(f)]
@@ -314,7 +359,7 @@ class Curator:
                     continue
                 fs, fe = span(f)
                 gs, ge = span(g)
-                if fs <= ge and gs <= fe and (fs - gs) % 3 == 0:
+                if fs <= ge and gs <= fe and not self.frame_differs(f, (gs, ge)):
                     self.log(f, "P2", (fs, fe), (gs, ge),
                              f"same-strand same-frame overlap with {g.qualifiers.get('gene', ['?'])[0]} - check manually")
 
@@ -324,7 +369,10 @@ class Curator:
             return
         g = gene_feature(self.rec, f)
         s, e = old = span(f)
-        neigh = [span(x) for x in self.others(f, types=("tRNA", "CDS", "rRNA")) if x.type != "gene"]
+        nf = [(sp, x) for x in self.others(f, types=("tRNA", "CDS", "rRNA")) for sp in spans(x)]
+        neigh = [sp for sp, _ in nf]
+        who = {sp: x.qualifiers.get("gene", ["?"])[0] for sp, x in nf}
+        noted = self.noted            # R3 'inside' rows once per rRNA pass pair (rrna() runs twice in run())
         changed = True
         while changed:                                # R1: no overlap with any other gene (repeat until stable)
             changed = False
@@ -337,10 +385,19 @@ class Curator:
                     s = ne + 1
                 elif ne >= e:                         # overlaps the 3' (right) end
                     e = ns - 1
-                elif ns - s >= e - ne:                # gene inside the rRNA: keep the longer side
-                    e = ns - 1
-                else:
-                    s = ne + 1
+                else:                                 # gene inside the rRNA: keep the longer side, but only if what is
+                    keep_left = ns - s >= e - ne      # lost is <= 10 % or <= MAX_INSIDE_TRIM nt (a tRNA-sized overhang
+                    lost = e - ns + 1 if keep_left else ne - s + 1   # of the core; a spurious tRNA call deep inside
+                    if lost * 10 > e - s + 1 and lost > MAX_INSIDE_TRIM:   # must not cut a core rRNA)
+                        if (ns, ne) not in noted:
+                            noted.add((ns, ne))
+                            self.log(f, "R3", old, old, f"gene {who[(ns, ne)]} inside rRNA, not trimmed (would lose "
+                                     f"{lost} nt) - check manually (spurious tRNA call?)")
+                        continue
+                    if keep_left:
+                        e = ns - 1
+                    else:
+                        s = ne + 1
                 changed = True
         if self.a.rrna_bounds == "fill":
             left = max([ne for ns, ne in neigh if ne < s] or [0])
@@ -349,8 +406,7 @@ class Curator:
                 s = left + 1
             if 0 < right - e - 1 <= self.a.max_fill:
                 e = right - 1
-        cds_ov = max([min(e, ne) - max(s, ns) + 1 for ns, ne in
-                      (span(x) for x in self.others(f, types=("CDS",)))] or [0])
+        cds_ov = max([min(e, ne) - max(s, ns) + 1 for x in self.others(f, types=("CDS",)) for ns, ne in spans(x)] or [0])
         if cds_ov > 50:
             self.log(f, "R3", old, (s, e), f"rRNA overlaps a CDS by {cds_ov} nt - boundary or assembly problem?")
         if (s, e) != old and e - s + 1 >= 200:
@@ -406,7 +462,7 @@ class Curator:
         for f in list(self.rec.features):
             if f.type in ("CDS", "rRNA", "tRNA"):
                 self.names(f)
-        for f in list(self.rec.features):
+        for f in list(self.rec.features):              # R1 first: a raw rRNA overhang must not push a CDS start (P1)
             if f.type == "rRNA":
                 self.rrna(f)
         for f in list(self.rec.features):
@@ -415,13 +471,29 @@ class Curator:
                 self.across_origin(f)
                 self.pcg_check(f)
         self.pcg_overlaps()
+        for f in list(self.rec.features):              # R1 again: P3 / O1 moved CDS ends, trim the rRNAs to them
+            if f.type == "rRNA":
+                self.rrna(f)
+        for f in self.rec.features:
+            if f.type == "CDS":
+                self.translation(f)
         for f in self.rec.features:                    # gene feature = exactly its CDS / RNA (SEQ_FEAT.CDSgeneRange)
             if f.type in ("CDS", "rRNA", "tRNA"):
                 g = gene_feature(self.rec, f)
                 if g is not None and str(g.location) != str(f.location):
                     g.location = f.location
-        self.rec.features.sort(key=lambda x: (int(x.location.start), x.type != "source", x.type != "gene"))
+        self.rec.features.sort(key=lambda x: (self.sort_start(x), x.type != "source", x.type != "gene"))
         return self.rows
+
+    def sort_start(self, f: SeqFeature) -> int:
+        """0-based sort position; an origin-spanning feature (a part from 0, a part to L) sorts by the start of the
+        part that ends at L, not at 0 (review C finding 20)."""
+        parts = f.location.parts
+        if len(parts) > 1 and any(int(p.start) == 0 for p in parts):
+            tails = [int(p.start) for p in parts if int(p.end) == self.L and int(p.start) > 0]
+            if tails:
+                return min(tails)
+        return min(int(p.start) for p in parts)
 
 
 FEATURE_RE = re.compile(r"FEATURE:\s*([\w-]+):\s*([^<\[]+)")
@@ -471,7 +543,6 @@ def main(argv=None) -> int:
     t2a = None if a.no_validate else mito_env.find("table2asn", a.table2asn)
     if t2a:
         sys.path.insert(0, str(Path(__file__).resolve().parent))
-        import copy
         import ncbi_validate as nv
     val_before: List[Dict[str, str]] = []
     val_after: List[Dict[str, str]] = []
@@ -480,12 +551,14 @@ def main(argv=None) -> int:
     rows: List[Dict[str, str]] = []
     for f in files:
         recs = list(SeqIO.parse(str(f), "genbank"))
-        for rec in recs:
+        for i, rec in enumerate(recs):
             if t2a:
                 val_before += nv.validate_record(copy.deepcopy(rec), out / "validation" / "before", t2a)
+            backup = copy.deepcopy(rec)                  # run() edits in place: a failure must not leave a half-curated record
             try:
                 rows += Curator(rec, a.genetic_code, a).run()
             except Exception as exc:
+                recs[i] = backup
                 rows.append({"record": rec.id, "rule": "error", "reason": f"left unchanged: {exc!r}"})
         if t2a:
             for rec in recs:

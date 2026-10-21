@@ -8,6 +8,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
         python3 python3-biopython && rm -rf /var/lib/apt/lists/*
 COPY . /opt/mito
 RUN bash /opt/mito/install.sh --refdir /opt/mitos_refs && /root/miniforge3/bin/mamba clean -a -y
-ENV PATH=/root/.local/bin:/root/miniforge3/bin:$PATH
+# conda LAST: the system python3 (with the apt Biopython) must stay ahead of Miniforge's python3, which has none
+ENV PATH=/root/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/root/miniforge3/bin
+# build-time check: the launcher starts and the python that runs the scripts imports Biopython
+RUN mitom run -h >/dev/null && python3 -c "import Bio"
 WORKDIR /data
 CMD ["mitom", "doctor"]

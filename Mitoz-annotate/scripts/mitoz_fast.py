@@ -17,7 +17,7 @@ Settings (environment variables, set by batch_mitoz.py):
   YZZ_MITOS_REFDIR  MITOS2 reference directory (contains refseq89m)
   YZZ_MITOS_REF     reference name (default refseq89m)
   YZZ_CIRCOS        yes = keep the circos plot (default no)
-  YZZ_MITOS_MODE    sensitive (default: MITOS2's sensitive pass for missing tRNAs, run in parallel - same
+  YZZ_MITOS_MODE    (case-insensitive; unknown value: warning and sensitive) sensitive (default: MITOS2's sensitive pass for missing tRNAs, run in parallel - same
                     tRNAs as runmitos; fast mode missed 28/28 such tRNAs in the 2026-10-20 dev benchmark)
                     | fast (skip that pass) | full (unmodified runmitos)
   YZZ_PHASE1_FAST   1 = fast tRNA mode in batch_mitoz round 1 (01.mitoz_anno1), which only orients the
@@ -43,6 +43,7 @@ from mitoz.annotate import annotation
 from mitoz.MitoZ import main
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import mito_env  # noqa: E402
 import mito_trna  # noqa: E402  (same directory as batch_mitoz.py)
 
 ORIGINAL_TRNA = annotation.tRNA_annotation
@@ -51,7 +52,7 @@ MITOS_BIN = os.environ.get("YZZ_MITOS_BIN", "")
 MITOS_REFDIR = os.environ.get("YZZ_MITOS_REFDIR", "")
 MITOS_REF = os.environ.get("YZZ_MITOS_REF", "refseq89m")
 WRAP_FILE = os.environ.get("YZZ_TRNA_WRAP", "")
-MITOS_MODE = os.environ.get("YZZ_MITOS_MODE", "sensitive")
+MITOS_MODE = mito_env.mitos_mode(os.environ.get("YZZ_MITOS_MODE"))        # lower-cased; unknown -> warning, sensitive
 CLADE_DB = os.environ.get("YZZ_CLADE_DB", "")
 
 
@@ -117,7 +118,6 @@ ORIGINAL_GATHER = annotation.gather_result
 
 def use_clade_db(argv):
     """--clade X (X in YZZ_CLADE_DB) -> --clade Arthropoda --profiles_dir <workdir>/mitom_profiles/X."""
-    import mito_env
     work = Path(argv[argv.index("--workdir") + 1]) if "--workdir" in argv else Path.cwd()
     src = Path(annotation.__file__).resolve().parents[1] / "profiles"
     d = mito_env.mitoz_profiles(src, CLADE_DB, work / "mitom_profiles", as_clade="Arthropoda")

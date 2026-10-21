@@ -895,7 +895,7 @@ def apply_model(rec, m: Model, exons: List[Tuple[int, int]], intron_info: List[d
     cds_loc = CompoundLocation(locs) if len(locs) > 1 else locs[0]
     gene_loc = FeatureLocation(BeforePosition(exons[0][0] - 1) if lo_open else ExactPosition(exons[0][0] - 1),
                                AfterPosition(exons[-1][1]) if hi_open else ExactPosition(exons[-1][1]), strand=strand)
-    note = "exon-intron structure: Exonerate protein2genome + MFannot boundary rules (mito_intron.py)"
+    note = "exon-intron structure predicted by protein alignment (Exonerate, MFannot method)"
     nt = cds_loc.extract(rec.seq)
     prot = str(nt[: len(nt) - len(nt) % 3].translate(table=gencode, to_stop=True))
     quals: Dict[str, List[str]] = {"gene": [name], "codon_start": ["1"], "transl_table": [str(gencode)],
@@ -1011,9 +1011,9 @@ def process_record(rec, lib: Dict[str, LibProt], lib_db: Path, a, tools: Dict[st
             gs, ge = (s_tx, e_tx) if m.strand == 1 else (L + 1 - e_tx, L + 1 - s_tx)
             kind, ev, model = tinfo[j]
             label = type_label(kind, ev, model)
-            if not kind and ge - gs + 1 > a.maxintron:
-                label += " - UNCONFIRMED: long intron from chained alignments, check manually"
-            info.append({"start": gs, "end": ge, "note": f"{label}; {notes[j]}; mito_intron.py (MFannot method)"})
+            hint = ("UNCONFIRMED: long intron from chained alignments, check manually"
+                    if not kind and ge - gs + 1 > a.maxintron else "")       # report only, never a feature note
+            info.append({"start": gs, "end": ge, "note": f"{label}; {notes[j]}; MFannot method", "hint": hint})
         if ends:
             info[0]["note"] += f"; {ends}"
         confidence, reason = evidence(use, adj, kinds, sscores, a.genetic_code, partial5)
@@ -1028,7 +1028,8 @@ def process_record(rec, lib: Dict[str, LibProt], lib_db: Path, a, tools: Dict[st
                          "cds": ",".join(f"{s}..{e}" for s, e in g_exons), "intron": n,
                          "intron_start": x["start"], "intron_end": x["end"], "intron_len": x["end"] - x["start"] + 1,
                          "confidence": confidence, "written": "no" if confidence == "low" else "yes",
-                         "evidence": reason, "note": x["note"], "homolog": f"{hom.species} {hom.gene}",
+                         "evidence": reason + (f"; {x['hint']}" if x.get("hint") else ""), "note": x["note"],
+                         "homolog": f"{hom.species} {hom.gene}",
                          "homolog_coverage": f"{m.qcov:.2f}", "exonerate_score": m.score})
     return rows
 

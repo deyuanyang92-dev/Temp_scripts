@@ -9,3 +9,10 @@
      89 mitom_v2 gt3
      21 mitom_v2 le3
      17 mitom_v2 missed
+
+# after the review fix pass (mitom_v3 = same raw outputs, fixed mito_curate + mito_rrna_hmm, library rebuilt with p5/p95 window)
+     62 mitom_v3 exact
+      6 mitom_v3 fp
+     94 mitom_v3 gt3
+     21 mitom_v3 le3
+      9 mitom_v3 missed

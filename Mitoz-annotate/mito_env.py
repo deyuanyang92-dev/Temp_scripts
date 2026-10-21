@@ -187,65 +187,107 @@ def mitoz_profiles(src: Path, db_clade: str, dest_root: Path, as_clade: str = "A
     """MitoZ profiles dir in which clade name `as_clade` uses MitoZ's `db_clade` protein database.
     MitoZ annotate uses the clade only for MT_database/<clade>_CDS_protein.fa and
     CDS_HMM/<clade>_CDS_length_list (mitoz/annotate/annotation.py:590-591); rRNA models are global.
-    The length list (expected CDS length, nt) is the median protein length x 3 of the database, 0 when a
-    gene is absent (e.g. ATP8 in flatworms)."""
+    The length list is a MINIMUM gene length for MitoZ (annotate/script/find_contro_region.py:135-153 counts a
+    PCG only if the list value <= gene length, and skips control-region detection when fewer than 13 pass): the
+    value written is int(0.5 x median protein length x 3) of the database, which stays below the lists MitoZ
+    ships (0.6-1.0 of the median x 3); 0 when a gene is absent (e.g. ATP8 in flatworms)."""
     import re
     import statistics
+    fa = Path(src) / "MT_database" / f"{db_clade}_CDS_protein.fa"
+    if not fa.is_file():
+        raise FileNotFoundError(f"MitoZ protein database for clade '{db_clade}' not found: {fa}")
     d = Path(dest_root) / db_clade
     (d / "MT_database").mkdir(parents=True, exist_ok=True)
     (d / "CDS_HMM").mkdir(exist_ok=True)
-    fa = Path(src) / "MT_database" / f"{db_clade}_CDS_protein.fa"
     link = d / "MT_database" / f"{as_clade}_CDS_protein.fa"
-    if not link.exists():
-        link.symlink_to(fa)
+    if link.is_symlink() or link.exists():              # a dangling link of an earlier failed run is replaced too
+        link.unlink()
+    link.symlink_to(fa)
     if not (d / "rRNA_CM").exists():
         (d / "rRNA_CM").symlink_to(Path(src) / "rRNA_CM", target_is_directory=True)
     lengths: Dict[str, List[int]] = {}
-    name, n = None, 0
+    name, n, headers, unparsed = None, 0, 0, 0
     for line in fa.read_text().splitlines() + [">"]:
         if line.startswith(">"):
             if name:
                 lengths.setdefault(name, []).append(n)
-            m = re.match(r">gi_[A-Z]{2}_?\d+_([A-Za-z0-9]+)_", line)
+            if line != ">":
+                headers += 1
+            m = re.match(r">gi_\S+?_(ATP6|ATP8|COX[123]|CYTB|ND[1-6]|ND4L)_", line, re.I)
+            if line != ">" and not m:
+                unparsed += 1
             name, n = (m.group(1).upper() if m else None), 0
         else:
             n += len(line.strip())
+    if unparsed:
+        print(f"[mito_env] mitoz_profiles: {unparsed} of {headers} protein headers in {fa.name} do not match "
+              f"'gi_<accession>_<GENE>_' and are not used for the length list", file=sys.stderr)
     (d / "CDS_HMM" / f"{as_clade}_CDS_length_list").write_text(
-        "".join(f"{g}\t{int(statistics.median(lengths[g]) * 3) if g in lengths else 0}\n" for g in PCG_NAMES))
+        "".join(f"{g}\t{int(0.5 * statistics.median(lengths[g]) * 3) if g in lengths else 0}\n" for g in PCG_NAMES))
     return d
+
+
+MITOS_MODES = ("fast", "sensitive", "full")
+
+
+def mitos_mode(value: Optional[str], default: str = "sensitive") -> str:
+    """YZZ_MITOS_MODE: case-insensitive; an unknown value is reported on stderr and replaced by `default`
+    (it used to behave as 'sensitive' silently)."""
+    v = (value or "").strip().lower()
+    if not v:
+        return default
+    if v not in MITOS_MODES:
+        print(f"[mito_env] YZZ_MITOS_MODE='{value}' is not one of {', '.join(MITOS_MODES)}; using {default}",
+              file=sys.stderr)
+        return default
+    return v
+
+
+def biopython_version() -> Optional[str]:
+    """Version of Biopython importable by this interpreter, None when it cannot be imported (every MitoM
+    script needs it)."""
+    try:
+        import Bio
+        return str(Bio.__version__)
+    except ImportError:
+        return None
 
 
 def doctor(write: bool = False) -> int:
     print(f"config: {config_path()}{'' if config_path().exists() else ' (not present)'}")
     print(f"conda/mamba: {', '.join(map(str, conda_roots())) or 'not found'}")
     missing = []
-    for name, (use, env) in TOOLS.items():
-        p = find(name)
-        flag = "OK " if p else ("-- " if name not in REQUIRED else "!! ")
-        print(f"  {flag}{name:12} {p or 'not found':60} {use}")
-        if not p:
-            missing.append((name, env))
+    for name, (use, env_name) in TOOLS.items():
+        exe = find(name)
+        flag = "OK " if exe else ("-- " if name not in REQUIRED else "!! ")
+        print(f"  {flag}{name:12} {exe or 'not found':60} {use}")
+        if not exe:
+            missing.append((name, env_name))
     ref = mitos_refdir()
     print(f"  {'OK ' if ref else '!! '}{'MITOS2 refs':12} {ref or 'not found (' + MITOS_REF + ')':60} MITOS2 reference data")
+    bio = biopython_version()          # required: all MitoM scripts read GenBank files with it
+    print(f"  {'OK ' if bio else '!! '}{'Biopython':12} "
+          f"{('version ' + bio) if bio else 'not found for ' + sys.executable:60} sequence input / output (all scripts)")
     req = [n for n, _ in missing if n in REQUIRED]
-    if req or not ref:
+    if req or not ref or not bio:
         envs = sorted({e for n, e in missing if n in REQUIRED})
         print("\nMissing required parts. Install everything with one command:\n"
               f"  bash {HERE / 'install.sh'}" + (f"   (environments: {', '.join(envs)})" if envs else "")
-              + ("\n  MITOS2 reference data is downloaded by the same script." if not ref else ""))
+              + ("\n  MITOS2 reference data is downloaded by the same script." if not ref else "")
+              + ("\n  Biopython is missing: pip install biopython (install.sh does this too)." if not bio else ""))
     else:
         print("\nAll required programs found.")
     if write:
-        p = config_path()
+        cfg_file = config_path()
         cfg = dict(config())
         mb, tb, env = mitos_bin(), bin_with("exonerate", "cmsearch", "blastp", "makeblastdb"), mitoz_env()
         for k, v in (("conda_env_mitoz", env), ("mitos_bin", mb), ("mitos_refdir", ref), ("tools_bin", tb)):
             if v and not cfg.get(k):
                 cfg[k] = v
-        p.parent.mkdir(parents=True, exist_ok=True)
-        p.write_text(json.dumps(cfg, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-        print(f"config written: {p}")
-    return 1 if req or not ref else 0
+        cfg_file.parent.mkdir(parents=True, exist_ok=True)
+        cfg_file.write_text(json.dumps(cfg, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        print(f"config written: {cfg_file}")
+    return 1 if req or not ref or not bio else 0
 
 
 if __name__ == "__main__":

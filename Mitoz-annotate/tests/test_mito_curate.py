@@ -301,3 +301,284 @@ def test_tbl_minus_strand_join_in_biological_order():
     SeqIO.write(r, h, "genbank")
     assert "complement(join(91..100,1..10))" in h.getvalue()
     assert nv.feature_lines(r)[1:3] == ["10\t1\ttRNA", "100\t91"]
+
+
+# ── in-process helpers (review C fixes) ──
+def _mc():
+    sys.path.insert(0, str(HERE.parent))
+    import mito_curate
+    return mito_curate
+
+
+def _args(**kw):
+    import argparse
+    d = dict(genetic_code=5, rrna_bounds="fill", max_fill=300, max_start_shift=30, aggressive_start=False)
+    d.update(kw)
+    return argparse.Namespace(**d)
+
+
+def _mkrec(seq, feats, topology="linear"):
+    """feats: (type, location, gene[, extra qualifiers]); a matching gene feature is added for CDS / RNA."""
+    from Bio.Seq import Seq
+    from Bio.SeqFeature import FeatureLocation, SeqFeature
+    from Bio.SeqRecord import SeqRecord
+    rec = SeqRecord(Seq(seq), id="X", description="")
+    rec.annotations.update(molecule_type="DNA", topology=topology)
+    rec.features = [SeqFeature(FeatureLocation(0, len(seq), 1), type="source")]
+    for ftype, loc, gene, *extra in feats:
+        q = {"gene": [gene], **(extra[0] if extra else {})}
+        if ftype == "CDS":
+            q.setdefault("codon_start", ["1"])
+            q.setdefault("transl_table", ["5"])
+        rec.features += [SeqFeature(loc, type="gene", qualifiers={"gene": [gene]}), SeqFeature(loc, type=ftype, qualifiers=q)]
+    return rec
+
+
+def _curate_rec(rec, **kw):
+    a = _args(**kw)
+    rows = _mc().Curator(rec, a.genetic_code, a).run()
+    return rows
+
+
+def _by(rec, ftype, gene):
+    return next(f for f in rec.features if f.type == ftype and f.qualifiers.get("gene", [""])[0] == gene)
+
+
+def test_wrapped_trna_does_not_block_p1():
+    """Review C finding 6: span() is the hull of a compound location, so an origin-spanning tRNA
+    join(L-29..L,1..35) counted as a preceding feature ending at L and disabled P1 for every same-strand CDS."""
+    from Bio.SeqFeature import CompoundLocation, FeatureLocation
+    L = 1200
+    seq = "GCC" * 100 + "ATG" + "GCC" + "GCC" * 40 + "TAA" + "GCC" * 257        # ATG 301..303, annotated start 307 = GCC
+    assert len(seq) == L
+    cds = FeatureLocation(306, 429, 1)
+    trna = CompoundLocation([FeatureLocation(L - 30, L, 1), FeatureLocation(0, 35, 1)])
+    rec = _mkrec(seq, [("tRNA", trna, "trnY", {"product": ["tRNA-Tyr"]}), ("CDS", cds, "ND1")], "circular")
+    rows = _curate_rec(rec)
+    assert any(r["rule"] == "P1" for r in rows), rows
+    assert int(_by(rec, "CDS", "ND1").location.start) + 1 == 301
+
+
+def _rrna_rec(feats, n=3000):
+    import random
+    rnd = random.Random(11)
+    seq = "".join(rnd.choice("ACGT") for _ in range(n))
+    from Bio.SeqFeature import FeatureLocation
+    out = []
+    for kind, s, e, gene in feats:
+        out.append((kind, FeatureLocation(s - 1, e, 1), gene, {"product": [{"tRNA": "tRNA-Gln", "rRNA": "16S ribosomal RNA"}[kind]]}))
+    return _mkrec(seq, out)
+
+
+def test_rrna_not_trimmed_for_inside_gene_when_loss_large():
+    """Review C finding 7: a spurious tRNA call inside a correctly annotated 1.3-kb l-rRNA cut the rRNA to 830 nt
+    (36 % lost). Trim only when the discarded side is <= 10 % of the rRNA; else keep it and log R3."""
+    rec = _rrna_rec([("rRNA", 1001, 2300, "l-rRNA"), ("tRNA", 1401, 1470, "trnQ(uug)")])
+    rows = _curate_rec(rec)
+    r = _by(rec, "rRNA", "rrnL")
+    assert (int(r.location.start) + 1, int(r.location.end)) == (1001, 2300)
+    r3 = [x for x in rows if x["rule"] == "R3" and "inside rRNA" in x["reason"]]
+    assert len(r3) == 1 and "trnQ" in r3[0]["reason"] and "not trimmed" in r3[0]["reason"], rows
+    assert not any(x["rule"] == "R1" for x in rows)
+
+
+def test_rrna_trimmed_for_inside_gene_near_the_end():
+    rec = _rrna_rec([("rRNA", 1001, 2300, "l-rRNA"), ("tRNA", 2201, 2270, "trnQ(uug)")])
+    rows = _curate_rec(rec)
+    r = _by(rec, "rRNA", "rrnL")
+    assert (int(r.location.start) + 1, int(r.location.end)) == (1001, 2200)
+    assert any(x["rule"] == "R1" for x in rows)
+
+
+def test_translation_kept_for_every_cds(tmp_path):
+    """Review C finding 9: pcg() popped /translation from every simple CDS and main() now always rewrites the file, so
+    KY753833 went from 13 /translation qualifiers to 0 (changed or not). Recomputed from the final location."""
+    before = SeqIO.read(str(DATA / "KY753833_mitoz.gbf"), "genbank")
+    rec, _ = curate(tmp_path, "KY753833_mitoz.gbf")
+    n_in = sum("translation" in f.qualifiers for f in before.features if f.type == "CDS")
+    cds = [f for f in rec.features if f.type == "CDS"]
+    assert n_in == 13 and sum("translation" in f.qualifiers for f in cds) == 13
+    for f in cds:
+        prot = f.qualifiers["translation"][0]
+        assert prot.startswith("M") and "*" not in prot, f.qualifiers["gene"]
+        assert prot == str(f.extract(rec.seq)[: len(f.extract(rec.seq)) // 3 * 3].translate(table=5)).rstrip("*"), \
+            f.qualifiers["gene"]
+
+
+def test_translation_alternative_start_is_methionine():
+    """NCBI convention: a (non-partial) CDS beginning with a start codon of the table (ATT under code 5) is
+    translated with M; checked on a + CDS, a - CDS and a join."""
+    from Bio.Seq import Seq
+    from Bio.SeqFeature import CompoundLocation, FeatureLocation
+    gene = "ATT" + "GCC" * 40 + "TAA"                                       # 126 nt
+    pad = "CCCGGG" * 10
+    ex1, ex2 = "ATT" + "GCC" * 20, "GCC" * 20 + "TAA"
+    seq = pad + gene + pad + str(Seq(gene).reverse_complement()) + pad + ex1 + "A" * 20 + ex2 + pad
+    j = 60 + 126 + 60 + 126 + 60                                             # exon 1 starts here (0-based)
+    rec = _mkrec(seq, [("CDS", FeatureLocation(60, 186, 1), "ND1"),
+                       ("CDS", FeatureLocation(246, 372, -1), "ND2"),
+                       ("CDS", CompoundLocation([FeatureLocation(j, j + 63, 1), FeatureLocation(j + 83, j + 146, 1)]), "ND3")])
+    _curate_rec(rec)
+    for gene_name in ("ND1", "ND2", "ND3"):
+        assert _by(rec, "CDS", gene_name).qualifiers["translation"] == ["M" + "A" * 40], gene_name
+
+
+def test_translation_not_written_with_internal_stop_and_partial_start_plain():
+    """An internal stop remains -> no /translation (P4 reports it); a 5'-partial CDS keeps the plain translation (I)."""
+    from Bio.SeqFeature import BeforePosition, FeatureLocation
+    nt = "ATG" + "GCC" * 10 + "TAA" + "GCC" * 100 + "TAA"
+    rec = _mkrec("CCCGGG" * 10 + nt + "CCCGGG" * 10, [("CDS", FeatureLocation(60, 60 + len(nt), 1), "ND1")])
+    rows = _curate_rec(rec)
+    assert "translation" not in _by(rec, "CDS", "ND1").qualifiers
+    assert any(r["rule"] == "P4" and "internal stop" in r["reason"] for r in rows)
+    nt = "ATT" + "GCC" * 20 + "TAA"
+    rec = _mkrec("CCCGGG" * 10 + nt + "CCCGGG" * 10, [("CDS", FeatureLocation(BeforePosition(60), 60 + len(nt), 1), "ND1")])
+    _curate_rec(rec)
+    assert _by(rec, "CDS", "ND1").qualifiers["translation"] == ["I" + "A" * 20]
+
+
+def test_p6_stop_tested_in_frame_only():
+    """Review C finding 10: an out-of-frame TAA at the end of a CDS whose length is not a multiple of 3 suppressed P6
+    (table2asn then gives SEQ_FEAT.NoStop). Stop test only when length % 3 == 0; otherwise T / TA tail or no stop."""
+    from Bio.SeqFeature import FeatureLocation
+    nt = "ATG" + "GCC" * 40 + "ATAA"                                       # 127 nt, no in-frame stop
+    rec = _mkrec("CCCGGG" * 10 + nt + "CCCGGG" * 10, [("CDS", FeatureLocation(60, 60 + len(nt), 1), "ND1")])
+    rows = _curate_rec(rec)
+    assert any(r["rule"] == "P6" for r in rows), rows
+    assert any(r["rule"] == "P4" and "not a multiple of 3" in r["reason"] for r in rows), rows
+    assert "stop codon not determined" in _by(rec, "CDS", "ND1").qualifiers["note"]
+
+
+def _cut_cds_record(stop_at, first_feature=True):
+    """Circular record; + strand ND4L = ATG + GCC*40 ends at L-1 (no stop); its first in-frame stop lies past the origin,
+    TAA at 0-based s[stop_at..] (stop_at % 3 == 2). First feature COX1 covers position 1 (cox1-first rotation)."""
+    from Bio.SeqFeature import FeatureLocation
+    first = list(("GCC" * 134)[:400])
+    first[stop_at:stop_at + 3] = "TAA"
+    nd4l = "ATG" + "GCC" * 40
+    seq = "".join(first) + "CCCGGG" * 30 + nd4l + "G"
+    feats = [("CDS", FeatureLocation(580, 703, 1), "ND4L")]
+    if first_feature:
+        feats.append(("tRNA", FeatureLocation(0, 400, 1), "trnY", {"product": ["tRNA-Tyr"]}))
+    rec = _mkrec(seq, feats, "circular")
+    return rec, _curate_rec(rec)
+
+
+def test_origin_extension_capped_by_feature_at_position_1():
+    """Review C finding 11: O1 extended a CDS up to 300 nt past the origin, i.e. up to 300 nt into the feature at
+    position 1 (cox1-first rotation); genuine mitochondrial overlaps are <= ~50 nt (dev cases 13-19 nt)."""
+    rec, rows = _cut_cds_record(14)                               # stop 17 nt into the first feature: genuine overlap
+    assert any(r["rule"] == "O1" for r in rows)
+    assert len(_by(rec, "CDS", "ND4L").location.parts) == 2
+    rec, rows = _cut_cds_record(149)                              # stop 152 nt into the first feature: not O1
+    assert not any(r["rule"] == "O1" for r in rows), rows
+    nd4l = _by(rec, "CDS", "ND4L")
+    assert len(nd4l.location.parts) == 1 and str(nd4l.location).endswith(">703](+)")
+    assert any(r["rule"] == "P6" for r in rows)
+    rec, rows = _cut_cds_record(149, first_feature=False)         # nothing at position 1: the 300 nt limit applies
+    assert any(r["rule"] == "O1" for r in rows)
+
+
+def test_cds_extension_does_not_overlap_following_rrna():
+    """Review C finding 12: R1 ran before the PCG loop, so P3 later extended a CDS (no stop at 1453, first stop at 1531)
+    into the rRNA that R1 had just cleared (78-nt CDS/rRNA overlap). The PCG loop now runs first."""
+    from Bio.SeqFeature import FeatureLocation
+    seq = ("CCCGGG" * 167)[:1000] + "ATG" + "GCC" * 150 + "GCC" * 25 + "TAA" + ("CCCGGG" * 300)[:1469]
+    assert len(seq) == 3000 and seq[1528:1531] == "TAA"
+    rec = _mkrec(seq, [("CDS", FeatureLocation(1000, 1453, 1), "COX1"),
+                       ("rRNA", FeatureLocation(1453, 2500, 1), "s-rRNA", {"product": ["12S ribosomal RNA"]})])
+    rows = _curate_rec(rec)
+    cds, rrna = _by(rec, "CDS", "COX1"), _by(rec, "rRNA", "rrnS")
+    assert int(cds.location.end) == 1531 and any(r["rule"] == "P3" for r in rows)
+    assert int(rrna.location.start) >= int(cds.location.end)
+
+
+def test_failed_curation_leaves_record_unchanged(tmp_path, monkeypatch):
+    """Review C finding 14: Curator.run() mutates the record in place, so after an exception the row said 'left
+    unchanged' but renames / trims done before the failure were still written."""
+    mc = _mc()
+    (tmp_path / "in").mkdir()
+    (tmp_path / "in" / "k.gbf").write_bytes((DATA / "KY753833_mitoz.gbf").read_bytes())
+
+    def boom(self):
+        self.names(next(f for f in self.rec.features if f.type == "CDS"))
+        self.rec.features[1].qualifiers["gene"] = ["MUTATED"]
+        self.rec.features.pop()
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(mc.Curator, "run", boom)
+    assert mc.main(["-i", str(tmp_path / "in"), "-o", str(tmp_path / "out"), "--genetic_code", "5", "--no_validate"]) == 0
+    before, after = (SeqIO.read(str(tmp_path / d / "k.gbf"), "genbank") for d in ("in", "out"))
+
+    def sig(r):
+        return [(f.type, str(f.location), f.qualifiers.get("gene")) for f in r.features]
+    assert sig(after) == sig(before)
+    rows = list(csv.DictReader((tmp_path / "out" / "curation_report.tsv").open(), delimiter="\t"))
+    assert any(r["rule"] == "error" and "left unchanged" in r["reason"] for r in rows)
+
+
+def test_origin_spanning_feature_sorts_by_its_larger_coordinate_part():
+    """Review C finding 20: sort key int(location.start) put join(L-29..L,1..35) (start 0) before every feature."""
+    from Bio.SeqFeature import CompoundLocation, FeatureLocation
+    seq = "CCCGGG" * 100 + "ATG" + "GCC" * 20 + "TAA" + "CCCGGG" * 100
+    L = len(seq)
+    trna = CompoundLocation([FeatureLocation(L - 30, L, 1), FeatureLocation(0, 35, 1)])
+    nt = 3 + 60 + 3
+    rec = _mkrec(seq, [("tRNA", trna, "trnY", {"product": ["tRNA-Tyr"]}), ("CDS", FeatureLocation(600, 600 + nt, 1), "ND1")],
+                 "circular")
+    _curate_rec(rec)
+    order = [(f.type, f.qualifiers.get("gene", [""])[0]) for f in rec.features]
+    assert order == [("source", ""), ("gene", "ND1"), ("CDS", "ND1"), ("gene", "trnY"), ("tRNA", "trnY")], order
+
+
+def test_rrna_trimmed_for_inside_trna_near_the_start_up_to_250_nt():
+    """Dev regression after review fix 7 (NC_023929.1 / NC_023931.1): MitoZ's l-rRNA began 199 nt before trnV, which
+    therefore counted as 'inside' (loss 199 nt > 10 % of 1370). A tRNA-sized overhang at either end is a normal
+    core error and is trimmed: the discarded side may be up to max(10 %, 250 nt)."""
+    rec = _rrna_rec([("rRNA", 1001, 2370, "l-rRNA"), ("tRNA", 1011, 1200, "trnV(uac)")])
+    rows = _curate_rec(rec)
+    r = _by(rec, "rRNA", "rrnL")
+    assert (int(r.location.start) + 1, int(r.location.end)) == (1201, 2370)
+    assert any(x["rule"] == "R1" for x in rows) and not any(x["rule"] == "R3" for x in rows)
+
+
+def test_rrna_overhang_is_trimmed_before_p1_pushes_a_cds_start():
+    """Dev regression after review fix 12 (NC_060482.1 nad6 exact -> +9 nt, NC_045069.1 nad1 exact -> +30 nt): with the
+    CDS loop before R1, the raw rRNA overhang still overlapped the CDS start and P1 moved the start downstream.
+    Order is rRNA (R1) -> CDS -> rRNA again (so P3/O1 extensions are trimmed as well)."""
+    from Bio.SeqFeature import FeatureLocation
+    seq = ("CCCGGG" * 167)[:1000] + ("CCCGGG" * 84)[:500] + "ATG" + "GCC" * 32 + "ATG" + "GCC" * 60 + "TAA" + ("CCCGGG" * 300)[:1215]
+    assert len(seq) == 3000 and seq[1500:1503] == "ATG" and seq[1599:1602] == "ATG"   # in-frame ATG at 1501 and 1600
+    rec = _mkrec(seq, [("rRNA", FeatureLocation(1000, 1560, 1), "l-rRNA", {"product": ["16S ribosomal RNA"]}),
+                       ("CDS", FeatureLocation(1500, 1785, 1), "ND6")])
+    rows = _curate_rec(rec)
+    cds, rrna = _by(rec, "CDS", "ND6"), _by(rec, "rRNA", "rrnL")
+    assert int(cds.location.start) + 1 == 1501 and not any(r["rule"] == "P1" for r in rows), rows
+    assert int(rrna.location.end) == 1500 and any(r["rule"] == "R1" for r in rows)
+
+
+def test_minus_strand_frame_anchored_at_the_genome_end():
+    """Dev regression NC_015829.1 (tardigrade) after review fix 6: nad4L/nad4 on the minus strand overlap by 7 nt in
+    DIFFERENT frames (NCBI keeps the overlap; the frame of a minus-strand CDS is set by its genome END), but the
+    frame test used the genome starts, called them 'same frame', and P1 moved the nad4 start 18 nt downstream.
+    No P1 and no P2 for such a pair; a true same-frame overlap (multiple of 3) is still reported."""
+    from Bio.SeqFeature import FeatureLocation
+    from Bio.Seq import Seq
+    nad4 = "ATG" + "GCC" * 5 + "ATG" + "GCC" * 94 + "T"      # 304 nt (T-tail stop, as NC_015829.1 nad4: length % 3 == 1);
+    #                                                          in-frame ATG 18 nt downstream = where P1 would move the start
+    nad4l = "ATG" + "GCC" * 60 + "TAA"                       # 186 nt
+    # genome (minus strand genes): ... [nad4l rc] overlapping the last 7 nt of [nad4 rc]
+    tx = nad4l[:-7] + nad4                                   # nad4l stop TAA + 4 nt overlap nad4 start -> 7 nt overlap
+    rc = str(Seq(tx).reverse_complement())
+    seq = ("CCCGGG" * 200)[:1000] + rc + ("CCCGGG" * 200)[:1000]
+    L = len(seq)
+    g_nad4_s, g_nad4_e = 1000, 1000 + len(nad4)              # nad4 occupies the 3' part of tx -> low genome coords
+    g_nad4l_s, g_nad4l_e = 1000 + len(nad4) - 7, 1000 + len(tx)
+    assert g_nad4l_s < g_nad4_e and (g_nad4l_s - g_nad4_s) % 3 == 0        # the OLD (start-based) test says 'same frame'
+    assert (g_nad4l_e - g_nad4_e) % 3 != 0                                  # the end-based frame differs
+    rec = _mkrec(seq, [("CDS", FeatureLocation(g_nad4_s, g_nad4_e, -1), "ND4"),
+                       ("CDS", FeatureLocation(g_nad4l_s, g_nad4l_e, -1), "ND4L")])
+    rows = _curate_rec(rec)
+    assert int(_by(rec, "CDS", "ND4").location.end) == g_nad4_e, rows
+    assert not any(r["rule"] in ("P1", "P2") for r in rows), rows
+    assert L > 0

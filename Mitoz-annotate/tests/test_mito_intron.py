@@ -21,6 +21,7 @@ from Bio.SeqFeature import FeatureLocation
 HERE = Path(__file__).resolve().parent
 DATA = HERE / "data"
 SCRIPT = HERE.parent / "mito_intron.py"
+NOTE = "exon-intron structure predicted by protein alignment (Exonerate, MFannot method)"
 BIN = os.environ.get("MITO_INTRON_BIN") or str(Path(shutil.which("exonerate") or
                                                    "/root/miniconda3/envs/mitointron/bin/exonerate").parent)
 pytestmark = pytest.mark.skipif(not (Path(BIN) / "exonerate").exists(), reason="exonerate not available")
@@ -42,7 +43,7 @@ def ncbi_cds(acc):
 def intron_models(path: Path):
     rec = SeqIO.read(str(path), "genbank")
     cds = {f.qualifiers["gene"][0]: (str(f.location), f.qualifiers["translation"][0])
-           for f in rec.features if f.type == "CDS" and "mito_intron" in str(f.qualifiers.get("note"))}
+           for f in rec.features if f.type == "CDS" and NOTE in f.qualifiers.get("note", [])}
     introns = [(int(f.location.start) + 1, int(f.location.end), f.qualifiers["note"][0])
                for f in rec.features if f.type == "intron"]
     return cds, introns
@@ -120,7 +121,7 @@ def test_mini_exon_plakinastrella(tmp_path):
     cds, introns = intron_models(tmp_path / "out" / "NC_010217.gbf")
     assert len(introns) == 2
     rec = SeqIO.read(str(tmp_path / "out" / "NC_010217.gbf"), "genbank")
-    cox1 = [f for f in rec.features if f.type == "CDS" and "mito_intron" in str(f.qualifiers.get("note"))][0]
+    cox1 = [f for f in rec.features if f.type == "CDS" and NOTE in f.qualifiers.get("note", [])][0]
     assert (11936, 11944) in [(int(p.start) + 1, int(p.end)) for p in cox1.location.parts]
     assert introns[1][:2] == (11945, 13062)
 
@@ -152,7 +153,7 @@ def test_submission_qualifiers(tmp_path):
     shutil.move(str(tmp_path / "x.gbf"), tmp_path / "in" / "NC_008164.gbf")
     run(tmp_path / "in", tmp_path / "out", 4)
     rec = SeqIO.read(str(tmp_path / "out" / "NC_008164.gbf"), "genbank")
-    ours = [f for f in rec.features if f.type == "CDS" and "mito_intron" in str(f.qualifiers.get("note"))]
+    ours = [f for f in rec.features if f.type == "CDS" and NOTE in f.qualifiers.get("note", [])]
     assert ours and all(f.qualifiers.get("product") for f in ours)
     for f in ours:
         tail = len(f.location.extract(rec.seq)) % 3
@@ -191,3 +192,21 @@ def test_next_chain_when_best_conflicts(tmp_path):
     run(mitoz_like("NC_006902", tmp_path), tmp_path / "out", 4)
     cds, _ = intron_models(tmp_path / "out" / "NC_006902.gbf")
     assert cds["ND5"][0] == ncbi_cds("NC_006902")["ND5"][0]
+
+
+def test_feature_notes_read_like_genbank_notes(tmp_path):
+    """Review C finding 15: /note qualifiers reach the submission table, so they carry no script name or
+    to-do: the CDS note is the neutral NOTE, intron notes name the 'MFannot method'."""
+    rec = SeqIO.read(str(DATA / "LC670763.gb"), "genbank")
+    rec.features = [f for f in rec.features if f.type == "source"]
+    (tmp_path / "in").mkdir()
+    SeqIO.write(rec, str(tmp_path / "in" / "LC670763.gbf"), "genbank")
+    run(tmp_path / "in", tmp_path / "out", 5)
+    out = SeqIO.read(str(tmp_path / "out" / "LC670763.gbf"), "genbank")
+    cds = [f for f in out.features if f.type == "CDS"]
+    introns = [f for f in out.features if f.type == "intron"]
+    assert len(cds) == 1 and cds[0].qualifiers["note"] == [NOTE] and introns
+    for f in cds + introns:
+        for note in f.qualifiers.get("note", []):
+            assert ".py" not in note and "mito_intron" not in note and "manually" not in note.lower()
+    assert all("MFannot method" in f.qualifiers["note"][0] for f in introns)

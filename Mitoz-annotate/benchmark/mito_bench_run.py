@@ -37,7 +37,7 @@ sys.path.insert(0, str(PIPE))
 import mito_env  # noqa: E402
 from mito_rescue import mitos_to_record  # noqa: E402,F401  (used by collect(); tests import it from here)
 
-TOOLS = ("ours", "mitoz", "mitos2", "mitom")
+TOOLS = ("ours", "mitoz", "mitos2", "mitom", "mitom_auto")
 # MitoM extended clades (batch_mitoz.EXTRA_CLADES) for phyla MitoZ lacks; any other phylum -> all-animal database
 EXTRA_CLADE = {"Cnidaria": "Cnidaria", "Platyhelminthes": "Platyhelminthes-flatworms",
                "Chaetognatha": "Chaetognatha-arrow-worms"}
@@ -119,10 +119,11 @@ def build_cmd(tool: str, row: dict, bare: Path, out: Path, threads: int) -> Opti
     acc, code = row["accession"], str(row["genetic_code"])
     if tool in ("ours", "mitoz") and not row["mitoz_clade"]:
         return None
-    if tool == "mitom":                       # one command: annotation, MitoM steps, curation (05.curated)
+    if tool in ("mitom", "mitom_auto"):       # one command: annotation, MitoM steps, curation (05.curated)
         clade = row["mitoz_clade"] or EXTRA_CLADE.get(row.get("phylum", ""), "Animal")
         return [[sys.executable, str(PIPE / "batch_mitoz.py"), "run", "-i", str(bare), "-o", str(out / "raw"),
-                 "--clade", clade, "--genetic_code", code, "--threads", str(threads), "--max_tasks", "1"]]
+                 "--clade", clade, "--genetic_code", code, "--threads", str(threads), "--max_tasks", "1",
+                 *(["--if_reannotation_2", "auto"] if tool == "mitom_auto" else [])]]
     if tool == "ours":
         clade = row["mitoz_clade"]
         return [[sys.executable, str(PIPE / "batch_mitoz.py"), "run", "-i", str(bare), "-o", str(out / "raw"),
@@ -200,7 +201,8 @@ def collect(tool: str, out: Path, ncbi: SeqRecord) -> SeqRecord:
     """The tool's annotation of this record, before lift-over."""
     if tool == "mitos2":
         return mitos_to_record(out / "mitos", Seq(str(ncbi.seq)), str(ncbi.id))
-    pattern = {"ours": "curated/*.gbf", "mitom": "raw/05.curated/*.gbf", "mitoz": "w/**/*.gbf"}[tool]
+    pattern = {"ours": "curated/*.gbf", "mitom": "raw/05.curated/*.gbf",
+               "mitom_auto": "raw/05.curated/*.gbf", "mitoz": "w/**/*.gbf"}[tool]
     files = sorted(out.glob(pattern), key=lambda p: p.stat().st_size, reverse=True)
     if not files:
         raise LiftError(f"no GenBank output ({pattern})")

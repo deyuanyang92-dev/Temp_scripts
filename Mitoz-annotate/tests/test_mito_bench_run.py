@@ -246,3 +246,11 @@ def test_mitom_runs_every_phylum(tmp_path):
     assert cmd[0][cmd[0].index("--clade") + 1] == "Animal"
     cmd = mr.build_cmd("mitom", ROW, tmp_path / "bare", tmp_path / "out", 2)
     assert cmd[0][cmd[0].index("--clade") + 1] == "Annelida-segmented-worms"
+
+
+def test_mitom_auto_differs_only_in_reannotation(tmp_path):
+    """A/B of --if_reannotation_2 auto: same command as mitom plus the option; output collected the same way."""
+    a = mr.build_cmd("mitom", ROW, tmp_path / "bare", tmp_path / "out", 2)[0]
+    b = mr.build_cmd("mitom_auto", ROW, tmp_path / "bare", tmp_path / "out", 2)[0]
+    assert b == a + ["--if_reannotation_2", "auto"]
+    assert "mitom_auto" in mr.TOOLS

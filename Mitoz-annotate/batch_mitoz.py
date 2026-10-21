@@ -338,6 +338,57 @@ MITOZ_CODES = {"Chordata": 2, "Echinodermata": 9, "Porifera-sponges": 4}
 # 2026-10-20 dev benchmark, 48 records of these phyla: 48/48 annotated, PCG both ends exact 54 % (MITOS2 49 %).
 EXTRA_CLADES = ("Cnidaria", "Platyhelminthes-flatworms", "Chaetognatha-arrow-worms", "Animal")
 ALL_CLADES = MITOZ_CLADES + EXTRA_CLADES
+# --clade auto: phylum (from the GenBank taxonomy) -> clade; any other metazoan phylum -> "Animal"
+PHYLUM_CLADE = {"Chordata": "Chordata", "Arthropoda": "Arthropoda", "Echinodermata": "Echinodermata",
+                "Annelida": "Annelida-segmented-worms", "Bryozoa": "Bryozoa", "Mollusca": "Mollusca",
+                "Nematoda": "Nematoda", "Nemertea": "Nemertea-ribbon-worms", "Porifera": "Porifera-sponges",
+                "Cnidaria": "Cnidaria", "Platyhelminthes": "Platyhelminthes-flatworms",
+                "Chaetognatha": "Chaetognatha-arrow-worms"}
+METAZOAN_PHYLA = set(PHYLUM_CLADE) | {
+    "Hemichordata", "Xenacoelomorpha", "Ctenophora", "Placozoa", "Tardigrada", "Onychophora", "Nematomorpha",
+    "Priapulida", "Kinorhyncha", "Loricifera", "Brachiopoda", "Phoronida", "Entoprocta", "Cycliophora", "Rotifera",
+    "Acanthocephala", "Gastrotricha", "Gnathostomulida", "Orthonectida", "Dicyemida", "Micrognathozoa"}
+# usual NCBI mitochondrial code when the input has no CDS transl_table (benchmark/mito_sample.py DEFAULT_CODE)
+PHYLUM_CODE = {"Chordata": 2, "Echinodermata": 9, "Hemichordata": 9, "Platyhelminthes": 9, "Cnidaria": 4,
+               "Porifera": 4, "Placozoa": 4, "Ctenophora": 4}
+GB_SUFFIXES = (".gb", ".gbk", ".gbf", ".genbank", ".gbff")
+
+
+def auto_clade(in_path: Path) -> Tuple[Optional[str], Optional[int], Optional[str], str]:
+    """--clade auto: (clade, genetic code, phylum, '') from the taxonomy and CDS transl_table of the GenBank
+    input; (None, None, None, error) for input of several phyla. Input with no taxonomy at all (FASTA, or
+    GenBank without a lineage) keeps the previous default clade with a WARNING message, as before auto
+    existed (check_mitoz.py 2026-10-21); records without taxonomy do not block the known phylum of the others."""
+    in_path = Path(in_path)
+    files = [in_path] if in_path.is_file() else sorted(p for p in in_path.rglob("*") if p.is_file())
+    files = [p for p in files if p.suffix.lower() in GB_SUFFIXES]
+    need = "give --clade (and --genetic_code), e.g. --clade Animal --genetic_code 5"
+    phyla: Dict[str, int] = {}
+    codes: Dict[str, int] = {}
+    for f in files:
+        for rec in SeqIO.parse(str(f), "genbank"):
+            tax = rec.annotations.get("taxonomy")
+            p = next((t for t in tax if t in METAZOAN_PHYLA), "") if isinstance(tax, list) else ""
+            if p:
+                phyla[p] = phyla.get(p, 0) + 1
+            for ft in rec.features:
+                if ft.type == "CDS" and "transl_table" in ft.qualifiers:
+                    c = str(ft.qualifiers["transl_table"][0])
+                    codes[c] = codes.get(c, 0) + 1
+    cds_code = int(max(codes, key=lambda c: codes[c])) if codes else None
+    if not phyla:
+        fallback = "Annelida-segmented-worms"
+        return fallback, cds_code or 5, None, (
+            f"WARNING: --clade auto found no metazoan phylum in the input (FASTA or GenBank without taxonomy); "
+            f"using the previous default --clade {fallback} --genetic_code {cds_code or 5}. "
+            f"For other taxa {need}")
+    if len(phyla) > 1:
+        got = ", ".join(f"{p} ({n})" for p, n in sorted(phyla.items()))
+        return None, None, None, (f"--clade auto: the input must be one metazoan phylum, found {got}; "
+                                  f"run each phylum separately or {need}")
+    phylum = next(iter(phyla))
+    code = cds_code or PHYLUM_CODE.get(phylum, 5)
+    return PHYLUM_CLADE.get(phylum, "Animal"), code, phylum, ""
 
 
 def fast_mitoz_cmd(cmd: List[str], fast: str) -> List[str]:
@@ -989,6 +1040,23 @@ def find_any_summary_txt(sample_dir: Path) -> Optional[Path]:
     return cands[0]
 
 
+def refresh_summary(out_root: Path, gb_dir: Path) -> None:
+    """Recount PCG / tRNA / rRNA of annotation-summary.tsv from the final GenBank files (after rescue, rRNA
+    HMM fallback and curation); rows without a final file are kept unchanged."""
+    f = out_root / "annotation-summary.tsv"
+    if not f.exists():
+        return
+    finals = {p.stem: p for p in Path(gb_dir).rglob("*.gbf")}
+    lines = f.read_text(encoding="utf-8").splitlines()
+    out = lines[:1]
+    for line in lines[1:]:
+        c = line.split("\t")
+        if c and c[0] in finals:
+            c[1:4] = [str(x) for x in counts_from_genbank(finals[c[0]])]
+        out.append("\t".join(c))
+    f.write_text("\n".join(out) + "\n", encoding="utf-8")
+
+
 def parse_counts_from_summary_txt(summary_txt: Path) -> Optional[Tuple[int, int, int]]:
     txt = summary_txt.read_text(encoding="utf-8", errors="ignore")
     m1  = re.search(r"Protein\s+coding\s+genes\s+totally\s+found:\s*(\d+)", txt, re.I)
@@ -1252,6 +1320,78 @@ def rotate_record(record: "SeqRecord", start_pos: int) -> "SeqRecord":
     new_features.sort(key=lambda f: feature_start_pos(f))
     new_rec.features = new_features
     return new_rec
+
+
+# --if_reannotation_2 auto (user 2026-10-21: re-annotating every record after reorientation wastes resources)
+STANDARD_GENES = ("COX1", "COX2", "COX3", "ATP6", "ATP8", "CYTB", "ND1", "ND2", "ND3", "ND4", "ND4L", "ND5", "ND6",
+                  "s-rRNA", "l-rRNA")
+REANNOT_EDGE = 50          # nt from the ends of the round-1 sequence where a gene may have been cut
+
+
+def select_reannotation(samples: List["SampleInfo"], results1: Dict[str, Dict], out_root: Path) -> List["SampleInfo"]:
+    """--if_reannotation_2 auto: the samples whose reoriented round-1 annotation fails reorient_check();
+    every decision with its reasons goes to reannotation_decision.tsv."""
+    chosen, rows = [], []
+    for si in samples:
+        iid = si.internal_id
+        reor = out_root / "01.mitoz_anno1" / iid / "reoriented" / f"{iid}.reoriented.gbf"
+        best = results1.get(iid, {}).get("best_gb")
+        try:
+            probs = reorient_check(Path(best), reor) if best else ["no round-1 GenBank"]
+        except Exception as exc:                     # any doubt -> re-annotate
+            probs = [f"check failed: {exc}"]
+        if probs:
+            chosen.append(si)
+        rows.append(f"{si.sample_name}\t{'reannotate' if probs else 'shifted_round1'}\t{'; '.join(probs)}")
+    write_nonempty_table(out_root / "reannotation_decision.tsv", "sample_name\tdecision\treasons", rows)
+    logging.info(f"[PHASE2] auto: {len(chosen)} of {len(samples)} sample(s) re-annotated, "
+                 f"{len(samples) - len(chosen)} use the shifted round-1 annotation (reannotation_decision.tsv)")
+    return chosen
+
+
+def reorient_check(round1_gb: Path, reor_gb: Path) -> List[str]:
+    """Reasons to re-annotate a reoriented record; [] = the shifted round-1 annotation can be used as is.
+    Checks: (1) a gene within REANNOT_EDGE nt of the ends of the round-1 sequence (MitoZ annotates the
+    sequence as linear, so a gene across the original origin is cut or missed) - only when the sequence
+    moved; (2) a standard protein gene / rRNA missing in round 1; (3) every feature's sequence identical
+    before and after the shift, same features; (4) no feature across the new origin."""
+    probs: List[str] = []
+    r1 = {r.id: r for r in SeqIO.parse(str(round1_gb), "genbank")}
+    for ro in SeqIO.parse(str(reor_gb), "genbank"):
+        a = r1.get(ro.id)
+        if a is None:
+            probs.append(f"{ro.id}: no round-1 record")
+            continue
+        L = len(a.seq)
+        genes = [f for f in a.features if f.type in ("CDS", "rRNA", "tRNA")]
+        moved = str(ro.seq) != str(a.seq)
+        if moved:
+            edge = sorted({f.qualifiers.get("gene", [f.type])[0] for f in genes
+                           if int(f.location.start) < REANNOT_EDGE or int(f.location.end) > L - REANNOT_EDGE})
+            if edge:
+                probs.append(f"{ro.id}: gene(s) at the end of the round-1 sequence, may be cut: {', '.join(edge)}")
+        have = {f.qualifiers.get("gene", [""])[0] for f in genes}
+        miss = [g for g in STANDARD_GENES if g not in have]
+        if miss:
+            probs.append(f"{ro.id}: standard gene(s) missing in round 1: {', '.join(miss)}")
+
+        def seqs(rec: "SeqRecord") -> Dict[Tuple[str, str], List[str]]:
+            out: Dict[Tuple[str, str], List[str]] = {}
+            for f in rec.features:
+                if f.type in ("CDS", "rRNA", "tRNA"):
+                    out.setdefault((f.type, f.qualifiers.get("gene", [""])[0]), []).append(str(f.extract(rec.seq)))
+            return {k: sorted(v) for k, v in out.items()}
+        before, after = seqs(a), seqs(ro)
+        diff = sorted(k[1] or k[0] for k in set(before) | set(after) if before.get(k) != after.get(k))
+        if diff:
+            probs.append(f"{ro.id}: gene sequence differs after the shift: {', '.join(diff)}")
+        n = len(ro.seq)
+        cross = sorted({f.qualifiers.get("gene", [f.type])[0] for f in ro.features if f.type != "source"
+                        and len(f.location.parts) > 1 and any(int(p.end) == n for p in f.location.parts)
+                        and any(int(p.start) == 0 for p in f.location.parts)})
+        if cross:
+            probs.append(f"{ro.id}: feature(s) across the new origin: {', '.join(cross)}")
+    return probs
 
 
 def feature_start_pos(feat: "SeqFeature") -> int:
@@ -2668,6 +2808,7 @@ def workflow_annotate(args: argparse.Namespace) -> int:
     run_intron_fix(args, in_path, final_dir, out_root)
     add_wrapped_trnas(final_dir, out_root / "trna_wrap.tsv")
     merge_dir = run_curate_and_submit(args, final_dir, out_root)
+    refresh_summary(out_root, merge_dir)
     all_final_gbs = sorted(
         p for p in merge_dir.rglob("*.gbf")
         if p.is_file() and p.stat().st_size > 0)
@@ -2756,6 +2897,18 @@ def resolve_tools(args: argparse.Namespace) -> str:
     if str(MITOZ_FAST.parents[1]) not in sys.path:
         sys.path.insert(0, str(MITOZ_FAST.parents[1]))
     import mito_env
+    if args.clade == "auto":
+        clade, code, phylum, err = auto_clade(Path(args.input))
+        if err and not err.startswith("WARNING"):
+            return f"ERROR: {err}"
+        if err:
+            print(f"\n{'=' * 68}\n  [CLADE_DEFAULT] {err}\n{'=' * 68}\n", file=sys.stderr)
+        args.clade = clade
+        if getattr(args, "genetic_code", None) is None:
+            args.genetic_code = code
+        if hasattr(args, "rrna_hmm") and not getattr(args, "phylum", None):
+            args.phylum = phylum
+        logging.info(f"[CLADE] auto: {phylum} -> --clade {args.clade} --genetic_code {args.genetic_code}")
     if getattr(args, "core", "hybrid") == "mitoz":
         if args.clade not in MITOZ_CLADES:
             return f"ERROR: --core mitoz needs a MitoZ clade ({', '.join(MITOZ_CLADES)}); use --core hybrid"
@@ -3042,10 +3195,12 @@ def workflow_run(args: argparse.Namespace) -> int:
             summary.reorient_failed.append(si.sample_name)
             no_gene_iids.add(si.internal_id)
 
-    do_phase2 = (args.if_reannotation_2 == "yes")
+    do_phase2 = args.if_reannotation_2 in ("yes", "auto")
     results2:  Dict[str, Dict] = {}
     if do_phase2:
         phase2_samples = [si for si in samples if si.internal_id in reor_ok_ids]
+        if args.if_reannotation_2 == "auto":
+            phase2_samples = select_reannotation(phase2_samples, results1, out_root)
         logging.info(f"[PHASE2] re-annotation: {len(phase2_samples)} samples")
         results2 = run_annotation_stage(
             samples=phase2_samples, phase_dirname="03.mitoz_anno2_reoriented",
@@ -3193,6 +3348,7 @@ def workflow_run(args: argparse.Namespace) -> int:
     run_intron_fix(args, in_path, final_dir, out_root)
     add_wrapped_trnas(final_dir, out_root / "trna_wrap.tsv")
     merge_dir = run_curate_and_submit(args, final_dir, out_root)
+    refresh_summary(out_root, merge_dir)
     all_final_gbs = sorted(
         p for p in merge_dir.rglob("*.gbf")
         if p.is_file() and p.stat().st_size > 0
@@ -3378,7 +3534,7 @@ def workflow_replace_organism(args: argparse.Namespace) -> int:
 # ─────────────────────────────────────────────────────────────────────────────
 # Argument parser
 # ─────────────────────────────────────────────────────────────────────────────
-_CLADE_DEFAULT = "Annelida-segmented-worms"
+_CLADE_DEFAULT = "auto"
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -3512,10 +3668,12 @@ def build_parser() -> argparse.ArgumentParser:
         g.add_argument("--max_tasks",    type=positive_int_arg, default=16,
                        help="Max concurrent annotation jobs (default: 16).")
         g.add_argument("--clade",        default=_CLADE_DEFAULT,
-                       help=f"MitoZ --clade value (default: '{_CLADE_DEFAULT}').\n"
-                            "⚠ Change this for non-Annelida datasets.")
+                       help="MitoZ --clade / protein database. auto (default): from the taxonomy of the GenBank "
+                            "input (one phylum per run; MitoZ clade, extended clade or Animal); FASTA input needs "
+                            f"an explicit value: {', '.join(ALL_CLADES)}.")
         g.add_argument("--genetic_code", type=int, default=None,
-                       help="Genetic code (default: MitoZ's code of the clade - 2 Chordata, 9 Echinodermata, "
+                       help="Genetic code (default with --clade auto: the CDS transl_table of the input, else the "
+                            "phylum's usual code; otherwise MitoZ's code of the clade - 2 Chordata, 9 Echinodermata, "
                             "4 Porifera, else 5; required for Cnidaria, Platyhelminthes, Chaetognatha, Animal).")
         g.add_argument("--species_name", default=None)
         g.add_argument("--mitoz_extra",  action="append", default=[],
@@ -3569,8 +3727,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Full pipeline: annotate → reorient → re-annotate → guaranteed final reorientation.")
     add_common(run_p)
     add_mitoz(run_p)
-    run_p.add_argument("--if_reannotation_2", choices=["yes", "no"], default="yes",
-                       help="Run Phase-2 re-annotation on reoriented sequences (default: yes).")
+    run_p.add_argument("--if_reannotation_2", choices=["yes", "auto", "no"], default="yes",
+                       help="Phase-2 re-annotation of the reoriented sequences. yes (default): every sample "
+                            "(round 1 uses the fast tRNA mode); auto: round 1 runs in full and only samples that "
+                            "fail the check (gene at the original sequence ends, standard gene missing, gene "
+                            "changed by the shift, gene across the new origin) are re-annotated, decisions in "
+                            "reannotation_decision.tsv; no: never.")
     run_p.add_argument("--preserve_phase1_metadata", choices=["yes", "no"], default="yes",
                        help="Restore original GenBank header metadata into final files "
                             "(default: yes; requires GenBank input).")
@@ -3666,16 +3828,6 @@ def main() -> int:
         print("ERROR: --auto_accept_metadata yes requires --smart_metadata yes", file=sys.stderr)
         return 2
 
-    if (getattr(args, "clade", None) == _CLADE_DEFAULT
-            and args.cmd in ("annotate", "run")):
-        print(
-            f"\n{'='*68}\n"
-            f"  [CLADE_DEFAULT] WARNING\n"
-            f"  --clade not set; using default: '{_CLADE_DEFAULT}'\n"
-            f"  Set --clade explicitly for non-Annelida datasets.\n"
-            f"  See: python3 batch_mitoz.py annotate --help\n"
-            f"{'='*68}\n",
-            file=sys.stderr)
 
     dispatch = {
         "annotate":          workflow_annotate,

@@ -1,5 +1,6 @@
 # Our own steps: mito_intron.py (exonerate, BLAST, Infernal), mito_curate.py / ncbi_validate.py (table2asn),
-# optional extra tRNA methods for mito_trna.py (ARAGORN, tRNAscan-SE). Versions = those validated 2026-10.
+# optional extra tRNA methods for mito_trna.py (ARAGORN, tRNAscan-SE), rRNA HMM fallback (HMMER nhmmer;
+# MAFFT only to rebuild the HMM library, mito_rrna_hmm.py). Versions = those validated 2026-10.
 name: mitotools
 channels: [conda-forge, bioconda]
 dependencies:
@@ -11,3 +12,5 @@ dependencies:
   - table2asn=1.28.1179
   - aragorn=1.2.41
   - trnascan-se=2.0.13
+  - hmmer=3.4
+  - mafft=7.526

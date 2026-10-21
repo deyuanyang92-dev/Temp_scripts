@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # install.sh - one command installs everything the mitogenome annotation workflow needs:
 #   conda environments mitoz (MitoZ 3.6), mitos (MITOS2 2.1.10), mitotools (exonerate, BLAST, Infernal,
-#   table2asn, ARAGORN, tRNAscan-SE), the MITOS2 reference data refseq89m (Zenodo 4284483, md5 checked),
-#   Biopython for the system python3, then mito_env.py doctor --write-config so no tool path has to be typed.
+#   table2asn, ARAGORN, tRNAscan-SE, HMMER, MAFFT), the MITOS2 reference data refseq89m (Zenodo 4284483, md5 checked),
+#   Biopython for the system python3, the `mitom` command (~/.local/bin/mitom), then mito_env.py doctor
+#   --write-config so no tool path has to be typed.
 # Existing environments are kept (--force recreates them). Safe to run again.
 #
 # Platforms (checked with mamba solves, 2026-10-20):
@@ -110,6 +111,15 @@ if ! python3 -c "import Bio" 2>/dev/null; then
   python3 -m pip install --user biopython 2>/dev/null || python3 -m pip install --user --break-system-packages biopython \
     || echo "could not install Biopython; run the scripts with: $SOLVER run -n mitotools python3 ..." >&2
 fi
+
+# ── the mitom command ────────────────────────────────────────────────────────
+mkdir -p "$HOME/.local/bin"
+ln -sf "$HERE/mitom" "$HOME/.local/bin/mitom"
+chmod +x "$HERE/mitom"
+case ":$PATH:" in
+  *":$HOME/.local/bin:"*) say "command installed: mitom" ;;
+  *) say "command installed: $HOME/.local/bin/mitom - add it to PATH: echo 'export PATH=\$HOME/.local/bin:\$PATH' >> ~/.bashrc" ;;
+esac
 
 # ── record what was found ────────────────────────────────────────────────────
 say "checking"

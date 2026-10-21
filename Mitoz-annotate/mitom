@@ -1,0 +1,56 @@
+#!/usr/bin/env python3
+"""mitom - MitoM, annotation workflow for animal mitochondrial genomes (one command for every step).
+
+Usage: mitom <command> [options]        mitom <command> -h   shows the options of one command
+
+  run                full workflow (input dedup, reorientation, MitoZ/MITOS2 cores, rescue, rRNA HMM
+                     fallback, introns, boundary curation, NCBI submission files)      = batch_mitoz.py run
+  annotate | reorient | transfer_metadata | replace_organism | dedup
+                     single parts of the workflow                                      = batch_mitoz.py <cmd>
+  doctor             which external programs are found; --write-config saves them      = mito_env.py doctor
+  curate             boundary rules + NCBI names on GenBank files                     = mito_curate.py
+  intron             introns (MFannot method)                                         = mito_intron.py
+  trna               multi-method tRNA annotation                                     = mito_trna.py
+  rescue             add genes MitoZ missed from MITOS2                                = mito_rescue.py
+  rrna-hmm           per-phylum 12S/16S HMMs: build / search                           = mito_rrna_hmm.py
+  validate           NCBI table2asn validation and submission files                   = ncbi_validate.py
+
+Typical:  mitom doctor
+          mitom run -i my_genomes.gb -o out          (clade and genetic code from the GenBank taxonomy)
+          mitom run -i contigs.fasta -o out --clade Mollusca --genetic_code 5
+"""
+import os
+import sys
+from pathlib import Path
+
+VERSION = "0.9.0"
+HERE = Path(os.path.realpath(__file__)).parent
+COMMANDS = {
+    **{c: ("batch_mitoz.py", [c]) for c in ("run", "annotate", "reorient", "transfer_metadata", "replace_organism", "dedup")},
+    "doctor": ("mito_env.py", ["doctor"]),
+    "curate": ("mito_curate.py", []),
+    "intron": ("mito_intron.py", []),
+    "trna": ("mito_trna.py", []),
+    "rescue": ("mito_rescue.py", []),
+    "rrna-hmm": ("mito_rrna_hmm.py", []),
+    "validate": ("ncbi_validate.py", []),
+}
+
+
+def main(argv):
+    if not argv or argv[0] in ("-h", "--help", "help"):
+        print(__doc__)
+        return 0
+    if argv[0] in ("-V", "--version"):
+        print(f"MitoM {VERSION}")
+        return 0
+    if argv[0] not in COMMANDS:
+        print(f"mitom: unknown command '{argv[0]}' (mitom -h lists the commands)", file=sys.stderr)
+        return 2
+    script, pre = COMMANDS[argv[0]]
+    os.execv(sys.executable, [sys.executable, str(HERE / script), *pre, *argv[1:]])
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

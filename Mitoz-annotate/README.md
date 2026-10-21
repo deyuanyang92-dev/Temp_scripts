@@ -1,7 +1,50 @@
-# batch_mitoz.py 使用说明 / User Guide
+# MitoM 使用说明 / User Guide
 
-本文档说明 `batch_mitoz.py` 的用途、输入格式、各子命令、常用参数、输出文件和工作流程。
-This document explains the purpose, inputs, subcommands, key options, outputs, and workflow of `batch_mitoz.py`.
+本文档说明 MitoM（命令 `mitom`，主程序 `batch_mitoz.py`）的安装、输入格式、各子命令、常用参数、输出文件和工作流程。
+This document explains installation, inputs, subcommands, key options, outputs, and workflow of MitoM (command `mitom`, main program `batch_mitoz.py`).
+
+## 快速上手 / Quick start
+
+**1. 安装（一条命令）/ Install (one command)** — Linux 或 Windows WSL2；macOS 见 `install.sh` 开头说明，或用 Docker：
+
+```bash
+git clone <this repository> MitoM && cd MitoM
+bash install.sh            # conda 环境 mitoz / mitos / mitotools + MITOS2 参考数据 + 命令 mitom
+mitom doctor               # 检查：所有必需程序都应显示 OK
+```
+
+Docker：`docker build -t mitom . && docker run --rm -v "$PWD":/data mitom mitom run -i /data/genomes.gb -o /data/out`
+
+**2. 运行 / Run**
+
+```bash
+# GenBank 输入（推荐）：类群库、遗传密码、门都从 GenBank 分类信息自动判断（一次一个门）
+mitom run -i genomes.gb -o out
+
+# FASTA 输入：需写明类群库和遗传密码
+mitom run -i contigs.fasta -o out --clade Mollusca --genetic_code 5
+```
+
+`--clade` 可选：`Chordata Arthropoda Echinodermata Annelida-segmented-worms Bryozoa Mollusca Nematoda
+Nemertea-ribbon-worms Porifera-sponges Cnidaria Platyhelminthes-flatworms Chaetognatha-arrow-worms Animal`
+（`Animal` = 全动物蛋白库，用于其他门）。常用：`--threads 8 --max_tasks 4`（每个任务线程数 / 同时任务数）、
+`--sbt template.sbt`（NCBI 提交者模板）。
+
+**3. 结果 / Results**（`out/`）
+
+| 文件 | 内容 |
+|---|---|
+| `05.curated/*.gbf`、`all.final.gbf` | 最终 GenBank（NCBI 命名，端点已校正） |
+| `06.ncbi_submission/` | NCBI 提交文件 `.fsa/.tbl`（BankIt）、`.sqn/.val`；`submission_summary.tsv` 中 ERROR 为 0 的可直接提交 |
+| `05.curated/curation_report.tsv` | 每处校正及需人工检查的基因（内部终止、tRNA 落在 CDS 内等） |
+| `rescue_report.tsv`、`rrna_hmm_report.tsv` | 从 MITOS2 补回的漏注基因、按门 HMM 补搜到的 12S/16S（需人工检查边界） |
+| `annotation-summary.tsv`、`pipeline.log` | 每条的基因数统计、总日志 |
+
+**4. 单独步骤 / Single steps**：`mitom -h` 列出全部命令（`curate`、`intron`、`trna`、`rescue`、`rrna-hmm`、`validate` 等），
+`mitom <命令> -h` 查看参数。
+
+**默认流程 / Default workflow**：GenBank 去重 → MitoZ 注释（蛋白基因、rRNA）+ MITOS2 tRNA → cox1 定向 → 第二轮注释 →
+元数据迁回 → MITOS2 补回漏注基因 → 仍缺的 12S/16S 用按门 HMM 补搜 → 内含子 → 端点校正与 NCBI 命名 → NCBI 校验与提交文件。
 
 ## MitoM：声明、致谢与引用 / Statement, acknowledgements and citation
 
@@ -95,6 +138,10 @@ It can:
 - Write final `.gbf` files, summary tables, logs, failure lists, and merged GenBank archives.
 
 ## 依赖 / Requirements
+
+一条命令安装全部依赖：`bash install.sh`（见"快速上手"）；`mitom doctor` 检查。下面是各组件：
+
+- MITOS2 2.1.10 + refseq89m（tRNA、补漏）；exonerate、BLAST、Infernal、table2asn、HMMER、MAFFT（env/mitotools.yml）
 
 基础依赖：
 
@@ -617,6 +664,7 @@ mitoz_run_out/
 │   ├── submission_summary.tsv  # 每条记录 NCBI ERROR / WARNING 数
 │   └── validation_messages.tsv
 ├── rescue_report.tsv           # 从 MITOS2 补回的漏注基因（需人工检查）
+├── rrna_hmm_report.tsv         # 按门 HMM 补搜的 12S/16S（只在仍缺失时搜索；需人工检查边界）
 ├── annotation-summary.tsv
 ├── metadata_transfer_log.tsv
 ├── all.final.gbf
@@ -827,7 +875,7 @@ python3 -m pytest -q tests          # Metridium / Nematostella / Platynereis，�
 
 ## 注意事项 / Practical Notes
 
-1. `--clade` 默认值是 `Annelida-segmented-worms`。非环节动物数据必须显式修改。
+1. `--clade` 默认 `auto`：从 GenBank 分类信息判断（一次运行只能一个门；FASTA 输入需显式给 `--clade` 和 `--genetic_code`）。
 2. `--genetic_code` 默认是 5，即无脊椎动物线粒体密码表；请按物种确认。
 3. `--id_maxlen` 不能小于 6，否则内部 ID 会冲突；脚本现在会拒绝这种参数。
 4. 线性序列重定向后会保留 `linear` topology，不会被强制改成 `circular`。
@@ -837,7 +885,7 @@ python3 -m pytest -q tests          # Metridium / Nematostella / Platynereis，�
 
 Notes:
 
-1. The default `--clade` is `Annelida-segmented-worms`; change it for other taxa.
+1. The default `--clade` is `auto` (from the GenBank taxonomy, one phylum per run); FASTA input needs `--clade` and `--genetic_code`.
 2. The default `--genetic_code` is 5; verify it for your dataset.
 3. `--id_maxlen` must be at least 6.
 4. Linear records keep linear topology after reorientation.

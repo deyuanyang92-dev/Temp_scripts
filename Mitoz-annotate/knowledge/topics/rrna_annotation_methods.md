@@ -77,7 +77,7 @@ Data used by our runs: (a) the 93 dev records of benchmark/sets/mito_bench_2026-
 - HiFiMiTie (calacademy-research): `script/rrna_cmsearch.sh` v2 switched to MITOS2 `rrnS.cm`/`rrnL.cm` with MITOS2-style args (`--noF4b -E 0.01 --mxsize 80000`) and always local search, i.e. the same move as Idea 1 [code] (https://github.com/calacademy-research/HiFiMiTie/blob/main/script/rrna_cmsearch.sh)
 - MitoPilot (NMNH-OceanDNA, R): MITOS2 for rRNA, MitoFinder optional; MitoHiFi, skim2mito: wrap MitoFinder/MITOS; mitocorrect (tjcreedy): PCG start/stop correction by profile alignment, no rRNA rule [code] (https://github.com/NMNH-OceanDNA/MitoPilot) (https://github.com/tjcreedy/mitocorrect)
 - drozdovapb/mt_genome_benchmark: benchmark of MITOS2, MitoFinder, MitoZ, MFannot, MitoFlex, AGORA, GeSeq and raw refseq89m CMs on Baikal amphipods, with an RNA-seq folder; its rRNA conclusions were not extracted (未确证) [code] (https://github.com/drozdovapb/mt_genome_benchmark/tree/main/2_annotation)
-- OAT, PRIMA (protists, MFannot), MitoGPT (DNABERT-2, human mtDNA region classification only): not applicable [code]
+- OAT, PRIMA (protists, MFannot), MitoGPT (DNABERT-2, human mtDNA region classification only): not applicable [code] (https://github.com/tranthanhbiet/OAT) (https://github.com/Anomalocaris98/PRIMA) (https://github.com/samueltckong/MitoGPT)
 
 ### 2.3 Structure resources and checks
 - Rfam release 15.1 (2026-01-16) has no metazoan mitochondrial SSU or LSU family; keyword "mito" returns only trypanosomatid mt SSU/LSU, mt-tmRNA, mtPerm-5S and mtDNA_ssA, so there is no Rfam CM to borrow [our run] (https://rfam.org/search/keyword?query=mito&output=json)

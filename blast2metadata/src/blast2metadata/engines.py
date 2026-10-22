@@ -22,7 +22,9 @@ from .util import _extra_has_outfmt, _shlex_split, ensure_dir, input_stem, is_fi
 # ─────────────────────────────────────────────
 # BLAST runners
 # ─────────────────────────────────────────────
-def compute_parallel_params(args: argparse.Namespace, mode: str) -> Tuple[int, int]:
+def compute_parallel_params(args: argparse.Namespace, mode: str, n_batches: int = 0) -> Tuple[int, int]:
+    """(parallel_jobs, threads_per_job). 修改 (2026-10-22): 批次数少于并行数时把线程分给实际批次
+    （原来 1 个批次对 nt 只拿到 16/4=4 线程）。"""
     total_threads = max(1, int(args.threads))
     pj = int(args.parallel_jobs) if args.parallel_jobs is not None else 0
 
@@ -35,6 +37,8 @@ def compute_parallel_params(args: argparse.Namespace, mode: str) -> Tuple[int, i
     if pj <= 0:
         pj = 1 if getattr(args, "engine", "blast") != "blast" else min(4, total_threads)
     pj = max(1, min(pj, total_threads))
+    if n_batches > 0:
+        pj = min(pj, n_batches)
     if args.local_threads_per_job and int(args.local_threads_per_job) > 0:
         tpj = int(args.local_threads_per_job)
     else:

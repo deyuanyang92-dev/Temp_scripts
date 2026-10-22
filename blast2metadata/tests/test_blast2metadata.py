@@ -667,3 +667,15 @@ def test_dbtool_update_real_small_db(tmp_path):
     assert r.returncode == 0, r.stdout[-3000:] + r.stderr[-1000:]
     assert dbtool.blastdbcmd_info(tmp_path / "16S_ribosomal_RNA", "nucl")["ok"]
     assert (tmp_path / "16S_ribosomal_RNA.update.json").exists() and not list(tmp_path.glob("*.tar.gz"))
+
+
+def test_threads_go_to_actual_batches():
+    m = load_module()
+    args = m.parse_arguments(["-i", "x", "--no_smk", "--threads", "16"])
+    args.threads = 16
+    assert m.compute_parallel_params(args, "local") == (4, 4)
+    assert m.compute_parallel_params(args, "local", n_batches=1) == (1, 16)
+    assert m.compute_parallel_params(args, "local", n_batches=2) == (2, 8)
+    assert m.compute_parallel_params(args, "local", n_batches=10) == (4, 4)
+    args.engine = "mmseqs"
+    assert m.compute_parallel_params(args, "local", n_batches=10) == (1, 16)

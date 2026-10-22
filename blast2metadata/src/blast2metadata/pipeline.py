@@ -305,7 +305,7 @@ def process_one_fasta(
 
             blast_files: List[Path] = []
             if args.blast_method == "local":
-                parallel_jobs, threads_per_job = compute_parallel_params(args, mode="local")
+                parallel_jobs, threads_per_job = compute_parallel_params(args, mode="local", n_batches=len(batches))
                 logger.info(
                     f"[LOCAL_SCHED] total_threads={args.threads} "
                     f"parallel_jobs={parallel_jobs} threads_per_job={threads_per_job}"

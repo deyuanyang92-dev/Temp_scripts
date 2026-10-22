@@ -10,7 +10,7 @@ Batch sequence search (BLAST+ local / `blastn -remote` / Biopython qblast / **DI
 
 ```bash
 # 依赖: Python >= 3.8, Biopython; 可选 pandas, psutil, snakemake
-pip install -e /path/to/Temp_scripts/blast2metadata        # 得到 blast2metadata 命令
+pip install -e /path/to/Temp_scripts/blast2metadata        # 得到 blast2metadata 和 blast2metadata-db 命令
 blast2metadata --doctor                                     # 检查 blastn/diamond/mmseqs/snakemake 是否可用
 
 # 不安装也能跑
@@ -79,8 +79,27 @@ mmseqs databases NR /db/mmseqs/NR /tmp/mmtmp               # 带 taxonomy
 blast2metadata -i q.faa -o OUT -bm local --engine mmseqs --blast_db /db/mmseqs/NR
 ```
 
+### 用 blast2metadata-db 管理本地库 / Managing local databases
+
+```bash
+blast2metadata-db list --remote                  # 列出 $BLASTDB 里的库: 版本/日期/序列数/卷数，并与 NCBI 比较是否有更新
+blast2metadata-db list --dir /media/deyuan/18T_A/database/blast_db/nt --dir /media/deyuan/18T_A/database/blast_db/nr --remote
+blast2metadata-db update nt -o /db/blast/nt      # 下载 NCBI 清单里的全部 tar.gz (aria2, md5 校验, 断点续传, 失败轮询重试)
+                                                  # -> 解压到 .staging_nt/ -> blastdbcmd 校验 -> 替换旧库 -> 删 tar.gz
+blast2metadata-db update nr -o /db/blast/nr --downloader ascp        # Aspera (需要 ~/.aspera/connect 和 UDP 33001)
+blast2metadata-db update swissprot -o /db/blast --downloader update_blastdb   # 交给 NCBI 的 update_blastdb.pl
+blast2metadata-db update nt -o /db/blast/nt --dry_run                # 只打印 URL 列表
+blast2metadata-db clean nt -o /db/blast/nt --yes # 删除遗留的 tar.gz / .aria2 / .md5
+blast2metadata-db env --dir /db/blast/nt --dir /db/blast/nr          # 打印 export BLASTDB=... 行
+```
+
+- 更新判断依据 NCBI 的 `<db>-nucl|prot-metadata.json`（`last-updated`、卷数、大小）对比本地 `blastdbcmd -info` 日期；已最新则不下载（`--force` 强制）。
+- 新库先在 `.staging_<db>/` 里解压并通过 `blastdbcmd -info` 校验，才替换旧库（`--keep_old` 把旧库移到 `<db>_old_<日期>/`），中途失败旧库不受影响；重跑同一命令会续传。
+- 磁盘空间不足会先报错（需要“下载压缩包 + 解压后”两份空间，`--keep_tarballs` 保留压缩包）。
+- 代理：aria2 走 `http_proxy/https_proxy`，`socks://` 的 `all_proxy` 会被忽略；snap 版 aria2c 读不了 `/tmp`，目标目录放 `$HOME` 或 `/media` 下。
+
 DIAMOND 旧文档里的 `diamond prepdb` 已不需要（2.1.14+ 直接 `-d nr`）；`diamond makedb --in nr.gz` 仍可用但没必要。
-`blast2metadata --doctor` 会显示你的 DIAMOND 版本是否能直接读 BLAST 库。
+`blast2metadata --doctor` 会显示你的 DIAMOND 版本是否能直接读 BLAST 库、下载工具 (aria2c/ascp/update_blastdb.pl) 和 `$BLASTDB` 各目录是否存在。
 
 ## TopN 排序 / Ranking
 
@@ -131,6 +150,7 @@ src/blast2metadata/
   fields.py     50 个 BLAST 列的字典、表头、-outfmt 处理
   smk.py        Snakemake 计划与 Snakefile
   ratelimit.py  Entrez / BLAST 限速器
+  dbtool.py     blast2metadata-db: 本地库清单、与 NCBI 比对、下载更新 (aria2/ascp/update_blastdb.pl)、清理
   accession.py, fastautil.py, writers.py, util.py, doctor.py
 tests/          真实 BLAST+/DIAMOND/MMseqs2 回归测试
 ```
@@ -138,6 +158,7 @@ tests/          真实 BLAST+/DIAMOND/MMseqs2 回归测试
 ```bash
 python -m pytest -q tests                                   # 需要 blastn/makeblastdb 在 PATH
 DIAMOND_EXE=/path/diamond MMSEQS_EXE=/path/mmseqs python -m pytest -q tests   # 含引擎测试
+B2M_NETWORK_TESTS=1 python -m pytest -q tests -k dbtool      # 真实下载 16S_ribosomal_RNA (~70 MB) 测试更新流程
 ```
 
 变更记录见 [CHANGELOG.md](CHANGELOG.md)。

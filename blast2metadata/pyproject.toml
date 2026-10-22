@@ -17,6 +17,7 @@ test = ["pytest"]
 
 [project.scripts]
 blast2metadata = "blast2metadata.cli:main"
+blast2metadata-db = "blast2metadata.dbtool:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

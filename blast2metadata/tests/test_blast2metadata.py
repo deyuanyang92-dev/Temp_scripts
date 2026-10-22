@@ -604,3 +604,66 @@ def test_find_blast_db_resolves_names_and_blastdb_env(db, tmp_path, monkeypatch)
     assert m.find_blast_db(db.name, "nucleotide") == str(db)
     monkeypatch.delenv("BLASTDB")
     assert m.find_blast_db(db.name, "nucleotide") is None
+
+
+# ── blast2metadata-db ────────────────────────────────────────────────────
+
+from blast2metadata import dbtool  # noqa: E402
+
+
+def test_dbtool_finds_and_describes_local_db(db, tmp_path):
+    (db.parent / "mito.001.tar.gz").write_bytes(b"x" * 10)     # leftovers of an earlier download
+    (db.parent / "mito.002.tar.gz.aria2").write_bytes(b"x")
+    found = dbtool.find_local_dbs([db.parent])
+    assert (db, "nucl") in found
+    info = dbtool.blastdbcmd_info(db, "nucl")
+    assert info["ok"] and info["sequences"] == 3 and info["version"] == 5 and info["volumes"] == 1
+    assert info["date"].count("-") == 2
+    files, size = dbtool.leftovers(db.parent, "mito")
+    assert {f.name for f in files} == {"mito.001.tar.gz", "mito.002.tar.gz.aria2"} and size == 11
+    r = subprocess.run([sys.executable, "-m", "blast2metadata.dbtool", "list", "--dir", str(db.parent)],
+                       env={**ENV, "PYTHONPATH": str(SRC)}, capture_output=True, text=True, cwd=tmp_path)
+    assert r.returncode == 0 and "3 seqs" in r.stdout and "leftovers: 2" in r.stdout
+    r = subprocess.run([sys.executable, "-m", "blast2metadata.dbtool", "clean", "mito", "-o", str(db.parent), "--yes"],
+                       env={**ENV, "PYTHONPATH": str(SRC)}, capture_output=True, text=True, cwd=tmp_path)
+    assert r.returncode == 0 and not (db.parent / "mito.001.tar.gz").exists()
+
+
+def test_dbtool_swap_keeps_old_and_installs_new(tmp_path):
+    dest = tmp_path / "d"
+    dest.mkdir()
+    for n in ("nt.nal", "nt.000.nin", "nt.000.nsq", "nt.ndb", "nt.001.tar.gz", "other.pin"):
+        (dest / n).write_text("old")
+    staging = tmp_path / ".staging_nt"
+    staging.mkdir()
+    for n in ("nt.nal", "nt.000.nin", "nt.001.nin", "nt.ndb", "nt.000.tar.gz.md5"):
+        (staging / n).write_text("new")
+    base = dbtool.swap_in(staging, dest, "nt", "nucl", keep_old=True)
+    assert base == dest / "nt" and (dest / "nt.001.nin").read_text() == "new"
+    assert (dest / "nt.nal").read_text() == "new" and not (dest / "nt.000.nsq").exists()
+    assert (dest / "other.pin").exists() and (dest / "nt.001.tar.gz").exists()  # untouched
+    old = next(dest.glob("nt_old_*"))
+    assert (old / "nt.000.nsq").read_text() == "old" and (old / "nt.nal").read_text() == "old"
+    assert not list(dest.glob("*.md5")) and not staging.exists()
+
+
+def test_dbtool_tarball_check(tmp_path):
+    f = tmp_path / "x.tar.gz"
+    f.write_bytes(b"hello")
+    assert dbtool._tarball_ok(f, None)
+    assert dbtool._tarball_ok(f, dbtool.md5_of(f))
+    assert not dbtool._tarball_ok(f, "0" * 32)
+    (tmp_path / "x.tar.gz.aria2").write_bytes(b"")
+    assert not dbtool._tarball_ok(f, None)  # unfinished aria2 download
+
+
+@pytest.mark.skipif(not os.environ.get("B2M_NETWORK_TESTS"), reason="set B2M_NETWORK_TESTS=1 (downloads ~70 MB from NCBI)")
+def test_dbtool_update_real_small_db(tmp_path):
+    man = dbtool.fetch_manifest("16S_ribosomal_RNA")
+    assert man["_dbtype"] == "nucl" and man["files"][0].startswith("https://")
+    r = subprocess.run([sys.executable, "-m", "blast2metadata.dbtool", "update", "16S_ribosomal_RNA", "-o", str(tmp_path),
+                        "--downloader", os.environ.get("B2M_DOWNLOADER", "aria2")],
+                       env={**ENV, "PYTHONPATH": str(SRC)}, capture_output=True, text=True, cwd=tmp_path)
+    assert r.returncode == 0, r.stdout[-3000:] + r.stderr[-1000:]
+    assert dbtool.blastdbcmd_info(tmp_path / "16S_ribosomal_RNA", "nucl")["ok"]
+    assert (tmp_path / "16S_ribosomal_RNA.update.json").exists() and not list(tmp_path.glob("*.tar.gz"))

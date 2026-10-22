@@ -23,6 +23,13 @@ New:
   DIAMOND or a nucleotide BLAST DB gives a clear error. MMseqs2 given a BLAST DB
   is pointed at `mmseqs databases NR|NT|core_nt`. `--doctor` reports whether the
   installed DIAMOND can read BLAST DBs.
+- `blast2metadata-db` command (list / update / clean / env): lists the databases in
+  `$BLASTDB`, compares them with NCBI's `<db>-nucl|prot-metadata.json` manifests,
+  downloads a database (aria2c with md5 checksums and retry rounds, ascp, or
+  update_blastdb.pl), extracts into a staging directory, verifies with
+  `blastdbcmd -info` and swaps it in; cleans leftover tarballs. Replaces the
+  ad-hoc aria2_nt.py / ascp_nt.py scripts. `--doctor` now also reports the
+  downloaders and whether each `$BLASTDB` directory exists.
 - `--query_gencode N` sets the genetic code of translated searches in one place
   (blastx `-query_gencode`, DIAMOND `--query-gencode`, MMseqs2 `--translation-table`).
 - gzipped FASTA input (`*.fasta.gz`, output stem drops `.fasta.gz`).

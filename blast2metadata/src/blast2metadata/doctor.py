@@ -18,6 +18,9 @@ _TOOLS: List[Tuple[str, List[str], str]] = [
     ("diamond",     ["diamond", "version"],      r"version\s+(\S+)"),
     ("mmseqs",      ["mmseqs", "version"],       r"(\S+)"),
     ("snakemake",   ["snakemake", "--version"],  r"(\S+)"),
+    ("aria2c",      ["aria2c", "--version"],     r"aria2 version (\S+)"),
+    ("ascp",        ["ascp", "--version"],       r"ascp version (\S+)"),
+    ("update_blastdb.pl", ["update_blastdb.pl", "--version"], r"version (\S+)"),
 ]
 
 
@@ -56,7 +59,9 @@ def run_doctor(exes: Optional[dict] = None) -> int:
                 ok = tuple(int(x) for x in m.groups()) >= (2, 1, 14)
                 note = ("  [reads BLAST v5 protein DBs directly: --blast_db /path/nr]" if ok
                         else "  [< 2.1.14: cannot read BLAST DBs, needs .dmnd]")
-        print(f"  {name:12s} {v if v else 'NOT FOUND'}{note}")
+        if name == "aria2c" and v and "/snap/" in v:
+            note = "  [snap build: cannot read /tmp, download under $HOME or /media]"
+        print(f"  {name:18s} {v if v else 'NOT FOUND'}{note}")
     print("\nPython packages:")
     for mod, note in [("Bio", "biopython, required"), ("pandas", "optional"),
                       ("psutil", "optional, host load detection"), ("snakemake", "optional scheduler")]:
@@ -66,6 +71,10 @@ def run_doctor(exes: Optional[dict] = None) -> int:
     proxies = {k: os.environ[k] for k in ("https_proxy", "HTTPS_PROXY", "http_proxy", "HTTP_PROXY") if os.environ.get(k)}
     print(f"  HTTP proxy   {proxies if proxies else 'none'}"
           + ("  (blastn -remote may fail behind a proxy; use --online_engine biopython)" if proxies else ""))
-    print(f"  BLASTDB      {os.environ.get('BLASTDB', 'not set')}")
+    blastdb = os.environ.get("BLASTDB", "")
+    print(f"  BLASTDB      {blastdb or 'not set'}")
+    for d in [x for x in blastdb.split(os.pathsep) if x]:
+        print(f"               {'ok ' if os.path.isdir(d) else 'MISSING '} {d}")
+    print("               (`blast2metadata-db list --remote` shows the databases and whether NCBI has newer ones)")
     print(f"  NCBI_API_KEY {'set' if os.environ.get('NCBI_API_KEY') else 'not set'}")
     return 0

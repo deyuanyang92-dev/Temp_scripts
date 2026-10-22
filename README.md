@@ -54,6 +54,9 @@ Snakemake scheduling, `--resume`, gzipped FASTA input.
   retried so one bad accession does not lose the others' metadata.
 - `--mode add-header` adds a header row to any existing BLAST tabular file
   (outfmt 6/7/10/20); `--header_style code|label|both`.
+- `blast2metadata-db list --remote | update nt -o DIR | clean | env` manages the
+  local NCBI databases (manifest comparison, md5-verified aria2/ascp/
+  update_blastdb.pl download, staged extraction and swap).
 - `--doctor` reports tools and packages found; behind an HTTP proxy
   `blastn -remote` fails or hangs, use `--online_engine biopython`.
 

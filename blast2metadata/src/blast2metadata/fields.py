@@ -16,8 +16,9 @@ NT_META_COLS: List[str] = [
     "reference_titles", "reference_authors", "reference_journals", "comment",
 ]
 
-NUMERIC_FLOAT_COLS = {"pident", "evalue", "qcovs", "bitscore"}
-NUMERIC_INT_COLS   = {"length", "mismatch", "gapopen", "qstart", "qend", "sstart", "send"}
+NUMERIC_FLOAT_COLS = {"pident", "evalue", "qcovs", "bitscore", "ppos", "qcovhsp", "qcovus", "pident_x_qcovs"}
+NUMERIC_INT_COLS   = {"length", "mismatch", "gapopen", "qstart", "qend", "sstart", "send",
+                      "qlen", "slen", "nident", "positive", "gaps", "score", "qframe", "sframe"}
 
 # 修改 (2026-10-11): 表头功能。BLAST 有 50 个列代码，用户记不住各格式的列含义；
 # 这里内置官方列表，用于 --header_style 和 --mode add-header。
@@ -81,7 +82,7 @@ _BLAST_LABEL_TO_CODE: Dict[str, str] = {lab: code for code, (lab, _d) in BLAST_F
 
 # Non-BLAST columns this script adds (Entrez / GenBank metadata).
 OUTPUT_FIELD_DESC: Dict[str, str] = {
-    "pident_x_qcovs": "pident x qcovs / 100 (% of query identical to subject)",
+    "pident_x_qcovs": "pident x qcovs / 100 (ranking heuristic; not whole-query identity)",
     "accession": "GenBank accession",
     "version": "GenBank accession.version",
     "locus": "GenBank LOCUS name",

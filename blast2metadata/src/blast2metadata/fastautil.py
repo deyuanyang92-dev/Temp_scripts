@@ -8,7 +8,7 @@ from typing import List, Union
 
 from Bio import SeqIO  # type: ignore
 
-from .util import ensure_dir, logger, open_text
+from .util import ensure_dir, open_text
 
 def detect_sequence_type(fasta_file: Union[str, Path], max_records: int = 2) -> str:
     fasta_file = str(fasta_file)
@@ -36,6 +36,12 @@ def get_blast_program(seq_type: str) -> str:
 
 
 def get_blast_db(seq_type: str, args: argparse.Namespace) -> str:
+    # 翻译搜索选择 subject 类型：blastx 的核酸 query 应查 nr，tblastn 的蛋白 query 应查 nt。
+    program = Path(getattr(args, "blast_exe", "auto")).name
+    if program in {"blastx", "blastp"}:
+        seq_type = "protein"
+    elif program in {"tblastn", "tblastx", "blastn"}:
+        seq_type = "nucleotide"
     if args.blast_db != "auto":
         return args.blast_db
     if args.blast_method == "local":
@@ -72,22 +78,18 @@ def iter_fasta_batches(
         bidx += 1
         cur_records = []
 
-    # 修改 (2026-10-22): 支持 .gz 输入；重复 query ID 会让 TopN 把不同序列的命中混在一起，提前警告。
+    # 修改 (2026-10-22): 支持 .gz 输入；重复 query ID 会让 TopN 把不同序列的命中混在一起，因此在启动比对前拒绝。
     seen_ids: set = set()
-    dup_ids: List[str] = []
     with open_text(fasta_file) as f:
         for rec in SeqIO.parse(f, "fasta"):
             if rec.id in seen_ids:
-                dup_ids.append(rec.id)
+                raise ValueError(f"{fasta_file}: duplicate sequence ID {rec.id!r}; use unique FASTA IDs")
+            if not rec.seq:
+                raise ValueError(f"{fasta_file}: empty sequence {rec.id!r}")
             seen_ids.add(rec.id)
             cur_records.append(rec)
             if len(cur_records) >= batch_size:
                 flush()
         flush()
-    if dup_ids:
-        logger.warning(
-            f"[FASTA] {fasta_file.name}: {len(dup_ids)} duplicate sequence ID(s) "
-            f"(e.g. {dup_ids[:3]}); hits of same-ID sequences are pooled in TopN"
-        )
 
     return batches

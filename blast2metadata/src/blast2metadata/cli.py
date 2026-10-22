@@ -211,14 +211,19 @@ def parse_arguments(argv: Optional[List[str]] = None) -> argparse.Namespace:
     p.add_argument("--local_threads_per_job", default=None, type=int,
                    help="Override per-job -num_threads for local BLAST")
     p.add_argument("--batch_size",            default=None, type=_positive_int,
-                   help="Sequences per search batch (default: 50 for BLAST+/online; 5000 for DIAMOND/MMseqs2, "
-                        "which are multithreaded and pay a start-up cost per call)")
+                   help="Sequences per search batch (default: 5000 for local BLAST+/DIAMOND/MMseqs2, 50 online). "
+                        "Each local batch is one full database pass, so fewer, larger batches are faster")
     p.add_argument("--online_max_concurrent", default=1,  type=int,
                    help="Max concurrent online BLAST batches (default: 1)")
-    p.add_argument("--online_delay_sec",      default=12, type=int,
-                   help="Delay in seconds after each online batch request (default: 12)")
+    # 修改 (2026-10-23): 默认 12 → 0。提交间隔已由 BLAST 限速器保证 ≥10 s（NCBI 规定），
+    # 这段固定等待是重复的；原来 qblast 逐条提交时每条都要多等 12 s。
+    p.add_argument("--online_delay_sec",      default=0, type=int,
+                   help="Extra delay in seconds after each online batch (default: 0; submissions are "
+                        "already spaced >=10 s apart as NCBI requires)")
     p.add_argument("--retries",    default=3,  type=_positive_int,
                    help="Retries for failed BLAST/metadata fetch (default: 3)")
+    p.add_argument("--blast_timeout", default=0, type=_nonnegative_float,
+                   help="Timeout in seconds per external search attempt; 0 disables it (not qblast)")
     p.add_argument("--retry_sleep", default=10, type=int,
                    help="Initial retry sleep in seconds (default: 10)")
 
@@ -230,7 +235,7 @@ def parse_arguments(argv: Optional[List[str]] = None) -> argparse.Namespace:
     # 修改 (2026-10-11): 可用预设或自定义多列排序，并加阈值过滤。
     p.add_argument("--sort_by", type=_sort_spec_arg, default="bitscore",
                    help="TopN ranking. Preset: bitscore (default), identity, coverage, evalue, "
-                        "pident_x_qcovs (= pident*qcovs/100, %% of query identical to subject); "
+                        "pident_x_qcovs (= pident*qcovs/100, ranking heuristic); "
                         "or comma-separated columns ranked in order, e.g. 'qcovs,pident' "
                         "(evalue/mismatch/gapopen/gaps: smaller is better; others: larger is better)")
     p.add_argument("--min_pident", type=float, default=0.0,
@@ -373,6 +378,14 @@ def parse_arguments(argv: Optional[List[str]] = None) -> argparse.Namespace:
     return args
 
 
+def _nonnegative_float(s: str) -> float:
+    import math
+    v = float(s)
+    if not math.isfinite(v) or v < 0:
+        raise argparse.ArgumentTypeError("must be finite and >= 0")
+    return v
+
+
 def _positive_int(s: str) -> int:
     try:
         v = int(s)
@@ -437,9 +450,23 @@ def main(argv: Optional[List[str]] = None) -> int:
         args.use_snakemake = False
 
     _absolutize_local_paths(args)
+    for name in ("min_pident", "min_qcovs"):
+        if not 0 <= getattr(args, name) <= 100:
+            raise SystemExit(f"ERROR: --{name} must be between 0 and 100")
+    if args.topN > args.max_target_seqs and args.mode in {"blast2topN", "blast2topN2metadata"}:
+        logger.warning("[TOPN] topN exceeds max_target_seqs; the search may return too few candidates")
     args.threads = resolve_total_threads(args)
     if args.batch_size is None:
-        args.batch_size = 5000 if (args.blast_method == "local" and args.engine != "blast") else 50
+        # 修改 (2026-10-23): 本地 BLAST+ 默认 500 → 5000（与 DIAMOND/MMseqs2 一致）。
+        # 理由: BLAST 每个批次要把整个数据库扫一遍，耗时主要在扫库而不是 query 数。
+        #       实测 (blastn 2.12, nt 前 10 卷 28 GB 已在缓存, 8 线程, 600 bp COI):
+        #       6 条 13.7 s, 96 条 20.0 s, 960 条 66.9 s —— 每批约 13 s 固定扫库开销;
+        #       960 条切成 20 批 × 4 进程 211.9 s，1 批 66.9 s，HSP 结果完全相同。
+        #       完整 nt 的 .nsq 有 800 GB，超过本机 503 GB 内存，每多一批就多读一遍磁盘。
+        #       megablast 内部每次最多拼接约 5 Mbp query，5000 × 600 bp 仍在一遍之内；
+        #       更长的 query 由 BLAST 自己内部分遍，不会因批大而变慢。
+        #       代价: 单批失败/中断时 --resume 要重跑更多序列，可用 --batch_size 调小。
+        args.batch_size = 5000 if args.blast_method == "local" else 50
     out_dir = ensure_dir(Path(args.output).resolve())
     args.output = str(out_dir)
 
@@ -450,7 +477,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     #     each child divides the global budget evenly so 10 parallel jobs never
     #     collectively exceed 3 (or 10) req/sec.
     # BLAST_LIMITER:
-    #   • STRICT 1 req / 3 sec limit, no API key support
+    #   • NCBI BLAST URL API: at most 1 request / 10 s, no API key support
     #   • _smk_active_jobs → divides this limit across parallel jobs
     active_jobs    = int(getattr(args, "_smk_active_jobs", 1))
     
@@ -489,7 +516,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     )
     logger.info(
         f"[BLAST_RATE_LIMIT] 1 call / "
-        f"{3.1 * active_jobs:.2f}s period "
+        f"{10.1 * active_jobs:.2f}s period "
         f"(strict NCBI BLAST limit, no API key support, "
         f"active_jobs={active_jobs})"
     )

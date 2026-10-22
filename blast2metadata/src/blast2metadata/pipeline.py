@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import concurrent.futures as cf
+import copy
 import csv
 import glob
 import json
@@ -12,16 +13,17 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 
+from . import cache
 from .util import input_stem, HAVE_PANDAS
 from .accession import accession_base, is_local_or_pseudo_accession, looks_like_fasta_path, read_accession_list, strip_blast_suffix
-from .blasttab import extract_accession_numbers_from_rows, get_topN_hits_py, header_columns, merge_blast_tsv_text, parse_blast_results_py
+from .blasttab import extract_accession_numbers_from_rows, get_topN_hits_py, header_columns, merge_blast_tsv_text, parse_blast_results_py, iter_blast_results
 from .engines import (compute_parallel_params, prepare_engine_db, run_biopython_qblast_one_batch,
                       run_diamond_one_batch, run_local_blast_one_batch, run_mmseqs_one_batch,
                       run_remote_blast_one_batch)
 from .fastautil import BatchInfo, detect_sequence_type, get_blast_db, get_blast_program, iter_fasta_batches
 from .fields import ACCESSION_LIST_EXTENSIONS, ADD_HEADER_EXTENSIONS, BLAST_HEADERS, BLAST_REQUIRED_MODES, BLAST_STD_FIELDS, BLAST_TABLE_EXTENSIONS, NT_META_COLS, _FLOAT_FIELDS, _INT_FIELDS, build_outfmt_string, columns_from_outfmt
 from .metadata import fetch_metadata_batch, load_local_meta, local_row_to_ncbi_meta, merge_rows_with_metadata
-from .util import ensure_dir, is_file_complete, logger, which
+from .util import ensure_dir, is_file_complete, logger, which, _shlex_split
 from .writers import debug_local_hit_examples, rows_to_delimited, rows_to_tsv, write_results_csv
 
 # ─────────────────────────────────────────────
@@ -94,7 +96,8 @@ def setup_output_directory(output_dir: Path) -> Dict[str, Path]:
 
 
 def _write_completion(marker: Path, args: argparse.Namespace, seq_type: Optional[str]) -> None:
-    with open(marker, "w", encoding="utf-8") as f:
+    part = marker.with_name(marker.name + ".part")
+    with open(part, "w", encoding="utf-8") as f:
         f.write(f"completed_at: {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
         f.write(f"mode: {args.mode}\n")
         if seq_type:
@@ -106,6 +109,9 @@ def _write_completion(marker: Path, args: argparse.Namespace, seq_type: Optional
         f.write(f"pandas: {HAVE_PANDAS}\n")
         f.write(f"entrez_tool: {args.entrez_tool}\n")
         f.write(f"api_key_set: {bool(args.api_key)}\n")
+    csv_output = marker.with_name(marker.name.replace("_completed.txt", "_results.csv"))
+    cache.commit(csv_output, args._result_signature)
+    os.replace(part, marker)
 
 
 def preflight_checks(args: argparse.Namespace, files: List[str], out_dir: Path) -> None:
@@ -131,6 +137,15 @@ def preflight_checks(args: argparse.Namespace, files: List[str], out_dir: Path) 
             add_issue(f"Empty input file: {p}")
 
     if args.mode in BLAST_REQUIRED_MODES:
+        # 调度/输出参数必须使用本软件对应选项，避免 extra 参数绕过线程上限或写到别处。
+        reserved = {
+            "blast": {"-num_threads", "-query", "-db", "-out", "-outfmt", "-evalue", "-max_target_seqs", "-remote"},
+            "diamond": {"-p", "--threads", "-q", "--query", "-d", "--db", "-o", "--out", "-f", "--outfmt", "-k", "--max-target-seqs", "-e", "--evalue"},
+            "mmseqs": {"--threads", "--format-output", "--search-type", "--max-seqs", "--max-accept", "-e"},
+        }[args.engine]
+        conflicts = [t for t in _shlex_split(args.extra_para2_blast) if t.split("=", 1)[0] in reserved]
+        if conflicts:
+            add_issue(f"--extra_para2_blast overrides managed parameters {conflicts}; use the dedicated CLI options")
         # Codex 修改: BLAST 预检按实际序列类型和 online_engine 检查 blastn/blastp。
         # 理由: 原代码只在 local 模式固定检查 nucleotide/blastn；默认 blast_remote 缺 blastn
         #       会到运行阶段才失败，并且旧 main 还返回 0。
@@ -216,6 +231,7 @@ def process_one_fasta(
     args: argparse.Namespace,
     dirs: Dict[str, Path],
 ) -> bool:
+    args = copy.copy(args)  # 每文件的缓存签名不泄漏到下一个输入。
     fasta_path = Path(fasta_file)
     # Codex 修改: process_one_fasta 返回 bool，并识别 topN-only 的 BLAST 表输入。
     # 理由: 原代码返回 None，失败路径只 log 后 return，主程序无法产生非零退出码；
@@ -237,9 +253,13 @@ def process_one_fasta(
     csv_output          = Path(args.output) / f"{file_stem}_results.csv"
     completion_marker   = Path(args.output) / f"{file_stem}_completed.txt"
 
-    if args.resume and is_file_complete(csv_output) and completion_marker.exists():
+    args._search_signature = cache.search_signature(args, fasta_path)
+    args._result_signature = cache.post_signature(args, args._search_signature)
+    if args.resume and cache.matches(csv_output, args._result_signature) and completion_marker.exists():
         logger.info(f"[SKIP] {fasta_file} (resume: outputs exist)")
         return True
+    # 重新执行前撤销旧完成标记；新任务失败时不能残留旧的“成功”。
+    completion_marker.unlink(missing_ok=True)
 
     blast_needed = args.mode in ["blast-only", "blast2topN", "blast2meta", "blast2topN2metadata"]
     topn_needed  = args.mode in ["topN-only", "blast2topN", "blast2topN2metadata"]
@@ -294,7 +314,7 @@ def process_one_fasta(
 
     # ── 1) BLAST ──────────────────────────────
     if blast_needed:
-        if args.resume and is_file_complete(blast_output_merged):
+        if args.resume and cache.matches(blast_output_merged, args._search_signature):
             logger.info(f"[BLAST] merged exists, skip: {blast_output_merged.name}")
         else:
             batch_size = int(args.batch_size or 50)
@@ -378,8 +398,9 @@ def process_one_fasta(
                 return False
 
             merge_blast_tsv_text(
-                blast_files, blast_output_merged, None if args.no_blast_header else col_names
+                sorted(blast_files), blast_output_merged, None if args.no_blast_header else col_names
             )
+            cache.commit(blast_output_merged, args._search_signature)
             logger.info(f"[BLAST] merged -> {blast_output_merged}")
 
         # Fix-H.1: blast-only mode must write csv_output
@@ -392,7 +413,8 @@ def process_one_fasta(
 
     merged_rows: List[Dict[str, object]] = []
     if blast_needed and blast_output_merged.exists():
-        merged_rows = parse_blast_results_py(blast_output_merged, col_names)
+        merged_rows = (iter_blast_results(blast_output_merged, col_names) if topn_needed
+                       else parse_blast_results_py(blast_output_merged, col_names))
     elif args.mode == "topN-only":
         # Codex 修改: topN-only 从已有 BLAST 表加载 merged_rows。
         # 理由: 原代码中 blast_needed=False，merged_rows 永远为空，导致静默输出空 TopN。
@@ -406,18 +428,18 @@ def process_one_fasta(
                 "Use a BLAST TSV as -i or keep the prior output under blast_results/{stem}_blast.tsv."
             )
             return False
-        merged_rows = parse_blast_results_py(blast_source, col_names)
+        merged_rows = iter_blast_results(blast_source, col_names)
         logger.info(f"[TOPN] loaded BLAST table -> {blast_source}")
 
-    if local_meta and merged_rows:
+    if local_meta and merged_rows and not topn_needed:
         debug_local_hit_examples(merged_rows, local_meta, pseudo_prefixes, n=8)
 
     # ── 2) TopN ──────────────────────────────
     top_rows: Optional[List[Dict[str, object]]] = None
     if topn_needed:
-        if args.resume and is_file_complete(topn_output):
+        if args.resume and cache.matches(topn_output, args._result_signature):
             logger.info(f"[TOPN] exists, skip: {topn_output.name}")
-            top_rows = parse_blast_results_py(topn_output, col_names)
+            top_rows = parse_blast_results_py(topn_output, col_names, quoted=True)
         else:
             if not merged_rows:
                 logger.warning(f"[TOPN] no hits for {fasta_file}")
@@ -428,6 +450,7 @@ def process_one_fasta(
                     min_pident=float(args.min_pident), min_qcovs=float(args.min_qcovs),
                 )
             rows_to_tsv(topn_output, top_rows or [], default_headers=col_names)
+            cache.commit(topn_output, args._result_signature)
             logger.info(f"[TOPN] wrote -> {topn_output}")
 
         # Fix-H.2: topN-only mode must write csv_output directly
@@ -448,6 +471,12 @@ def process_one_fasta(
     # ── 3) Metadata fetch + merge ─────────────
     if meta_needed:
         metadata_dict: Dict[str, dict] = {}
+        unresolved = []
+        meta_signature = cache.digest([
+            args._search_signature, args.metadata_type, args.shorter_metadata,
+            cache.file_digest(args.local_meta_tsv) if args.local_meta_tsv else None,
+            args.local_meta_key, args.local_meta_mode, args.local_meta_prefix, args.pseudo_acc_prefixes,
+        ])
         # Codex 修改: metadata-only 读取 accession list；其他模式仍从 BLAST/TopN 行提取。
         # 理由: 原代码在 metadata-only 下直接 accessions=[]，该模式实际空跑。
         # 原代码:
@@ -491,26 +520,38 @@ def process_one_fasta(
                 f"local_or_pseudo_skipped={len(accessions) - len(accessions_real)}"
             )
 
-            if args.resume and is_file_complete(metadata_output):
+            if args.resume and cache.matches(metadata_output, meta_signature):
                 logger.info(f"[META] exists, load: {metadata_output.name}")
                 with open(metadata_output, "r", encoding="utf-8", errors="ignore") as f:
                     reader = csv.DictReader(f, delimiter="\t")
                     for r in reader:
-                        a = str(r.get("accession", "")).split(".")[0]
+                        a = accession_base(str(r.get("accession", "")))
                         if a:
                             metadata_dict[a] = dict(r)
 
             missing = [a for a in accessions_real if a not in metadata_dict]
             if missing:
-                preferred_db = "protein" if seq_type == "protein" else "nucleotide"
+                # 翻译查询的 metadata 库由 subject 决定，而不是由核酸 query 决定。
+                program = Path(args.blast_exe).name
+                protein_target = args.engine == "diamond" or getattr(args, "_engine_db_type", "") == "protein" or program in {"blastp", "blastx"}
+                preferred_db = "protein" if protein_target or (seq_type == "protein" and program != "tblastn") else "nucleotide"
+                # 修改 (2026-10-23): efetch 每请求 20 → 100 个 accession。
+                # 理由: 耗时以每次请求的往返延迟为主。实测 200 条 nt 命中 accession:
+                #       100/请求 4.6–6.4 s，20/请求 17.9–18.5 s，取回记录数相同。
+                #       NCBI 对 GET 建议 ≤200 个 ID；整批因个别坏 ID 失败时仍按原逻辑对半拆分重试。
                 metadata_new = fetch_metadata_batch(
-                    missing, args, batch_size=20, preferred_db=preferred_db
+                    missing, args, batch_size=100, preferred_db=preferred_db
                 )
                 metadata_dict.update(metadata_new)
 
             if metadata_dict:
                 rows_to_tsv(metadata_output, list(metadata_dict.values()), default_headers=NT_META_COLS)
+                cache.commit(metadata_output, meta_signature)
                 logger.info(f"[META] wrote -> {metadata_output}")
+            unresolved = [a for a in accessions_real if a not in metadata_dict]
+            # 显式列出缺失项，保存已取得的结果；不写完成标记，使 resume 可重试缺失 metadata。
+            missing_output = dirs["meta"] / f"{file_stem}_missing_accessions.tsv"
+            rows_to_tsv(missing_output, [{"accession": a} for a in unresolved], default_headers=["accession"])
         else:
             logger.info("[META] --no_ncbi_metadata ON, skip Entrez efetch.")
             if metadata_dict:
@@ -521,6 +562,9 @@ def process_one_fasta(
         if args.mode == "metadata-only":
             write_results_csv(csv_output, list(metadata_dict.values()), args, default_headers=NT_META_COLS)
             logger.info(f"[CSV] wrote -> {csv_output}")
+            if unresolved:
+                logger.error(f"[META_INCOMPLETE] {len(unresolved)} accessions missing; rerun with --resume")
+                return False
             _write_completion(completion_marker, args, seq_type)
             return True
 
@@ -533,6 +577,9 @@ def process_one_fasta(
 
         logger.info(f"[SUMMARY] wrote -> {summary_output}")
         logger.info(f"[CSV] wrote -> {csv_output}")
+        if unresolved:
+            logger.error(f"[META_INCOMPLETE] {len(unresolved)} accessions missing; rerun with --resume")
+            return False
 
     _write_completion(completion_marker, args, seq_type)
     return True

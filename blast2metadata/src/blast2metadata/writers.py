@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import os
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence
 
@@ -41,12 +42,15 @@ def rows_to_delimited(
 ) -> None:
     ensure_dir(path.parent)
     ordered = _ordered_row_keys(rows, default_headers=default_headers)
-    with open(path, "w", encoding=encoding, newline="") as f:
+    # 写完才发布，异常/中断不得留下会被 resume 读取的半张表。
+    part = path.with_name(path.name + ".part")
+    with open(part, "w", encoding=encoding, newline="") as f:
         w = csv.writer(f, delimiter=delimiter)
         meta_table = list(default_headers or []) == NT_META_COLS
         w.writerow([column_label(k, header_style, meta_table) for k in ordered])
         for r in rows:
             w.writerow(["" if r.get(k) is None else r.get(k) for k in ordered])
+    os.replace(part, path)
 
 
 def write_results_csv(

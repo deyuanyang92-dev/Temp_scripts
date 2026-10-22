@@ -12,7 +12,7 @@ from typing import List
 # The NCBI API Key system *only applies to Entrez E-utilities* (esearch, efetch).
 # The NCBI BLAST API (https://blast.ncbi.nlm.nih.gov/Blast.cgi) is a completely
 # separate backend that does NOT support API keys and enforces a strict limit
-# of 1 request every 3 seconds. Sharing a single rate limiter between them
+# of 1 request every 10 seconds. Sharing a single rate limiter between them
 # causes immediate IP bans when users supply an API key (bumping the limit to
 # 10/sec) and fire BLAST requests at that rate.
 #
@@ -64,19 +64,22 @@ def _make_blast_limiter(active_jobs: int = 1) -> "_RateLimiter":
     """
     Build NCBI BLAST API rate limiter.
     
-    CRITICAL: The BLAST API enforces a STRICT limit of 1 request every 3 seconds,
+    CRITICAL: The BLAST URL API allows at most 1 request every 10 seconds,
     regardless of API keys. To be safe across distributed clock jitter, we use 
-    3.1 seconds per request.
+    10.1 seconds per request.
     
     Parameters
     ----------
     active_jobs : number of concurrently running Snakemake child processes;
-                  each gets 1 request per (3.1 × active_jobs) seconds.
+                  each gets 1 request per (10.1 × active_jobs) seconds.
     """
     active_jobs = max(1, int(active_jobs))
-    # STRICT limit: 1 request every 3 seconds. 
-    # To be safe across distributed clock jitter, we use 3.1 seconds.
-    safe_period = 3.1 * active_jobs
+    # 修改 (2026-10-23): 3.1 s → 10.1 s。
+    # 理由: NCBI BLAST URL API 开发者说明要求 "Do not contact the server more often than
+    #       once every 10 seconds"（Biopython qblast 源码注释同样引用此条）。原来 3.1 s 只因
+    #       每次请求后另有 --online_delay_sec 12 s 才没有超速；现在去掉了那段重复的固定等待，
+    #       由这里单独保证提交间隔。轮询由 Biopython / BLAST+ 自己节流。
+    safe_period = 10.1 * active_jobs
     return _RateLimiter(max_calls=1, period=safe_period)
 
 

@@ -1,0 +1,6 @@
+{"date": "2026-10-22", "blastn": "2.12.0+", "db": "nt.000-nt.009 (warm cache)", "threads_total": 8, "host_load1": 55, "name": "q6   1x8 mt0", "seconds": 13.7, "rows": 437, "hash": 76168102}
+{"date": "2026-10-22", "blastn": "2.12.0+", "db": "nt.000-nt.009 (warm cache)", "threads_total": 8, "host_load1": 55, "name": "q96  1x8 mt0", "seconds": 20.0, "rows": 7379, "hash": 24336575}
+{"date": "2026-10-22", "blastn": "2.12.0+", "db": "nt.000-nt.009 (warm cache)", "threads_total": 8, "host_load1": 55, "name": "q960 1x8 mt0", "seconds": 66.9, "rows": 72389, "hash": 70588378}
+{"date": "2026-10-22", "blastn": "2.12.0+", "db": "nt.000-nt.009 (warm cache)", "threads_total": 8, "host_load1": 55, "name": "q960 1x8 mt1", "seconds": 407.6, "rows": 72389, "hash": 70588378}
+{"date": "2026-10-22", "blastn": "2.12.0+", "db": "nt.000-nt.009 (warm cache)", "threads_total": 8, "host_load1": 55, "name": "q960 2x4 mt0 (480/batch)", "seconds": 77.8, "rows": 72389, "hash": 70588378}
+{"date": "2026-10-22", "blastn": "2.12.0+", "db": "nt.000-nt.009 (warm cache)", "threads_total": 8, "host_load1": 55, "name": "q960 4x2 mt0 (20x48/batch)", "seconds": 211.9, "rows": 72389, "hash": 70588378}

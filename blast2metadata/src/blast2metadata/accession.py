@@ -40,7 +40,8 @@ def parse_accession_from_sseqid(sseqid: str) -> str:
 
 
 def accession_base(acc: str) -> str:
-    return (acc or "").strip().split(".")[0]
+    # 仅去掉末尾数字版本；contig.partA 这类本地 ID 中的点不是 accession 版本分隔符。
+    return re.sub(r"\.\d+$", "", (acc or "").strip())
 
 
 # Codex 修改: 新增输入类型、accession-list 读取和 Entrez DB 猜测工具函数。

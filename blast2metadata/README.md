@@ -61,9 +61,18 @@ blast2metadata -i fasta_dir -o OUT -bm local --blast_db_nt /db/nt --resume
 
 DIAMOND/MMseqs2 的输出被整理成与 BLAST+ 相同的 14 列（`qseqid sseqid stitle pident length mismatch gapopen qstart qend sstart send evalue bitscore qcovs`），
 `qcovs` 按 BLAST+ 定义由同一 query–subject 所有 HSP 的并集算出，后续 TopN、metadata、表头功能完全一致。
-这两个引擎自身多线程，默认 1 个任务占满 `--threads`、`--batch_size 5000`；BLAST+ 默认 4 个并行任务、每批 50 条。
+这两个引擎自身多线程，默认 1 个任务占满 `--threads`、`--batch_size 5000`；本地 BLAST+ 默认每批 5000 条、最多 4 个并行任务（在线仍为 50 条）。
+并行数 × 每任务线程数不会超过 `--threads`；显式 `--local_threads_per_job` 过大时会降低并行数。
+BLAST 每批都要把整个库扫一遍：nt 实测 960 条序列 1 批 67 秒、切成 20 批 212 秒，所以批越大越快；只有想让 `--resume` 粒度更细时才调小。不要加 `-mt_mode 1`（nt 上慢 6 倍）。性能测量见 [评估报告](docs/performance-review-2026-10-22.md)。
 
 `--blast_db` 可给：BLAST 库名/路径（`blast` 引擎任意库；`diamond` 引擎读蛋白库）；`x.dmnd`；MMseqs2 库前缀（`mmseqs createdb` / `mmseqs databases` 的输出）；或一个 FASTA（自动建库一次到 `OUT/_engine_db/`，`--resume` 和 Snakemake 子任务复用）。
+
+### 在线 BLAST 速度 / Online speed
+
+- `--online_engine biopython` 每批（默认 50 条）只向 NCBI 提交**一次**请求，不再逐条提交。实测 nt：旧做法 82 s/条，现在 50 条一次 72 s（1.4 s/条）。NCBI 拒绝过大的批次时会自动对半拆分重试。
+- qblast 的 blastn 默认 `MEGABLAST=on`，和 `-remote`、本地 BLAST+、NCBI 网页一致（URL API 本身默认是普通 blastn，慢 4.5 倍、计分不同）。要普通 blastn：`--extra_para2_blast "-megablast off"`。
+- 提交间隔由程序保证 ≥10 s（NCBI 规定）；`--online_delay_sec` 默认改为 0。不要调大 `--online_max_concurrent`：Biopython 所有任务共用一个轮询节拍，并发不会更快，还可能被 NCBI 限制。
+- 更快：调小 `--max_target_seqs`（只要 Top10 时 20–50 足够）；`--extra_para2_blast '-entrez_query "Metazoa[organism]"'` 限定类群；序列很多时改用本地库（`-bm local`）。
 
 ### 下载 nr / nt 直接用 / Getting nr and nt
 
@@ -103,9 +112,12 @@ DIAMOND 旧文档里的 `diamond prepdb` 已不需要（2.1.14+ 直接 `-d nr`�
 
 ## TopN 排序 / Ranking
 
-- TopN 按 subject 计数（同一 subject 多个 HSP 只留最好的一个），默认按 `bitscore` 排。
-- `--sort_by` 预设：`bitscore` `identity` `coverage` `evalue` `pident_x_qcovs`（= pident×qcovs/100，相当于“query 中与 subject 一致的比例”），或自定义列顺序如 `qcovs,pident`。
-- `--min_pident` / `--min_qcovs` 先过滤再取 TopN。物种鉴定推荐：`--min_qcovs 80 --sort_by pident_x_qcovs`。
+- TopN 按完整 `sseqid` 计数（同一 subject 多个 HSP 只留当前排序下最好的一个；不同 accession 版本和带点的本地 ID 不合并），默认按 `bitscore` 排。
+- `--sort_by` 预设：`bitscore` `identity` `coverage` `evalue` `pident_x_qcovs`（= pident×qcovs/100，用作排序启发式，不是全 query 的精确一致率），或自定义列顺序如 `qcovs,pident`。
+- `--min_pident` / `--min_qcovs` 先过滤 HSP 行再取 TopN。`pident` 和 `bitscore` 属于保留的代表 HSP；`qcovs` 属于原始搜索返回的同一 subject 全部 HSP。过滤不会重新计算 HSP 并集覆盖度。
+- 多 HSP 的 identity 可能不同；不能把代表 HSP 的 identity 当成所有覆盖区域的 identity，也不直接相加重叠 HSP 的 bitscore。TopN 是候选列表，不能单凭 Top1 确定物种。
+- 标准无表头 12 列、14 列 TSV、CSV 和 outfmt 7 均可读取；12 列没有 `qcovs`，可按 bitscore 排序，覆盖度排序/过滤会明确报缺列。自定义无表头输入需提供原列顺序。
+- TopN 流式处理，每条 query 只保存 N 个候选；同分按 subject ID/坐标/title 决定次序。数字损坏、缺列、未知排序列会报错，不再静默丢行。
 - 不要用 `-max_target_seqs 1` 取“最佳命中”（BLAST 在搜索早期截断，不保证最佳；Shah et al. 2018/2019, Bioinformatics）。
 
 ## 输出 / Output
@@ -113,7 +125,7 @@ DIAMOND 旧文档里的 `diamond prepdb` 已不需要（2.1.14+ 直接 `-d nr`�
 ```
 OUT/
   <stem>_results.csv         最终表 (UTF-8 BOM, Excel 直接打开)；--header_style code|label|both
-  <stem>_completed.txt       完成标记 (--resume 依据)
+  <stem>_completed.txt       完成标记（resume 同时验证缓存签名）
   blast_results/<stem>_blast.tsv      合并后的比对表 (带表头)；<stem>/batch_*.tsv 各批次
   topN_results/<stem>_topN.tsv
   metadata_results/<stem>_metadata.tsv
@@ -123,12 +135,15 @@ OUT/
   preflight_report.json, batch_blast.log
 ```
 
-任一批次比对失败 → 该文件失败（非零退出、无完成标记），`--resume` 只重跑失败批次。
-Entrez 整批失败（常见原因：某个 accession 无效）会自动拆半重试，其余 accession 仍能拿到 metadata。
+任一批次比对失败 → 该文件失败（非零退出、无完成标记）。`--resume` 核对输入 SHA-256、搜索参数、可执行文件和本地库文件的大小/修改时间，以及结果文件状态；匹配时只重跑失败批次，零命中成功批次也可复用。只修改 TopN/阈值时复用 BLAST，重算后处理。文件旁的 `*.cache.json` 为缓存凭据；旧版无签名输出在第一次续跑时重算。
+
+表格和完成标记先写 `.part`，写完再替换。重复 FASTA ID、空序列会在启动比对前报错。`--blast_timeout 3600` 可设置每次外部搜索的秒数上限，默认 0 不设限；不适用于 Biopython qblast。`--extra_para2_blast` 不允许覆盖程序管理的线程、输入、输出、数据库及主要搜索参数。
+
+Entrez 整批失败会拆半重试；仍缺少 metadata 时保存已取得的结果和 `metadata_results/<stem>_missing_accessions.tsv`，返回非零且不写完成标记，续跑补抓缺失项。`--no_ncbi_metadata` 保持离线行为。
 
 ## Metadata 来源
 
-- NCBI Entrez（`--email` 必填真实邮箱，`--api_key` 提升到 10 req/s；BLAST 在线接口另有 1 req/3 s 限制，二者独立限速，Snakemake 子任务按并发数均分配额）。
+- NCBI Entrez（`--email` 必填真实邮箱，`--api_key` 提升到 10 req/s；BLAST 在线接口另有每 10 s 最多 1 次提交的限制（NCBI 规定），二者独立限速，Snakemake 子任务按并发数均分配额）。
 - 本地 TSV：`--local_meta_tsv`，键列自动识别（accession / pseudo_accession / 第一列），`--pseudo_acc_prefixes LOC` 标记本地伪 accession 不去 NCBI 查。
 - `--no_ncbi_metadata` 完全离线。
 

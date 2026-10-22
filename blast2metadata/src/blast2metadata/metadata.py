@@ -156,7 +156,7 @@ def local_row_to_ncbi_meta(row: Dict[str, str]) -> Dict[str, str]:
 def fetch_metadata_batch(
     accession_list: List[str],
     args: argparse.Namespace,
-    batch_size: int = 20,
+    batch_size: int = 100,
     preferred_db: str = "nucleotide",
 ) -> Dict[str, dict]:
     # Codex 修改: preferred_db + accession 分组 + missing 后备库重试。

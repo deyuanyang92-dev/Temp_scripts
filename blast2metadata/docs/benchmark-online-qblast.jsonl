@@ -1,0 +1,4 @@
+{"date": "2026-10-23", "db": "nt (NCBI)", "via": "HTTP proxy", "name": "old: 1 request per query + 12 s sleep", "queries": 3, "seconds": 246.3, "per_query": 82.1, "pairs": 300}
+{"date": "2026-10-23", "db": "nt (NCBI)", "via": "HTTP proxy", "name": "new: 1 request per batch (URL-API default = plain blastn)", "queries": 10, "seconds": 125.2, "per_query": 12.5, "pairs": 1000, "same_pairs_as_old_on_shared_queries": true}
+{"date": "2026-10-23", "db": "nt (NCBI)", "via": "HTTP proxy", "name": "new: 1 request per batch, MEGABLAST=on", "queries": 10, "seconds": 27.7, "per_query": 2.8, "pairs": 969, "best_hit_pident_same_as_blastn": true}
+{"date": "2026-10-23", "db": "nt (NCBI)", "via": "HTTP proxy", "name": "end-to-end CLI blast2topN, 50 queries, 1 request, megablast default", "queries": 50, "seconds": 72.1, "per_query": 1.4, "topn_rows": 499, "queries_with_hits": 50}

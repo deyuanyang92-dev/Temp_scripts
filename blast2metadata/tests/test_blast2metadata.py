@@ -94,9 +94,11 @@ def test_bitscore_default_beats_short_perfect_hit():
 
 def test_failed_batch_fails_file_and_resume_retries_only_it(db, tmp_path):
     fake = tmp_path / "flaky_blastn"
+    fail_flag = tmp_path / "fail_batch"
+    fail_flag.touch()
     fake.write_text(
         "#!/bin/sh\n"
-        'case "$*" in *batch_00001__*) echo boom >&2; exit 1;; esac\n'
+        f'case "$*" in *batch_00001__*) if [ -f "{fail_flag}" ]; then echo boom >&2; exit 1; fi;; esac\n'
         f'exec {shutil.which("blastn", path=ENV["PATH"])} "$@"\n'
     )
     fake.chmod(0o755)
@@ -115,7 +117,8 @@ def test_failed_batch_fails_file_and_resume_retries_only_it(db, tmp_path):
     assert not list(batch_dir.glob("*.part"))
     mtime = good.stat().st_mtime_ns
 
-    r = run(base + ["--resume"], tmp_path)
+    fail_flag.unlink()  # 同一程序/参数恢复后仅重试失败批次；换程序则应使缓存失效。
+    r = run(base + ["--blast_exe", str(fake), "--resume"], tmp_path)
     assert r.returncode == 0, r.stdout[-2000:]
     assert good.stat().st_mtime_ns == mtime  # finished batch not rerun
     qs = {row["qseqid"] for row in read_csv(out / "query_results.csv")}
@@ -148,26 +151,25 @@ def test_qblast_columns_match_blastplus(db, tmp_path):
          "-outfmt", "6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qcovs"],
         check=True, env=ENV, capture_output=True, text=True,
     ).stdout
-    # outfmt 5 has one <BlastOutput> per run; split it per query for the per-sequence qblast calls
+    # 2026-10-23: 整批一次提交；本地 outfmt 5 就是同样的多 query XML（每条 query 一个 Iteration）。
     from Bio.Blast import NCBIXML
-    per_query = {rec.query.split()[0]: rec for rec in NCBIXML.parse(io.StringIO(xml))}
+    from Bio import SeqIO
+    n_query = sum(1 for _ in SeqIO.parse(str(query), "fasta"))
+    calls = []
 
     def fake_qblast(program, database, sequence, **kw):
-        for qid, seq in seqs.items():
-            if seq == sequence:
-                return io.StringIO(qid)
-        raise AssertionError("unknown query")
+        calls.append(sequence.count(">"))
+        return io.StringIO(xml)
 
-    from Bio import SeqIO
-    seqs = {r.id: str(r.seq) for r in SeqIO.parse(str(query), "fasta")}
     m.NCBIWWW.qblast = fake_qblast
-    m.NCBIXML.parse = lambda h: [per_query[h.read()]]
+    m.NCBIXML.parse = NCBIXML.parse
 
     args = m.parse_arguments(["-i", str(query), "--no_smk", "-bm", "online",
                               "--online_engine", "biopython", "--online_delay_sec", "0"])
     batch = m.BatchInfo("batch_00000", query)
     _, ok, out_file, cols = m.run_biopython_qblast_one_batch(batch, "nucleotide", args, tmp_path, m.BLAST_HEADERS)
     assert ok
+    assert calls == [n_query]  # one request for the whole batch
     got = m.parse_blast_results_py(out_file, cols)
 
     def key(r):
@@ -192,6 +194,36 @@ def test_qblast_columns_match_blastplus(db, tmp_path):
         assert int(r["qcovs"]) == int(w["qcovs"]), (r, w)
         gaps_seen |= int(w["gapopen"]) > 0
     assert gaps_seen  # indel query exercised gap counting
+
+
+def test_qblast_splits_batch_rejected_by_ncbi(db, tmp_path):
+    """NCBI rejects a too-large batch (ValueError) -> halves are retried; IDs map back correctly."""
+    m = load_module()
+    ratelimit.BLAST_LIMITER = m._RateLimiter(1000, 1.0)
+    query = DATA / "query.fasta"
+    xml = subprocess.run(["blastn", "-query", str(query), "-db", str(db), "-outfmt", "5", "-evalue", "1e-5"],
+                         check=True, env=ENV, capture_output=True, text=True).stdout
+    from Bio.Blast import NCBIXML
+    per_query = {rec.query.split()[0]: rec for rec in NCBIXML.parse(io.StringIO(xml))}
+    calls = []
+
+    def fake_qblast(program, database, sequence, **kw):
+        ids = [line[1:].split()[0] for line in sequence.splitlines() if line.startswith(">")]
+        calls.append(len(ids))
+        if len(ids) > 2:
+            raise ValueError("Error message from NCBI: CPU usage limit was exceeded")
+        return io.StringIO(",".join(ids))
+
+    m.NCBIWWW.qblast = fake_qblast
+    m.NCBIXML.parse = lambda h: [per_query[i] for i in h.read().split(",")]
+    args = m.parse_arguments(["-i", str(query), "--no_smk", "-bm", "online", "--online_engine", "biopython",
+                              "--retries", "1"])
+    _, ok, out_file, cols = m.run_biopython_qblast_one_batch(
+        m.BatchInfo("batch_00000", query), "nucleotide", args, tmp_path, m.BLAST_HEADERS)
+    assert ok and calls[0] == len(per_query)  # first tried as one request
+    assert sum(c for c in calls if c <= 2) == len(per_query)  # every query searched exactly once
+    got = {r["qseqid"] for r in m.parse_blast_results_py(out_file, cols)}
+    assert got == {q for q, rec in per_query.items() if rec.alignments}
 
 
 def test_topn_only_from_existing_blast_table(db, tmp_path):
@@ -476,11 +508,12 @@ def test_gzipped_fasta_input_and_output_stem(db, tmp_path):
     assert len(rows) == (DATA / "query.fasta").read_text().count(">")
 
 
-def test_duplicate_query_ids_are_warned(db, tmp_path):
+def test_duplicate_query_ids_are_rejected(db, tmp_path):
     fa = tmp_path / "dup.fasta"
     fa.write_text((DATA / "query.fasta").read_text() * 2)
     r = run(local_args(fa, tmp_path / "o", db, "--no_smk", "--mode", "blast-only"), tmp_path)
-    assert r.returncode == 0 and "duplicate sequence ID" in r.stdout
+    assert r.returncode != 0 and "duplicate sequence ID" in r.stdout
+    assert not (tmp_path / "o" / "dup_completed.txt").exists()
 
 
 def test_entrez_batch_failure_is_split_so_good_accessions_survive():
@@ -679,3 +712,33 @@ def test_threads_go_to_actual_batches():
     assert m.compute_parallel_params(args, "local", n_batches=10) == (4, 4)
     args.engine = "mmseqs"
     assert m.compute_parallel_params(args, "local", n_batches=10) == (1, 16)
+
+
+def test_resume_changed_topn_reuses_search_but_changed_input_reruns(db, tmp_path):
+    query = tmp_path / 'query.fasta'
+    shutil.copy(DATA / 'query.fasta', query)
+    out = tmp_path / 'out'
+    args = local_args(query, out, db, '--no_smk', '--mode', 'blast2topN', '--resume')
+    r = run(args + ['--topN', '1'], tmp_path)
+    assert r.returncode == 0, r.stdout
+    raw = out / 'blast_results' / 'query_blast.tsv'
+    original_time = raw.stat().st_mtime_ns
+    top = out / "topN_results" / "query_topN.tsv"
+    top_time = top.stat().st_mtime_ns
+    r = run(args + ['--topN', '3'], tmp_path)
+    assert r.returncode == 0, r.stdout
+    assert raw.stat().st_mtime_ns == original_time
+    assert top.stat().st_mtime_ns != top_time  # 新 TopN 参数触发重算；该小库每 query 只有一个 subject。
+    query.write_text(query.read_text().replace('LC670763.1_COX1', 'renamed_query'))
+    r = run(args + ['--topN', '3'], tmp_path)
+    assert r.returncode == 0, r.stdout
+    assert raw.stat().st_mtime_ns != original_time
+    assert 'renamed_query' in {row['qseqid'] for row in read_csv(out / 'query_results.csv')}
+
+
+def test_topn_standard_csv_end_to_end(tmp_path):
+    path = tmp_path / 'hits.csv'
+    path.write_text('q,A,99,100,1,0,1,100,1,100,1e-10,100\n')
+    r = run(['-i', str(path), '-o', str(tmp_path / 'out'), '--no_smk', '--mode', 'topN-only'], tmp_path)
+    assert r.returncode == 0, r.stdout
+    assert read_csv(tmp_path / 'out' / 'hits_results.csv')[0]['sseqid'] == 'A'

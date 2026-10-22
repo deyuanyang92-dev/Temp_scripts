@@ -1,3 +1,29 @@
+## 2026-10-23 — 在线 BLAST 提速
+
+- Biopython qblast 每批提交一次多条 FASTA，不再逐条提交；按 query ID 核对结果；NCBI 拒绝时对半拆分重试，网络错误不拆分。
+- qblast blastn 默认 MEGABLAST=on（与 -remote/本地/NCBI 网页一致），`-megablast off` 可关闭。
+- BLAST 提交限速 3.1 s → 10.1 s（NCBI 规定 ≥10 s），`--online_delay_sec` 默认 12 → 0。
+- 实测 nt：旧 82.1 s/条；新 50 条一次 72.1 s（1.4 s/条）。数据 `docs/benchmark-online-qblast.jsonl`，脚本 `benchmarks/benchmark_online_qblast.py`。
+
+## 2026-10-23 — 真实 nt 测量后的调整
+
+- 本地 BLAST 默认批大小 500 → 5000：nt 上每批约 13 s 为固定扫库开销，960 条 1 批 66.9 s，20 批 211.9 s，结果相同。
+- metadata efetch 每请求 20 → 100 个 accession：200 条实测 4.6–6.4 s 对 17.9–18.5 s。
+- TopN 阈值改为作用于每个 subject 的代表（最佳）HSP，短的高一致率片段不再让主比对未达标的 subject 混过 `--min_pident`。
+- 新增 `benchmarks/benchmark_nt_passes.py` 与 `docs/benchmark-nt-passes.jsonl`；评估报告补充 nt 实测与 `-mt_mode 1` 不采用的原因。
+
+## 2026-10-22 — BLAST 性能、结果语义与续跑审查
+
+- 修复线程预算向上取整导致超额；本地 BLAST 批次默认 50 → 500，保留显式调参。
+- TopN 改为流式、有界候选集合；保留完整 subject ID，稳定处理同分，禁用阈值不要求相应列。
+- 严格解析标准 12/14 列、CSV、outfmt 7 和可往返的带引号 TSV；坏行报错，排序仅接受数值列。
+- 为搜索、TopN、metadata 和最终结果添加缓存签名；零命中可续跑，输入/参数改变不误用旧结果。
+- 原子发布表格/完成标记，外部搜索支持超时，重试清空半成品，qblast 重试撤销已写入的部分 HSP。
+- 拒绝重复 query ID 和空序列；修复翻译搜索默认数据库选择和带点本地 metadata ID。
+- metadata 不完整时输出缺失清单并保持可续跑状态；Snakemake 将参数文件纳入依赖。
+- BLAST 原始表按 QUOTE_NONE 读取（title 以 `"` 开头不再崩溃）；仅读回自写的 TopN TSV 时解析引号。
+- 修正 pident×qcovs 的解释；新增回归用例、可运行基准及评估报告，关键改动有中文原因注释。
+
 # Changelog
 
 ## 3.0.0 (2026-10-22)

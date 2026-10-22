@@ -99,21 +99,28 @@ def run_cmd(
     retries: int = 1,
     retry_sleep: int = 10,
     env: Optional[Dict[str, str]] = None,
+    timeout: float = 0,
+    output_path: Optional[Path] = None,
 ) -> Tuple[int, str, str]:
     last = (1, "", "")
     sleep = max(1, int(retry_sleep))
     for attempt in range(1, retries + 1):
         logger.info(f"[CMD] {' '.join(cmd)}")
-        p = subprocess.run(
-            cmd,
-            cwd=str(cwd) if cwd else None,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            errors="replace",
-            env=env,
-        )
-        last = (p.returncode, p.stdout or "", p.stderr or "")
+        # 修改 (2026-10-22): 每次重试清空临时输出，防止前次半成品混入成功结果。
+        if output_path is not None:
+            output_path.unlink(missing_ok=True)
+        try:
+            p = subprocess.run(
+                cmd, cwd=str(cwd) if cwd else None,
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                text=True, errors="replace", env=env,
+                timeout=timeout if timeout > 0 else None,
+            )
+            last = (p.returncode, p.stdout or "", p.stderr or "")
+        except subprocess.TimeoutExpired:
+            # subprocess.run 会 kill/wait 直接子进程；不把超时的 .part 作为成功输出。
+            last = (124, "", f"command timed out after {timeout} seconds")
+            p = subprocess.CompletedProcess(cmd, *last)
         if p.returncode == 0:
             return last
         # 修改 (2026-10-10): 每次失败都记 stderr 末尾。理由: 原代码只记 rc，blastn -remote rc=255
@@ -123,6 +130,8 @@ def run_cmd(
         if attempt < retries:
             time.sleep(sleep)
             sleep = int(sleep * 1.8)
+    if output_path is not None:
+        output_path.unlink(missing_ok=True)
     return last
 
 

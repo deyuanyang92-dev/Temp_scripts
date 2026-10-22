@@ -67,7 +67,8 @@ rule all:
 
 rule run_one:
     input:
-        lambda wc: BY_SAMPLE[wc.sample]["fasta"]
+        fasta = lambda wc: BY_SAMPLE[wc.sample]["fasta"],
+        settings = ARGS_JSON  # 参数变化必须进入子进程校验签名，不能只按 CSV 存在跳过。
     output:
         csv  = os.path.join(OUTDIR, "{sample}", "{sample}_results.csv"),
         mark = os.path.join(OUTDIR, "{sample}", "{sample}_completed.txt")
@@ -91,7 +92,7 @@ rule run_one:
         mkdir -p {params.sample_outdir:q}
         export PYTHONPATH={params.pkg_root:q}${{PYTHONPATH:+:$PYTHONPATH}}
         {params.py:q} -m blast2metadata \
-            -i {input:q} \
+            -i {input.fasta:q} \
             -o {params.sample_outdir:q} \
             --args_json {params.args_json:q} \
             --out_stem {wildcards.sample:q} \

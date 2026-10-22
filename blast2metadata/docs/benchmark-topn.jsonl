@@ -1,0 +1,7 @@
+{"mode": "old", "seconds": 10.851, "maxrss_mb": 368.8, "rows": 3000}
+{"mode": "new", "seconds": 5.986, "maxrss_mb": 75.9, "rows": 3000}
+{"mode": "old", "seconds": 11.308, "maxrss_mb": 366.3, "rows": 3000}
+{"mode": "new", "seconds": 4.693, "maxrss_mb": 77.1, "rows": 3000}
+{"mode": "old", "seconds": 8.219, "maxrss_mb": 368.6, "rows": 3000}
+{"mode": "new", "seconds": 3.832, "maxrss_mb": 76.5, "rows": 3000}
+{"comparison": "byte-identical"}

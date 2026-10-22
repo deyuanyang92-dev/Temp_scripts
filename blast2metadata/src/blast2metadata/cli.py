@@ -168,8 +168,10 @@ def parse_arguments(argv: Optional[List[str]] = None) -> argparse.Namespace:
     p.add_argument("--engine", choices=["blast", "diamond", "mmseqs"], default="blast",
                    help="Local search engine (-bm local): blast = BLAST+ (default); diamond = DIAMOND "
                         "(protein DB only: blastp/blastx, 100-10000x faster than BLAST for protein); "
-                        "mmseqs = MMseqs2 (nucleotide or protein DB). DB from --blast_db: a ready .dmnd / "
-                        "MMseqs2 DB, or a FASTA that is converted once into OUT/_engine_db/")
+                        "mmseqs = MMseqs2 (nucleotide or protein DB). DB from --blast_db: DIAMOND >= 2.1.14 "
+                        "reads BLAST protein DBs directly (nr, swissprot; bare names are looked up in $BLASTDB) "
+                        "or a .dmnd; MMseqs2 takes a DB from `mmseqs createdb` / `mmseqs databases NR|NT`; "
+                        "both accept a FASTA, converted once into OUT/_engine_db/")
     p.add_argument("--query_gencode", type=int, default=None,
                    help="Genetic code for translated searches of nucleotide queries (blastx -query_gencode, "
                         "diamond --query-gencode, mmseqs --translation-table), e.g. 5 = invertebrate mito, "

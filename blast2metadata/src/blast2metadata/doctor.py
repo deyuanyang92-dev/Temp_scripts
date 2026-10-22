@@ -49,7 +49,14 @@ def run_doctor(exes: Optional[dict] = None) -> int:
     for name, cmd, pat in _TOOLS:
         cmd = [exes.get(name, cmd[0])] + cmd[1:]
         v = _tool_version(cmd, pat)
-        print(f"  {name:12s} {v if v else 'NOT FOUND'}")
+        note = ""
+        if name == "diamond" and v:
+            m = re.match(r"(\d+)\.(\d+)\.(\d+)", v)
+            if m:
+                ok = tuple(int(x) for x in m.groups()) >= (2, 1, 14)
+                note = ("  [reads BLAST v5 protein DBs directly: --blast_db /path/nr]" if ok
+                        else "  [< 2.1.14: cannot read BLAST DBs, needs .dmnd]")
+        print(f"  {name:12s} {v if v else 'NOT FOUND'}{note}")
     print("\nPython packages:")
     for mod, note in [("Bio", "biopython, required"), ("pandas", "optional"),
                       ("psutil", "optional, host load detection"), ("snakemake", "optional scheduler")]:

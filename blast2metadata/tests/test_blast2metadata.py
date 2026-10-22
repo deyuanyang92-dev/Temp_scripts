@@ -536,3 +536,71 @@ def test_console_entry_points(tmp_path):
     assert r.returncode == 0 and "blast2metadata 3." in r.stdout
     r = run(["--topN", "0", "-i", "x"], tmp_path)
     assert r.returncode == 2 and "must be >= 1" in r.stderr
+
+
+# ── DIAMOND on BLAST databases (nr-style), MMseqs2 DB hints ──────────────
+
+@pytest.fixture(scope="module")
+def blast_prot_db(protein_db_fasta, tmp_path_factory):
+    """BLAST v5 protein DB, split into volumes with an alias file like NCBI nr (nr.pal + nr.00, nr.01 ...)."""
+    d = tmp_path_factory.mktemp("blastprot")
+    subprocess.run(["makeblastdb", "-in", str(protein_db_fasta), "-dbtype", "prot", "-parse_seqids",
+                    "-blastdb_version", "5", "-max_file_sz", "300B", "-out", str(d / "nr")],
+                   check=True, env=ENV, capture_output=True)
+    assert (d / "nr.pal").exists() and (d / "nr.01.pin").exists()
+    return d / "nr"
+
+
+@pytest.mark.skipif(DIAMOND_EXE is None, reason="DIAMOND not installed (set DIAMOND_EXE)")
+def test_diamond_searches_blast_protein_db_directly(blast_prot_db, tmp_path):
+    m = load_module()
+    if m.diamond_version(DIAMOND_EXE) < (2, 1, 14):
+        pytest.skip("DIAMOND < 2.1.14 cannot read BLAST databases")
+    out = tmp_path / "o"
+    r = run(["-i", str(DATA / "query.fasta"), "-o", str(out), "-bm", "local", "--engine", "diamond",
+             "--blast_db", str(blast_prot_db), "--diamond_exe", DIAMOND_EXE, "--no_smk", "--mode", "blast2topN",
+             "--topN", "1", "--no_ncbi_metadata", "--query_gencode", "5"], tmp_path)
+    assert r.returncode == 0, r.stdout[-2000:]
+    assert not (out / "_engine_db").exists()           # no makedb: the BLAST DB is searched as is
+    assert f"db={blast_prot_db}" in r.stdout
+    by_q = results_by_query(out / "query_results.csv")
+    assert len(by_q) == (DATA / "query.fasta").read_text().count(">")
+    for q, rows in by_q.items():
+        assert rows[0]["sseqid"] == q + "_prot" and float(rows[0]["pident"]) >= 99, (q, rows)
+    # bare database name resolved through $BLASTDB, like blastn
+    env_blastdb = {**ENV, "BLASTDB": str(blast_prot_db.parent)}
+    r = subprocess.run([sys.executable, str(SCRIPT), "-i", str(DATA / "query.fasta"), "-o", str(tmp_path / "o2"),
+                        "-bm", "local", "--engine", "diamond", "--blast_db", "nr", "--diamond_exe", DIAMOND_EXE,
+                        "--no_smk", "--mode", "blast2topN", "--topN", "1", "--no_ncbi_metadata", "--query_gencode", "5"],
+                       cwd=tmp_path, env=env_blastdb, capture_output=True, text=True)
+    assert r.returncode == 0, r.stdout[-2000:]
+    assert f"db={blast_prot_db}" in r.stdout
+    assert len(results_by_query(tmp_path / "o2" / "query_results.csv")) == len(by_q)
+
+
+@pytest.mark.skipif(DIAMOND_EXE is None, reason="DIAMOND not installed (set DIAMOND_EXE)")
+def test_diamond_rejects_nucleotide_blast_db(db, tmp_path):
+    r = run(["-i", str(DATA / "query.fasta"), "-o", str(tmp_path / "o"), "-bm", "local", "--engine", "diamond",
+             "--blast_db", str(db), "--diamond_exe", DIAMOND_EXE, "--no_smk", "--mode", "blast2topN",
+             "--no_ncbi_metadata"], tmp_path)
+    assert r.returncode != 0
+    assert "nucleotide BLAST database" in r.stdout + r.stderr and "protein databases only" in r.stdout + r.stderr
+
+
+@pytest.mark.skipif(MMSEQS_EXE is None, reason="MMseqs2 not installed (set MMSEQS_EXE)")
+def test_mmseqs_given_blast_db_points_to_mmseqs_databases(db, tmp_path):
+    r = run(["-i", str(DATA / "query.fasta"), "-o", str(tmp_path / "o"), "-bm", "local", "--engine", "mmseqs",
+             "--blast_db", str(db), "--mmseqs_exe", MMSEQS_EXE, "--no_smk", "--mode", "blast2topN",
+             "--no_ncbi_metadata"], tmp_path)
+    assert r.returncode != 0 and "mmseqs databases" in r.stdout + r.stderr
+
+
+def test_find_blast_db_resolves_names_and_blastdb_env(db, tmp_path, monkeypatch):
+    m = load_module()
+    assert m.find_blast_db(str(db), "nucleotide") == str(db)
+    assert m.find_blast_db(str(db) + ".nin", "nucleotide") == str(db)
+    assert m.find_blast_db(str(db), "protein") is None
+    monkeypatch.setenv("BLASTDB", f"{tmp_path}{os.pathsep}{db.parent}")
+    assert m.find_blast_db(db.name, "nucleotide") == str(db)
+    monkeypatch.delenv("BLASTDB")
+    assert m.find_blast_db(db.name, "nucleotide") is None

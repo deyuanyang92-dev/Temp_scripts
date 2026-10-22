@@ -37,7 +37,10 @@ Snakemake scheduling, `--resume`, gzipped FASTA input.
 
 - `--engine diamond|mmseqs` (with `-bm local`) uses DIAMOND (protein DB only:
   blastp/blastx) or MMseqs2 (nucleotide or protein DB) and produces the same 14
-  BLAST columns; `--blast_db` may be a FASTA, converted once to `OUT/_engine_db/`.
+  BLAST columns. DIAMOND >= 2.1.14 reads the NCBI BLAST nr directly
+  (`--blast_db nr`, found via `$BLASTDB`), no makedb needed; MMseqs2 uses
+  `mmseqs databases NR|NT`; both also accept a FASTA, converted once to
+  `OUT/_engine_db/`.
 - TopN counts subjects (best HSP per query-subject), default sort `bitscore`.
   `--sort_by` takes a preset (`bitscore`, `identity`, `coverage`, `evalue`,
   `pident_x_qcovs` = pident*qcovs/100) or columns in order, e.g. `qcovs,pident`;

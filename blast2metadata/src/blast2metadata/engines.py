@@ -349,11 +349,38 @@ def _db_lock(path: Path):
     return _Lock()
 
 
+_BLASTDB_SUFFIXES = {"protein": (".pal", ".pin", ".00.pin"), "nucleotide": (".nal", ".nin", ".00.nin")}
+DIAMOND_MIN_BLASTDB_VERSION = (2, 1, 14)  # wiki: "downloading and using a BLAST database (use DIAMOND >= v2.1.14)"
+
+
+def find_blast_db(name: str, db_type: str) -> Optional[str]:
+    """Absolute base path of a BLAST database (`nr`, `/db/nr`, `nr.pal`), searching $BLASTDB for bare
+    names like blastn does; None if not found. DIAMOND itself does not consult $BLASTDB."""
+    name = os.path.expanduser(name)
+    for suf in (".pal", ".nal", ".pin", ".nin"):
+        if name.endswith(suf):
+            name = name[: -len(suf)]
+    dirs = [""] if (os.sep in name or os.path.isabs(name)) else [""] + [
+        d for d in os.environ.get("BLASTDB", "").split(os.pathsep) if d]
+    for d in dirs:
+        base = os.path.join(d, name) if d else name
+        if any(os.path.isfile(base + suf) for suf in _BLASTDB_SUFFIXES[db_type]):
+            return os.path.abspath(base)
+    return None
+
+
+def diamond_version(exe: str) -> Tuple[int, ...]:
+    rc, so, se = run_cmd([exe, "version"], retries=1)
+    m = re.search(r"version\s+(\d+)\.(\d+)\.(\d+)", so + se)
+    return tuple(int(x) for x in m.groups()) if m else (0,)
+
+
 def resolve_engine_db(engine: str, requested: str, seq_type: str, out_dir: Path,
                       exe: str, threads: int = 1) -> Tuple[str, str]:
     """Return (db_path, db_seq_type) for DIAMOND/MMseqs2, building the DB from a FASTA if needed.
 
-    `requested` may be a ready DB (x.dmnd / MMseqs2 prefix with x.dbtype) or a FASTA file; a FASTA is
+    `requested` may be a ready DB (x.dmnd; a BLAST protein DB such as nr for DIAMOND >= 2.1.14;
+    an MMseqs2 DB prefix with x.dbtype, e.g. from `mmseqs databases NR`) or a FASTA file; a FASTA is
     converted once into OUT/_engine_db/ (guarded by a lock, so --resume and parallel jobs reuse it).
     """
     req = os.path.expanduser(requested)
@@ -361,10 +388,30 @@ def resolve_engine_db(engine: str, requested: str, seq_type: str, out_dir: Path,
         for cand in (req, req + ".dmnd"):
             if cand.endswith(".dmnd") and os.path.isfile(cand):
                 return os.path.abspath(cand), "protein"
+        # 修改 (2026-10-22): DIAMOND >= 2.1.14 直接搜 BLAST (v5) 蛋白库，nr 用
+        # `update_blastdb.pl --decompress --blastdb_version 5 nr` 下载后无需 makedb。
+        blast_prot = find_blast_db(req, "protein")
+        if blast_prot:
+            ver = diamond_version(exe)
+            if ver < DIAMOND_MIN_BLASTDB_VERSION:
+                raise SystemExit(
+                    f"ERROR: {exe} is DIAMOND {'.'.join(map(str, ver))}; searching a BLAST database directly "
+                    f"needs DIAMOND >= 2.1.14. Upgrade, or build a .dmnd with `diamond makedb`."
+                )
+            if not any(os.path.isfile(blast_prot + s) for s in (".pdb", ".00.pdb", ".pos")):
+                logger.warning(f"[DIAMOND] {blast_prot} looks like a BLAST v4 database; NCBI nr downloads "
+                               "(`update_blastdb.pl --blastdb_version 5 nr`) are v5, which DIAMOND documents.")
+            return blast_prot, "protein"
+        if find_blast_db(req, "nucleotide"):
+            raise SystemExit(
+                f"ERROR: --engine diamond: {requested} is a nucleotide BLAST database. DIAMOND searches "
+                "protein databases only (blastp/blastx); use --engine blast or --engine mmseqs for nt."
+            )
         if not _is_fasta_file(req):
             raise SystemExit(
-                f"ERROR: --engine diamond needs a DIAMOND database (.dmnd) or a protein FASTA; got: {requested}\n"
-                "Pass it with --blast_db (DIAMOND searches protein databases only: blastp / blastx)."
+                f"ERROR: --engine diamond needs a protein database: a BLAST protein DB (e.g. nr, DIAMOND >= 2.1.14), "
+                f"a .dmnd file, or a protein FASTA; got: {requested}\n"
+                "Pass it with --blast_db. DIAMOND searches protein databases only (blastp / blastx)."
             )
         if not _fasta_is_protein(req):
             raise SystemExit(f"ERROR: --engine diamond: {requested} looks like a nucleotide FASTA; "
@@ -386,9 +433,13 @@ def resolve_engine_db(engine: str, requested: str, seq_type: str, out_dir: Path,
             if t:
                 return os.path.abspath(cand), t
         if not _is_fasta_file(req):
+            hint = ""
+            if find_blast_db(req, "protein") or find_blast_db(req, "nucleotide"):
+                hint = (" MMseqs2 cannot read BLAST database files; download its own copy with "
+                        "`mmseqs databases NR|NT|core_nt <outDB> <tmp>` or point --blast_db at a FASTA.")
             raise SystemExit(
-                f"ERROR: --engine mmseqs needs an MMseqs2 database (created by `mmseqs createdb`) or a FASTA; "
-                f"got: {requested}. Pass it with --blast_db."
+                f"ERROR: --engine mmseqs needs an MMseqs2 database (`mmseqs createdb` / `mmseqs databases`) "
+                f"or a FASTA; got: {requested}. Pass it with --blast_db." + hint
             )
         db_dir = ensure_dir(out_dir.resolve() / "_engine_db")
         target = db_dir / (input_stem(req) + "_mmseqsdb")
@@ -419,7 +470,7 @@ def prepare_engine_db(args: argparse.Namespace, seq_type: str, out_dir: Path) ->
     db, db_type = resolve_engine_db(args.engine, requested, seq_type, out_dir, exe, threads=int(args.threads))
     args._engine_db = db
     args._engine_db_type = db_type
-    logger.info(f"[ENGINE] {args.engine} db={db} db_type={db_type}")
+    logger.info(f"[ENGINE] {args.engine} db={db} db_type={db_type} (requested: {requested})")
 
 
 def mmseqs_search_type(query_type: str, db_type: str) -> int:

@@ -16,6 +16,13 @@ New:
   which is converted once into `OUT/_engine_db/` (lock-protected, reused by
   `--resume` and parallel Snakemake jobs). Batch size defaults to 5000 and one
   job with all threads for these engines.
+- `--engine diamond --blast_db nr`: DIAMOND >= 2.1.14 searches a BLAST v5 protein
+  database directly (multi-volume `nr.pal` alias included), so the nr from
+  `update_blastdb.pl --decompress --blastdb_version 5 nr` needs no makedb/.dmnd;
+  bare names are looked up in `$BLASTDB` (DIAMOND itself ignores it), older
+  DIAMOND or a nucleotide BLAST DB gives a clear error. MMseqs2 given a BLAST DB
+  is pointed at `mmseqs databases NR|NT|core_nt`. `--doctor` reports whether the
+  installed DIAMOND can read BLAST DBs.
 - `--query_gencode N` sets the genetic code of translated searches in one place
   (blastx `-query_gencode`, DIAMOND `--query-gencode`, MMseqs2 `--translation-table`).
 - gzipped FASTA input (`*.fasta.gz`, output stem drops `.fasta.gz`).

@@ -32,9 +32,10 @@ blast2metadata -i query.fasta -o OUT -bm local --blast_db_nt /db/nt --email you@
 # 3) 本地库 + MMseqs2 (核酸或蛋白库; FASTA 会自动 createdb 一次到 OUT/_engine_db/)
 blast2metadata -i query.fasta -o OUT -bm local --engine mmseqs --blast_db refs.fasta
 
-# 4) 本地蛋白库 + DIAMOND (蛋白 query -> blastp; 核酸 query -> blastx)
-blast2metadata -i proteins.faa -o OUT -bm local --engine diamond --blast_db nr.dmnd
-blast2metadata -i cds.fasta -o OUT -bm local --engine diamond --blast_db nr.dmnd --query_gencode 5   # 线粒体基因翻译用无脊椎动物密码
+# 4) NCBI nr + DIAMOND (蛋白 query -> blastp; 核酸 query -> blastx)。DIAMOND >= 2.1.14 直接读 BLAST 蛋白库，
+#    不需要 makedb/.dmnd；库名会像 blastn 一样在 $BLASTDB 里查找
+blast2metadata -i proteins.faa -o OUT -bm local --engine diamond --blast_db nr
+blast2metadata -i cds.fasta -o OUT -bm local --engine diamond --blast_db /db/nr --query_gencode 5   # 线粒体基因翻译用无脊椎动物密码
 
 # 5) 代理环境下 -remote 常失败 -> 用 Biopython qblast
 blast2metadata -i query.fasta -o OUT --online_engine biopython --email you@lab.org
@@ -55,14 +56,31 @@ blast2metadata -i fasta_dir -o OUT -bm local --blast_db_nt /db/nt --resume
 | 引擎 | 适用 | 速度 | 注意 |
 |---|---|---|---|
 | `blast` (默认, BLAST+) | 核酸↔核酸 (blastn/megablast)、蛋白、所有 NCBI 库；`-remote` 在线 | 基线 | 条形码物种鉴定 (高相似度、短序列、对 nt 全库) 仍以 blastn 最准最省事 |
-| `diamond` | **只搜蛋白库**：蛋白 query (blastp) 或核酸 query 翻译后 (blastx) | 比 blastp/blastx 快 100–10000× | 不能做 blastn；需要 `.dmnd` 或蛋白 FASTA；核酸 query 翻译密码用 `--query_gencode 5` 等 |
+| `diamond` | **只搜蛋白库**：蛋白 query (blastp) 或核酸 query 翻译后 (blastx) | 比 blastp/blastx 快 100–10000× | 不能做 blastn；库可直接是 BLAST 蛋白库 (nr、swissprot，DIAMOND ≥ 2.1.14)、`.dmnd` 或蛋白 FASTA；核酸 query 翻译密码用 `--query_gencode 5` 等 |
 | `mmseqs` | 核酸↔核酸、蛋白↔蛋白、核酸→蛋白 (translated) | 大 query 集 (万条以上) 对大库时远快于 BLAST | 每对 query–target 只报一个比对 (不支持核酸多 HSP)，跨环形基因组起点或多外显子的命中 `qcovs` 会偏低；小 query 集每次调用有数秒固定开销 |
 
 DIAMOND/MMseqs2 的输出被整理成与 BLAST+ 相同的 14 列（`qseqid sseqid stitle pident length mismatch gapopen qstart qend sstart send evalue bitscore qcovs`），
 `qcovs` 按 BLAST+ 定义由同一 query–subject 所有 HSP 的并集算出，后续 TopN、metadata、表头功能完全一致。
 这两个引擎自身多线程，默认 1 个任务占满 `--threads`、`--batch_size 5000`；BLAST+ 默认 4 个并行任务、每批 50 条。
 
-`--blast_db` 可给：BLAST 库名/路径；`x.dmnd`；MMseqs2 库前缀 (`mmseqs createdb` 的输出)；或一个 FASTA（自动建库一次到 `OUT/_engine_db/`，`--resume` 和 Snakemake 子任务复用）。
+`--blast_db` 可给：BLAST 库名/路径（`blast` 引擎任意库；`diamond` 引擎读蛋白库）；`x.dmnd`；MMseqs2 库前缀（`mmseqs createdb` / `mmseqs databases` 的输出）；或一个 FASTA（自动建库一次到 `OUT/_engine_db/`，`--resume` 和 Snakemake 子任务复用）。
+
+### 下载 nr / nt 直接用 / Getting nr and nt
+
+```bash
+# NCBI BLAST 库 (v5 格式, 多卷 nr.00 ... + nr.pal)。BLAST+ 和 DIAMOND >= 2.1.14 都直接用这一份
+update_blastdb.pl --decompress --blastdb_version 5 nr      # 蛋白; 同理 nt / core_nt / swissprot
+export BLASTDB=/db/blast                                   # 之后 --blast_db nr 即可
+blast2metadata -i q.faa -o OUT -bm local --engine diamond --blast_db nr
+blast2metadata -i q.fasta -o OUT -bm local --blast_db_nt nt
+
+# MMseqs2 不读 BLAST 库文件，用它自带的下载器 (NR, ClusteredNR, NT, core_nt, UniRef50/90/100, UniProtKB ...)
+mmseqs databases NR /db/mmseqs/NR /tmp/mmtmp               # 带 taxonomy
+blast2metadata -i q.faa -o OUT -bm local --engine mmseqs --blast_db /db/mmseqs/NR
+```
+
+DIAMOND 旧文档里的 `diamond prepdb` 已不需要（2.1.14+ 直接 `-d nr`）；`diamond makedb --in nr.gz` 仍可用但没必要。
+`blast2metadata --doctor` 会显示你的 DIAMOND 版本是否能直接读 BLAST 库。
 
 ## TopN 排序 / Ranking
 

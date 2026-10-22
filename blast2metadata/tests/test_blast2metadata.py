@@ -1,22 +1,25 @@
-"""Regression tests for blast2_metadatav2.12.py with a real local BLAST+ database.
+"""Regression tests for blast2metadata with a real local BLAST+ database.
 
-Run: mamba run -n blast python -m pytest -q tests/
+Run: python -m pytest -q tests/
 Needs blastn and makeblastdb on PATH (or BLAST_BIN=<dir>).
 """
 import csv
-import importlib.util
 import io
 import os
 import shutil
 import subprocess
 import sys
+import types
 from pathlib import Path
 
 import pytest
 
 HERE = Path(__file__).resolve().parent
 DATA = HERE / "data"
-SCRIPT = HERE.parent / "blast2_metadatav2.12.py"
+SRC = HERE.parent / "src"
+SCRIPT = HERE.parent / "run_blast2metadata.py"
+sys.path.insert(0, str(SRC))
+from blast2metadata import accession, blasttab, cli, engines, fields, ratelimit  # noqa: E402
 BLAST_BIN = os.environ.get("BLAST_BIN") or str(Path(sys.executable).parent)
 ENV = {**os.environ, "PATH": BLAST_BIN + os.pathsep + os.environ.get("PATH", "")}
 
@@ -26,11 +29,11 @@ pytestmark = pytest.mark.skipif(
 
 
 def load_module():
-    spec = importlib.util.spec_from_file_location("b2m", SCRIPT)
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules["b2m"] = mod  # dataclasses resolves annotations via sys.modules
-    spec.loader.exec_module(mod)
-    return mod
+    """Flat view of the package API (the tests predate the package split)."""
+    m = types.SimpleNamespace()
+    for mod in (fields, accession, blasttab, engines, ratelimit, cli):
+        m.__dict__.update({k: v for k, v in vars(mod).items() if not k.startswith("__")})
+    return m
 
 
 @pytest.fixture(scope="module")
@@ -134,7 +137,7 @@ def test_resume_ignores_leftover_part_file(db, tmp_path):
 def test_qblast_columns_match_blastplus(db, tmp_path):
     """Feed the qblast parser BLAST XML from the same local search and compare to outfmt 6."""
     m = load_module()
-    m.BLAST_LIMITER = m._RateLimiter(1000, 1.0)
+    ratelimit.BLAST_LIMITER = m._RateLimiter(1000, 1.0)
     query = DATA / "query.fasta"
     xml = subprocess.run(
         ["blastn", "-query", str(query), "-db", str(db), "-outfmt", "5", "-evalue", "1e-5"],
@@ -253,6 +256,8 @@ def test_field_dictionary_matches_installed_blast():
     ("20 qseqid sacc nident gaps", "qseqid sacc nident gaps"),
 ])
 def test_add_header_auto_detects(db, tmp_path, outfmt, expect_cols):
+    if outfmt.startswith("20") and "20" not in blastn_outfmts():
+        pytest.skip("outfmt 20 needs BLAST+ >= 2.13")
     table = blast_table(db, tmp_path, outfmt, "t.out")
     r, out = add_header(table, tmp_path)
     assert r.returncode == 0, r.stdout[-1500:]
@@ -261,6 +266,12 @@ def test_add_header_auto_detects(db, tmp_path, outfmt, expect_cols):
     if outfmt.startswith("20"):
         n_data -= 1  # its own header row
     assert len(read_csv_sig(out)) == n_data
+
+
+def blastn_outfmts():
+    h = subprocess.run(["blastn", "-help"], env=ENV, capture_output=True, text=True).stdout
+    import re
+    return set(re.findall(r"^\s+(\d+) = ", h, flags=re.M))
 
 
 def read_csv_sig(p):
@@ -356,3 +367,172 @@ def test_custom_sort_end_to_end(db, tmp_path):
     for x in rows:
         scores.setdefault(x["qseqid"], []).append(float(x["pident_x_qcovs"]))
     assert all(v == sorted(v, reverse=True) for v in scores.values())
+
+
+# ── v3.0: package, engines, gzip, Entrez robustness ─────────────────────
+
+DIAMOND_EXE = os.environ.get("DIAMOND_EXE") or shutil.which("diamond")
+MMSEQS_EXE = os.environ.get("MMSEQS_EXE") or shutil.which("mmseqs")
+
+
+def results_by_query(path):
+    out = {}
+    for row in read_csv(path):
+        out.setdefault(row["qseqid"], []).append(row)
+    return out
+
+
+@pytest.fixture(scope="module")
+def protein_db_fasta(tmp_path_factory):
+    """COX1 proteins translated from the query genes (invertebrate mito code) -> DIAMOND blastx target."""
+    from Bio import SeqIO
+    d = tmp_path_factory.mktemp("prot")
+    out = d / "cox1.faa"
+    with open(out, "w") as fh:
+        for r in SeqIO.parse(str(DATA / "query.fasta"), "fasta"):
+            best = min((str(r.seq[f:len(r.seq) - (len(r.seq) - f) % 3].translate(table=5)) for f in range(3)),
+                       key=lambda p: p.count("*"))
+            fh.write(f">{r.id}_prot cytochrome c oxidase subunit I [test]\n{best.rstrip('*')}\n")
+    return out
+
+
+@pytest.mark.skipif(DIAMOND_EXE is None, reason="DIAMOND not installed (set DIAMOND_EXE)")
+def test_diamond_engine_blastx_from_fasta_db(protein_db_fasta, tmp_path):
+    out = tmp_path / "o"
+    # the proteins were translated with the invertebrate mito code -> tell DIAMOND via extra params
+    base = ["-i", str(DATA / "query.fasta"), "-o", str(out), "-bm", "local", "--engine", "diamond",
+            "--blast_db", str(protein_db_fasta), "--diamond_exe", DIAMOND_EXE, "--no_smk",
+            "--mode", "blast2topN", "--topN", "1", "--no_ncbi_metadata", "--query_gencode", "5"]
+    r = run(base, tmp_path)
+    assert r.returncode == 0, r.stdout[-2000:]
+    assert (out / "_engine_db" / "cox1.dmnd").exists()  # built once from the FASTA
+    assert header_of(out / "query_results.csv") == fields.BLAST_HEADERS
+    by_q = results_by_query(out / "query_results.csv")
+    for q, rows in by_q.items():
+        assert rows[0]["sseqid"] == q + "_prot", (q, rows)  # own translation is the best hit
+        # the frameshifted "_indel" query cannot be translated full length
+        assert float(rows[0]["qcovs"]) >= (80 if q.endswith("_indel") else 95), (q, rows)
+        assert float(rows[0]["pident"]) >= 99, (q, rows)
+    assert "NC_006902.1_COX1" in by_q
+    # resume reuses the DB and the batch outputs
+    r = run(base + ["--resume"], tmp_path)
+    assert r.returncode == 0 and "building database" not in r.stdout
+
+
+@pytest.mark.skipif(MMSEQS_EXE is None, reason="MMseqs2 not installed (set MMSEQS_EXE)")
+def test_mmseqs_engine_nucleotide_matches_blast(db, tmp_path):
+    out = tmp_path / "o"
+    r = run(["-i", str(DATA / "query.fasta"), "-o", str(out), "-bm", "local", "--engine", "mmseqs",
+             "--blast_db", str(DATA / "mito_db.fasta"), "--mmseqs_exe", MMSEQS_EXE, "--no_smk",
+             "--mode", "blast2topN", "--topN", "1", "--no_ncbi_metadata"], tmp_path)
+    assert r.returncode == 0, r.stdout[-2000:]
+    m = load_module()
+    assert m.mmseqs_db_type(str(out / "_engine_db" / "mito_db_mmseqsdb")) == "nucleotide"
+    assert header_of(out / "query_results.csv") == fields.BLAST_HEADERS
+    by_q = results_by_query(out / "query_results.csv")
+    assert set(by_q) == {r.split()[0][1:] for r in (DATA / "query.fasta").read_text().splitlines() if r.startswith(">")}
+    for q, rows in by_q.items():
+        assert q.split("_COX")[0] == rows[0]["sseqid"], (q, rows)  # source genome is the best hit
+        assert float(rows[0]["pident"]) >= 98, (q, rows)
+        # MMseqs2 reports one alignment per query-target pair, so LC670763 COX1 (spans the genome
+        # origin: 2 HSPs in BLAST) only gets ~61% coverage here; the others are full length.
+        assert float(rows[0]["qcovs"]) >= (60 if q.startswith("LC670763") else 99), (q, rows)
+    # a reverse-strand query must still be found (--strand 2)
+    rc = tmp_path / "rc.fasta"
+    from Bio import SeqIO
+    rec = next(SeqIO.parse(str(DATA / "query.fasta"), "fasta"))
+    rc.write_text(f">{rec.id}_rc\n{rec.seq.reverse_complement()}\n")
+    r = run(["-i", str(rc), "-o", str(tmp_path / "o2"), "-bm", "local", "--engine", "mmseqs",
+             "--blast_db", str(out / "_engine_db" / "mito_db_mmseqsdb"), "--mmseqs_exe", MMSEQS_EXE,
+             "--no_smk", "--mode", "blast2topN", "--topN", "1", "--no_ncbi_metadata"], tmp_path)
+    assert r.returncode == 0, r.stdout[-2000:]
+    rows = read_csv(tmp_path / "o2" / "rc_results.csv")
+    assert rows and rows[0]["sseqid"] == rec.id.split("_COX")[0]
+
+
+def test_engine_requires_local_mode(tmp_path):
+    r = run(["-i", str(DATA / "query.fasta"), "-o", str(tmp_path / "o"), "--engine", "mmseqs", "--no_smk"], tmp_path)
+    assert r.returncode != 0 and "only works with -bm local" in r.stdout
+
+
+def test_qcovs_from_spans_matches_blast_rounding():
+    m = load_module()
+    assert m._qcovs_from_spans([(1, 50), (40, 100)], 100) == 100
+    assert m._qcovs_from_spans([(1, 50), (52, 100)], 100) == 99   # 99 covered -> 99
+    assert m._qcovs_from_spans([(1, 50), (51, 100)], 100) == 100  # adjacent spans merge
+    assert m._qcovs_from_spans([(1, 999)], 1000) == 99            # 99.9% is not 100
+    assert m._qcovs_from_spans([(1, 5)], 1000) == 1               # 0.5% rounds half up
+
+
+def test_gzipped_fasta_input_and_output_stem(db, tmp_path):
+    import gzip
+    d = tmp_path / "in"
+    d.mkdir()
+    with gzip.open(d / "sample1.fasta.gz", "wt") as fh:
+        fh.write((DATA / "query.fasta").read_text())
+    r = run(local_args(d, tmp_path / "o", db, "--no_smk", "--mode", "blast2topN", "--topN", "1"), tmp_path)
+    assert r.returncode == 0, r.stdout[-2000:]
+    rows = read_csv(tmp_path / "o" / "sample1_results.csv")  # stem without .fasta.gz
+    assert len(rows) == (DATA / "query.fasta").read_text().count(">")
+
+
+def test_duplicate_query_ids_are_warned(db, tmp_path):
+    fa = tmp_path / "dup.fasta"
+    fa.write_text((DATA / "query.fasta").read_text() * 2)
+    r = run(local_args(fa, tmp_path / "o", db, "--no_smk", "--mode", "blast-only"), tmp_path)
+    assert r.returncode == 0 and "duplicate sequence ID" in r.stdout
+
+
+def test_entrez_batch_failure_is_split_so_good_accessions_survive():
+    from blast2metadata import metadata
+    m = load_module()
+    calls = []
+
+    class Handle(list):
+        def close(self):
+            pass
+
+    class FakeEntrez:
+        email = api_key = tool = None
+
+        @staticmethod
+        def efetch(db, id, rettype, retmode):
+            ids = id.split(",")
+            calls.append((db, ids))
+            if "BAD1" in ids:
+                raise RuntimeError("HTTP Error 400: Bad Request")
+            return Handle(ids)
+
+        @staticmethod
+        def read(handle):
+            return [{"GBSeq_primary-accession": a, "GBSeq_accession-version": a + ".1",
+                     "GBSeq_organism": "Org " + a} for a in handle]
+
+    real = metadata.Entrez
+    metadata.Entrez = FakeEntrez
+    ratelimit.ENTREZ_LIMITER = m._RateLimiter(1000, 1.0)
+    try:
+        args = m.parse_arguments(["-i", "x", "--no_smk", "--retries", "1", "--entrez_delay_sec", "0"])
+        got = metadata.fetch_metadata_batch(["OK1", "OK2", "BAD1", "OK3"], args, batch_size=20)
+    finally:
+        metadata.Entrez = real
+    assert set(got) == {"OK1", "OK2", "OK3"}
+    assert got["OK3"]["organism"] == "Org OK3"
+    assert ("nucleotide", ["OK1", "OK2", "BAD1", "OK3"]) == calls[0]      # whole batch first
+    assert ("nucleotide", ["OK3"]) in calls                                # then split down to singles
+    assert any(db == "protein" and ids == ["BAD1"] for db, ids in calls)  # alt DB tried for the bad one
+
+
+def test_console_entry_points(tmp_path):
+    r = run(["--version"], tmp_path)
+    assert r.returncode == 0 and r.stdout.strip().startswith("blast2metadata 3.")
+    r = run(["--doctor"], tmp_path)
+    assert r.returncode == 0 and "blastn" in r.stdout and "biopython" in r.stdout
+    if DIAMOND_EXE:
+        r = run(["--doctor", "--diamond_exe", DIAMOND_EXE], tmp_path)
+        assert DIAMOND_EXE in r.stdout and "diamond      NOT FOUND" not in r.stdout
+    r = subprocess.run([sys.executable, "-m", "blast2metadata", "--version"], cwd=tmp_path,
+                       env={**ENV, "PYTHONPATH": str(SRC)}, capture_output=True, text=True)
+    assert r.returncode == 0 and "blast2metadata 3." in r.stdout
+    r = run(["--topN", "0", "-i", "x"], tmp_path)
+    assert r.returncode == 2 and "must be >= 1" in r.stderr

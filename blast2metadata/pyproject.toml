@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "blast2metadata"
+version = "3.0.0"
+description = "Batch BLAST / DIAMOND / MMseqs2 search, TopN hit ranking and GenBank metadata retrieval into one CSV"
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+dependencies = ["biopython>=1.79"]
+
+[project.optional-dependencies]
+full = ["pandas", "psutil", "snakemake"]
+test = ["pytest"]
+
+[project.scripts]
+blast2metadata = "blast2metadata.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

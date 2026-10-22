@@ -7,8 +7,11 @@ Small bioinformatics and utility scripts collected by topic.
 ```text
 Temp_scripts/
   blast2metadata/
-    blast2_metadatav2.12.py
+    pyproject.toml
+    run_blast2metadata.py
+    src/blast2metadata/
     tests/
+    README.md
   getorganelle/
     batch_getorganelle.py
     README.md
@@ -26,10 +29,15 @@ Temp_scripts/
 
 ### blast2metadata
 
-Batch BLAST (local, `blastn -remote`, or Biopython qblast) -> TopN hits per
-query -> GenBank metadata via Entrez -> merged CSV. Python or Snakemake
-scheduling, `--resume`.
+Installable package (`pip install -e blast2metadata` -> `blast2metadata`
+command; or `python blast2metadata/run_blast2metadata.py`). Batch search
+(local BLAST+, `blastn -remote`, Biopython qblast, DIAMOND or MMseqs2) -> TopN
+hits per query -> GenBank metadata via Entrez -> merged CSV. Python or
+Snakemake scheduling, `--resume`, gzipped FASTA input.
 
+- `--engine diamond|mmseqs` (with `-bm local`) uses DIAMOND (protein DB only:
+  blastp/blastx) or MMseqs2 (nucleotide or protein DB) and produces the same 14
+  BLAST columns; `--blast_db` may be a FASTA, converted once to `OUT/_engine_db/`.
 - TopN counts subjects (best HSP per query-subject), default sort `bitscore`.
   `--sort_by` takes a preset (`bitscore`, `identity`, `coverage`, `evalue`,
   `pident_x_qcovs` = pident*qcovs/100) or columns in order, e.g. `qcovs,pident`;
@@ -39,19 +47,16 @@ scheduling, `--resume`.
   limit is applied early in the search and need not return the best hit
   (Shah et al. 2018/2019, Bioinformatics; NCBI reply by Madden et al.).
 - A failed BLAST batch fails the file (non-zero exit, no completion marker);
-  `--resume` reruns only the failed batches.
+  `--resume` reruns only the failed batches. A failed Entrez batch is split and
+  retried so one bad accession does not lose the others' metadata.
 - `--mode add-header` adds a header row to any existing BLAST tabular file
-  (outfmt 6/7/10/20). Columns come from a `# Fields:` line or header row, from
-  `--outfmt_blast "6 std staxids"`, or from the column count (12 = `std`), and
-  are type-checked so a wrong guess is refused.
-- `--header_style code|label|both` writes `pident`, `Percentage of identical
-  matches`, or both as column headers (descriptions from `blastn -help`, 2.17).
-- Behind an HTTP proxy `blastn -remote` failed or hung in testing; use
-  `--online_engine biopython`.
+  (outfmt 6/7/10/20); `--header_style code|label|both`.
+- `--doctor` reports tools and packages found; behind an HTTP proxy
+  `blastn -remote` fails or hangs, use `--online_engine biopython`.
 
-Tests (real BLAST+): `mamba create -n blast -c conda-forge -c bioconda blast
-biopython pandas psutil pytest snakemake-minimal`, then
-`mamba run -n blast python -m pytest -q blast2metadata/tests`.
+Tests (real BLAST+, optional DIAMOND/MMseqs2): `python -m pytest -q
+blast2metadata/tests` (set `DIAMOND_EXE` / `MMSEQS_EXE` to include the engine
+tests). See [blast2metadata/README.md](blast2metadata/README.md).
 
 ### getorganelle
 

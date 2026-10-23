@@ -129,16 +129,17 @@ mitom run -i organelle/summary_fasta_mt.fasta -o mito_anno --clade Annelida-segm
 ### 8. BLAST 物种 / 污染验证
 
 ```bash
-# 在线（默认，NCBI blastn -remote，无需本地库）
+# 在线（默认，NCBI qblast，无需本地库）
 python3 ../blast2metadata/run_blast2metadata.py -i organelle/summary_fasta_all.fasta -o blast \
-    --topN 5 --email you@lab.org --no_smk
+    --online_engine biopython --topN 5 --email you@lab.org --no_smk
 # 本地 nt（样本多时更快；NCBI 在线限速约 10 秒/次请求）
 python3 ../blast2metadata/run_blast2metadata.py -i organelle/summary_fasta_all.fasta -o blast \
     -bm local --blast_db_nt /media/deyuan/18T_A/database/blast_db/nt/nt --topN 5 --email you@lab.org --no_smk
 ```
 
 一键流程中由 config 的 `blast_db_nt` 控制：`null` = 在线，填库前缀 = 本地。
-代理环境下 `-remote` 可能失败，可加 `extra.blast: ["--online_engine", "biopython"]`。
+在线默认用 Biopython qblast（`blast_online_engine`）：本机有 HTTP 代理，`blastn -remote` 测试时卡住 25 分钟无结果。
+本地全 nt 对 16 kb 线粒体序列较慢（测试中 20 分钟未完成），样本少时在线更省事。
 
 查看每条序列 TopN 命中的物种：与预期物种不符 → 鉴定有误或污染。
 

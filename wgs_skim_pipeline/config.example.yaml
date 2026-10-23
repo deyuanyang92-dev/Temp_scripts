@@ -54,6 +54,7 @@ genetic_code: 5                   # 无脊椎动物线粒体
 # ── BLAST 物种验证（线粒体 + 18S-28S 结果）────────────────────────────
 blast_db_nt: null                 # null = NCBI 在线 BLAST（blastn -remote，无需本地库）
 # blast_db_nt: /media/deyuan/18T_A/database/blast_db/nt/nt   # 本地 nt（库前缀），样本多时更快
+blast_online_engine: biopython   # 在线引擎：biopython（qblast，可走代理）或 blast_remote（blastn -remote）
 blast_topN: 5
 
 # ── 透传给各脚本的额外参数（高级，可选）───────────────────────────────

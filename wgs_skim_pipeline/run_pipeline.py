@@ -152,6 +152,8 @@ def cmd_blast(cfg, out, dry):
          "--resume", "--no_smk"]
     if cfg.get("blast_db_nt"):
         c += ["-bm", "local", "--blast_db_nt", cfg["blast_db_nt"]]
+    else:  # 在线：biopython qblast 可穿过 HTTP 代理；blastn -remote 在代理下常卡住
+        c += ["--online_engine", cfg.get("blast_online_engine", "biopython")]
     if cfg.get("email"):
         c += ["--email", cfg["email"]]
     if dry:

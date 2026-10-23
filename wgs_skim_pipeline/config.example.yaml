@@ -1,0 +1,66 @@
+# WGS 浅测序流程配置：fastp -> GetOrganelle(线粒体 + 18S-28S) -> SPAdes -> BUSCO -> 基因组大小
+#                     -> MitoM 线粒体注释 -> BLAST 物种验证
+# 复制本文件为 config.yaml，修改「必改」部分后运行：
+#   python3 run_pipeline.py -c config.yaml --dryrun   # 先预览命令
+#   python3 run_pipeline.py -c config.yaml            # 正式运行
+
+# ── 必改 ────────────────────────────────────────────────────────────
+input_dir: /path/to/rawdata          # 原始 reads 目录
+fq_position: flat                    # flat: 目录下直接放 reads；subdir: 每个样本一个子目录
+suffix_fq: auto                      # R1/R2 后缀，auto 自动识别；或写 "_1.fq.gz _2.fq.gz"
+out_root: /path/to/results           # 输出根目录
+
+busco_lineage: /media/deyuan/18T_A/database/busco/metazoa_odb12
+nr_seed_fasta: /media/deyuan/18T_A/database/18-28s/seed.fasta      # 18S-28S 种子
+nr_genes_fasta: /media/deyuan/18T_A/database/18-28s/lable.fasta    # 18S-28S label
+genomescope_r: /home/deyuan/Softs/genomescope2.0-master/genomescope.R
+email: you@example.com               # NCBI Entrez 需要邮箱（blast 步骤）
+
+# ── 要跑哪些步骤（按顺序执行，可删减）────────────────────────────────
+steps: [fastp, organelle, assembly, genome_size, annotate, blast]
+
+# ── conda 环境（留空 null 则直接用 PATH 中的程序）─────────────────────
+conda_env:
+  fastp: fastp
+  spades: spades
+  busco: busco
+  getorganelle: getorganelle
+  meangs: meangs
+rscript: /home/deyuan/miniforge3/envs/genome_size/bin/Rscript   # 需装 genomescope R 包
+jellyfish: jellyfish
+
+# ── 资源 ────────────────────────────────────────────────────────────
+max_parallel: 4            # 同时跑几个样本
+threads: 16                # 每个样本线程数
+spades_mem_gb: 64
+
+# ── 线粒体 / 18S-28S ────────────────────────────────────────────────
+# all     : MEANGS 种子 -> GetOrganelle 线粒体 -> GetOrganelle 18S-28S（上次 POL 样本用这个）
+# mt-nr   : 不跑 MEANGS，直接线粒体 + 18S-28S
+# nr-only : 只组装 18S-28S
+organelle_mode: all
+meangs_species_class: A-worms     # MEANGS --species_class
+
+# ── 基因组大小 ──────────────────────────────────────────────────────
+kmer_size: 21
+jellyfish_hash: 20G
+ploidy: 2
+
+# ── 线粒体注释（MitoM，https://github.com/deyuanyang92-dev/Mitom）──────────
+mitom: mitom                      # mitom 命令（bash install.sh 安装）
+mitom_clade: Annelida-segmented-worms   # Chordata Arthropoda Mollusca ... Animal；auto 需 GenBank 输入
+genetic_code: 5                   # 无脊椎动物线粒体
+
+# ── BLAST 物种验证（线粒体 + 18S-28S 结果）────────────────────────────
+blast_db_nt: null                 # null = NCBI 在线 BLAST（blastn -remote，无需本地库）
+# blast_db_nt: /media/deyuan/18T_A/database/blast_db/nt/nt   # 本地 nt（库前缀），样本多时更快
+blast_topN: 5
+
+# ── 透传给各脚本的额外参数（高级，可选）───────────────────────────────
+extra:
+  fastp: []          # 例：["--fastp_reads_to_process", "0"]
+  organelle: []      # 例：["--max_reads_mt", "1500000"]
+  assembly: []       # 例：["--assembly_mode", "meta"]
+  genome_size: []    # 例：["--keep_jf"]
+  annotate: []       # 例：["--sbt", "template.sbt"]
+  blast: []          # 例：["--min_qcovs", "80", "--sort_by", "pident_x_qcovs"]

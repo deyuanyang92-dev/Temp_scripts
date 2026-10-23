@@ -18,6 +18,11 @@ Temp_scripts/
   mitofinder-batch/
     mitofinder_pipeline_v2_7.py
     README.md
+  wgs_skim_pipeline/
+    run_pipeline.py
+    config.example.yaml
+    scripts/
+    README.md
   Mitoz-annotate/
     batch_mitoz.py
     README.md
@@ -63,6 +68,14 @@ Snakemake scheduling, `--resume`, gzipped FASTA input.
 Tests (real BLAST+, optional DIAMOND/MMseqs2): `python -m pytest -q
 blast2metadata/tests` (set `DIAMOND_EXE` / `MMSEQS_EXE` to include the engine
 tests). See [blast2metadata/README.md](blast2metadata/README.md).
+
+### wgs_skim_pipeline
+
+WGS 浅测序流程：fastp（WGS/RNA）→ MEANGS 种子 + GetOrganelle 线粒体 / 18S-28S → SPAdes（多种
+组装模式）→ BUSCO → jellyfish + GenomeScope2 基因组大小 → MitoM 线粒体注释 → BLAST 物种验证
+（在线或本地 nt）。每个工具可单独运行；`run_pipeline.py -c config.yaml` 一键串联，断点续跑。
+
+See [wgs_skim_pipeline/README.md](wgs_skim_pipeline/README.md) for usage.
 
 ### getorganelle
 

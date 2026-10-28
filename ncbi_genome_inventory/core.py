@@ -645,3 +645,16 @@ def change_report(old_rows, new_rows):
                 out.append({"change": "field changed", "assembly": acc, "organism": new[acc]["Organism Name"],
                             "field": f, "old": a, "new": b})
     return out
+
+
+def tsv_safe(v):
+    """Neutralise spreadsheet formula injection in TSV cells (submitter text such as titles goes into the
+    files): a text cell starting with = + - @ TAB or CR gets a leading apostrophe. Numbers, including
+    negative ones, are left as they are. The .xlsx output writes inline strings and needs no escaping."""
+    if not isinstance(v, str) or not v or v[0] not in "=+-@\t\r":
+        return v
+    try:
+        float(v)
+        return v
+    except ValueError:
+        return "'" + v

@@ -6,11 +6,12 @@
 
 The page runs the same command-line tool (so CLI and web always give identical results), shows the progress
 log, renders the result tables with search/filter, and offers the Excel/TSV files for download.
-Listens on 127.0.0.1 only.
+Listens on 127.0.0.1 only; Host header, Origin and a per-launch token are checked (CSRF / DNS rebinding).
 """
 import argparse
 import json
 import re
+import secrets
 import subprocess
 import sys
 import threading
@@ -24,6 +25,8 @@ NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 ._-]{0,80}$")
 TABLES = ["assemblies", "species", "mitogenomes", "qc", "runs", "changes", "goat_pipeline"]
 JOBS: "dict[str, subprocess.Popen]" = {}   # taxon -> running job
 LOCK = threading.Lock()
+TOKEN = secrets.token_urlsafe(24)      # per launch; the page sends it on every /api request
+MAX_JOBS = 2
 
 PAGE = r"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -71,16 +74,18 @@ species:["class","order","family","species","organism_name","n_assemblies","asse
 mitogenomes:null,qc:null,changes:null,goat_pipeline:null,runs:["species_tax_id","Run","ScientificName","category_derived","category_confidence_derived","category_rule_derived","linked_assemblies_derived","individual_derived","bases_Gb","BioProject","BioSample","Platform","Model","LibraryStrategy","experiment_title","library_protocol"]};
 let cur=null,tab="assemblies",data={},sortc=null,sortd=1;
 const $=id=>document.getElementById(id);
-async function j(u,o){const r=await fetch(u,o);if(!r.ok)throw new Error(await r.text());return r.json()}
+const TOKEN="__TOKEN__";
+function auth(o){o=o||{};o.headers=Object.assign({},o.headers||{},{"X-Token":TOKEN});return o}
+async function j(u,o){const r=await fetch(u,auth(o));if(!r.ok)throw new Error(await r.text());return r.json()}
 async function listResults(){const d=await j("/api/results");$("results").innerHTML="";$("rmsg").textContent=d.length?"":" none yet";
  d.forEach(t=>{const b=document.createElement("button");b.className="sec";b.textContent=t;b.onclick=()=>openRes(t);$("results").appendChild(b)})}
 async function openRes(t){cur=t;data={};$("view").hidden=false;$("vtitle").textContent=t;
  const f=await j("/api/files?taxon="+encodeURIComponent(t));
- $("files").innerHTML=f.map(x=>` <a href="/files/${encodeURIComponent(t)}/${encodeURIComponent(x)}">${x}</a>`).join(" ·");
+ $("files").innerHTML=f.map(x=>` <a href="/files/${encodeURIComponent(t)}/${encodeURIComponent(x)}?token=${TOKEN}">${x}</a>`).join(" ·");
  $("tabs").innerHTML="";["assemblies","species","mitogenomes","qc","runs","changes","goat_pipeline"].forEach(n=>{const b=document.createElement("button");b.textContent=n;b.onclick=()=>show(n);b.id="tab-"+n;$("tabs").appendChild(b)});show("assemblies")}
 function parseTSV(s){const L=s.replace(/\r/g,"").split("\n").filter(x=>x.length);const h=L.shift().split("\t");return{h,rows:L.map(l=>l.split("\t"))}}
 async function show(n){tab=n;sortc=null;document.querySelectorAll(".tabs button").forEach(b=>b.classList.toggle("on",b.id=="tab-"+n));
- if(!data[n]){const r=await fetch(`/api/table?taxon=${encodeURIComponent(cur)}&name=${n}`);data[n]=r.ok?parseTSV(await r.text()):{h:["(missing)"],rows:[]}}render()}
+ if(!data[n]){const r=await fetch(`/api/table?taxon=${encodeURIComponent(cur)}&name=${n}`,auth());data[n]=r.ok?parseTSV(await r.text()):{h:["(missing)"],rows:[]}}render()}
 function render(){const d=data[tab];if(!d)return;let cols=d.h.map((c,i)=>i);
  if($("keycols").checked&&KEY[tab]){const k=KEY[tab].map(c=>d.h.indexOf(c)).filter(i=>i>=0);if(k.length)cols=k}
  const q=$("filter").value.toLowerCase();let rows=d.rows.filter(r=>!q||r.join("\t").toLowerCase().includes(q));
@@ -110,6 +115,16 @@ def safe_name(s):
 
 class Handler(BaseHTTPRequestHandler):
     data_dir = Path("genome_inventory_results")
+    port = 8765
+
+    def host_ok(self):
+        """DNS-rebinding guard: only our own loopback host names."""
+        return self.headers.get("Host", "") in (f"127.0.0.1:{self.port}", f"localhost:{self.port}")
+
+    def token_ok(self, q):
+        """CSRF guard: other web pages cannot read the per-launch token from our page."""
+        got = self.headers.get("X-Token") or q.get("token", "")
+        return secrets.compare_digest(got, TOKEN)
 
     def log_message(self, fmt, *a):            # quiet
         pass
@@ -133,9 +148,14 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         u = urllib.parse.urlparse(self.path)
         q = dict(urllib.parse.parse_qsl(u.query))
+        if not self.host_ok():
+            return self.send(403, "forbidden host", "text/plain")
         try:
             if u.path == "/":
-                return self.send(200, PAGE, "text/html; charset=utf-8")
+                return self.send(200, PAGE.replace("__TOKEN__", TOKEN), "text/html; charset=utf-8",
+                                 {"Cache-Control": "no-store"})
+            if not self.token_ok(q):
+                return self.send(403, "missing or bad token", "text/plain")
             if u.path == "/api/results":
                 names = sorted(p.name for p in self.data_dir.glob("*") if p.is_dir() and any(p.glob("*.xlsx")))
                 return self.send(200, json.dumps(names))
@@ -181,6 +201,11 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         if self.path != "/api/run":
             return self.send(404, "not found", "text/plain")
+        origin = self.headers.get("Origin", "")
+        if (not self.host_ok() or not self.token_ok({})
+                or (origin and origin not in (f"http://127.0.0.1:{self.port}", f"http://localhost:{self.port}"))
+                or not self.headers.get("Content-Type", "").startswith("application/json")):
+            return self.send(403, "forbidden", "text/plain")
         try:
             body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))) or b"{}")
             taxon = safe_name(body.get("taxon"))
@@ -192,6 +217,8 @@ class Handler(BaseHTTPRequestHandler):
             p = JOBS.get(taxon)
             if p is not None and p.poll() is None:
                 return self.send(409, "already running", "text/plain")
+            if sum(1 for x in JOBS.values() if x.poll() is None) >= MAX_JOBS:
+                return self.send(429, f"at most {MAX_JOBS} jobs at a time", "text/plain")
             cmd = [sys.executable, str(TOOL), body["taxon"].strip(), "-o", str(d)]
             cmd += ["--no-worms"] if body.get("no_worms") else []
             cmd += ["--all-versions"] if body.get("all_versions") else []
@@ -208,6 +235,7 @@ def main(argv=None):
     ap.add_argument("--port", type=int, default=8765)
     a = ap.parse_args(argv)
     Handler.data_dir = Path(a.data_dir)
+    Handler.port = a.port
     Handler.data_dir.mkdir(parents=True, exist_ok=True)
     srv = ThreadingHTTPServer(("127.0.0.1", a.port), Handler)
     print(f"Genome inventory web UI: http://127.0.0.1:{a.port}  (results in {Handler.data_dir.resolve()})")

@@ -556,7 +556,7 @@ def write_outputs(out, taxon, taxid, asm_rows, sp_rows, runs, mito_rows, qc, arg
         with open(out / f"{taxon}_{name}.tsv", "w", newline="", encoding="utf-8") as f:
             w = csv.DictWriter(f, cols, delimiter="\t", extrasaction="ignore")
             w.writeheader()
-            w.writerows(rows)
+            w.writerows({k: core.tsv_safe(v) for k, v in r.items()} for r in rows)
     return xlsx
 
 

@@ -300,3 +300,10 @@ def test_goat_project_field_string_or_list():
                      {"result": {"taxon_id": 2, "scientific_name": "B", "lineage": [],
                                  "fields": {"long_list": {"value": ["ATLASEA", "DTOL"]}}}}]}
     assert [g["goat_projects"] for g in core.goat_species(j)] == ["DTOL", "ATLASEA;DTOL"]
+
+
+def test_tsv_formula_injection_neutralised():
+    assert core.tsv_safe('=HYPERLINK("http://x")') == '\'=HYPERLINK("http://x")'
+    assert core.tsv_safe("@SUM(A1)") == "'@SUM(A1)"
+    assert core.tsv_safe("-12.5") == "-12.5" and core.tsv_safe(15641) == 15641
+    assert core.tsv_safe("PacBio - HiFi") == "PacBio - HiFi"

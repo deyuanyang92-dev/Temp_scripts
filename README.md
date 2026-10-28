@@ -18,6 +18,10 @@ Temp_scripts/
   mitofinder-batch/
     mitofinder_pipeline_v2_7.py
     README.md
+  ncbi_genome_inventory/
+    genome_inventory.py
+    tests/
+    README.md
   wgs_skim_pipeline/
     run_pipeline.py
     config.example.yaml
@@ -31,6 +35,14 @@ Temp_scripts/
 ```
 
 ## Available Scripts
+
+### ncbi_genome_inventory
+
+`python ncbi_genome_inventory/genome_inventory.py Annelida` -> one Excel of every NCBI genome assembly under a
+taxon: the NCBI Datasets web-table columns (same names as the manual export), raw data behind each assembly
+(HiFi / CLR / ONT / Hi-C / short-read WGS / 10x / RNA-seq / Iso-Seq, linked by BioSample, BioProject or sibling
+umbrella project), mitogenomes (inside the assembly, same BioSample, same species), NCBI + WoRMS taxonomy, QC.
+Standard library only; cached and resumable. See `ncbi_genome_inventory/README.md`.
 
 ### blast2metadata
 

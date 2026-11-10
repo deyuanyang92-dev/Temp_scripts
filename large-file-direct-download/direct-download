@@ -591,6 +591,24 @@ def read_manifest(path):
     return items
 
 
+CTRL = re.compile(r"[\x00-\x20\x7f]")
+
+
+def unsafe_item(it):
+    """URL/out must not inject aria2 input-file options (newlines) or escape outdir (path traversal)."""
+    url, out = it["url"], it["out"]
+    if CTRL.search(url):
+        return "control character or whitespace in URL"
+    if urllib.parse.urlparse(url).scheme not in ("http", "https", "ftp", "sftp"):
+        return "URL scheme must be http/https/ftp/sftp"
+    if CTRL.search(out) or out in (".", "..") or Path(out).name != out:
+        return "out must be a plain file name (no '/', '..', control characters)"
+    for k in ("md5", "sha256"):
+        if it.get(k) and not re.fullmatch(r"[0-9a-fA-F]+", it[k]):
+            return f"{k} is not hex"
+    return ""
+
+
 def cmd_fetch(args):
     if not shutil.which("aria2c"):
         sys.exit("aria2c not found; use `direct-download run -- curl -C - -O URL` instead")
@@ -612,6 +630,14 @@ def cmd_fetch(args):
         return 2
     env = direct_env(os.environ, jd / "rc")
 
+    # 0. validate every entry before any network access (no option injection / path traversal)
+    for it in items:
+        it["out"] = it.get("out") or Path(urllib.parse.unquote(urllib.parse.urlparse(it["url"]).path)).name
+        bad = "cannot derive file name; give `out`" if not it["out"] else unsafe_item(it)
+        if bad:
+            log(f"refusing unsafe manifest entry ({bad}): {it['url']!r} out={it['out']!r}", logfh)
+            return 1
+
     # 1. preflight: direct reachability of each host (no proxy fallback, ever)
     for host_url in {urllib.parse.urlparse(i["url"])._replace(path="", query="").geturl(): i["url"]
                      for i in items}.values():
@@ -622,10 +648,6 @@ def cmd_fetch(args):
     # 2. metadata: size / resume support, skip completed
     todo = []
     for it in items:
-        it["out"] = it.get("out") or Path(urllib.parse.unquote(urllib.parse.urlparse(it["url"]).path)).name
-        if not it["out"]:
-            log(f"cannot derive file name for {it['url']}; give `out` in the manifest", logfh)
-            return 1
         pr = probe(it["url"], env) if not args.no_head else {}
         if pr.get("error"):
             log(f"HEAD failed ({pr['error']}) for {it['url']}", logfh)

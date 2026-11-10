@@ -14,3 +14,12 @@ Record every run error here: date, symptom, cause, fix.
   exit 3 (layer-2 protection).
 - Not yet tested: a real organise-sra / prefetch SRA download under `run` (inherits the clean env by design,
   organise_sra spawns kingfisher via subprocess with os.environ copy — src/organise_sra/download.py:155).
+
+## 2026-11-10 — security review: aria2 input-file injection / path traversal in `fetch`
+
+- Cause: `out` (from manifest, or derived from the URL with `unquote`) was written unchecked into the aria2c
+  input file and joined to outdir. `%0A` in a URL or a manifest `out` like `../x` could inject aria2 options
+  (e.g. `all-proxy=` → proxy use) or write outside outdir.
+- Fix: every entry is validated before any network access: URL without control chars/whitespace and scheme
+  http/https/ftp/sftp; `out` must be a plain file name (no `/`, `..`, control chars); md5/sha256 must be hex.
+  Tested: `../evil`, `x%0A all-proxy=...`, and a manifest line `  dir=/tmp` are all refused (exit 1).

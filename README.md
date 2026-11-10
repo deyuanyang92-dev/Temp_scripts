@@ -15,6 +15,10 @@ Temp_scripts/
   getorganelle/
     batch_getorganelle.py
     README.md
+  large-file-direct-download/
+    direct-download
+    skill/SKILL.md
+    README.md
   mitofinder-batch/
     mitofinder_pipeline_v2_7.py
     README.md
@@ -43,6 +47,15 @@ taxon: the NCBI Datasets web-table columns (same names as the manual export), ra
 (HiFi / CLR / ONT / Hi-C / short-read WGS / 10x / RNA-seq / Iso-Seq, linked by BioSample, BioProject or sibling
 umbrella project), mitogenomes (inside the assembly, same BioSample, same species), NCBI + WoRMS taxonomy, QC.
 Standard library only; cached and resumable. See `ncbi_genome_inventory/README.md`.
+
+### large-file-direct-download
+
+`direct-download fetch|run ...` -> large research downloads (SRA, genomes, databases, GB files) go DIRECT instead of
+through the Clash/Mihomo proxy, without touching the caller's (e.g. Claude Code's) proxy settings. Proxy settings are
+stripped only in the child process tree; every TCP socket of the job is watched with `ss` and the job is killed on a
+proxy connection; refuses when TUN / policy routing is active. `fetch` = aria2c with resume, retries, parallel,
+bandwidth limit, md5/sha256/size/gzip verification, skip-if-done and TSV/JSON reports. Includes a Claude Code skill.
+Standard library only. See `large-file-direct-download/README.md`.
 
 ### blast2metadata
 

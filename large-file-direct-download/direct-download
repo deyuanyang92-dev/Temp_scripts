@@ -1,0 +1,824 @@
+#!/usr/bin/env python3
+"""direct-download — run large-file downloads over the local network (DIRECT), not the Clash/Mihomo proxy.
+
+Subcommands
+  check                       audit proxy env, tool rc files, Mihomo/FlClash config, TUN / routing (local only)
+  size   URL...               HEAD-probe size / resume support over a direct connection
+  run    [opts] -- CMD ARGS   run ANY command (organise-sra, prefetch, kingfisher, wget, python ...) with proxy
+                              settings stripped, and watch every TCP socket of its whole process tree
+  fetch  [opts] URL... | -i manifest.tsv
+                              managed aria2c download: resume, retries, parallel, bandwidth limit,
+                              checksum/size/gzip verification, skip-if-done, JSON/TSV report
+  selftest                    real small-file direct test with curl, wget, aria2c and python
+
+How DIRECT is achieved (minimal-impact design, see README):
+  * the caller's environment (Claude Code, shells) is never modified; only the child gets a clean env
+  * http(s)/ftp/all/no_proxy (both cases) are removed, NO_PROXY='*' set, wget/git proxy rc neutralised
+  * valid only while Mihomo TUN is OFF: then a process that does not talk to the proxy port leaves via the
+    normal default route. If TUN / extra policy routing is detected, the tool refuses (strict) instead of
+    pretending.
+  * proof: every TCP socket of the process tree is sampled with `ss -tinp`; any connection to a local
+    proxy port = leak -> job is killed (strict). Egress interface of each remote is taken from
+    `ip route get`. Bytes on the proxy port (all apps) are reported as the proxy traffic counter.
+Privacy: never contacts IP-lookup services; local addresses are not written to logs.
+"""
+import argparse
+import hashlib
+import ipaddress
+import json
+import os
+import re
+import shutil
+import signal
+import socket
+import subprocess
+import sys
+import tempfile
+import time
+import urllib.parse
+from pathlib import Path
+
+VERSION = "0.1.0"
+HOME = Path.home()
+PROXY_VARS = ["http_proxy", "https_proxy", "ftp_proxy", "all_proxy", "rsync_proxy", "socks_proxy",
+              "no_proxy", "HTTP_PROXY", "HTTPS_PROXY", "FTP_PROXY", "ALL_PROXY", "RSYNC_PROXY",
+              "SOCKS_PROXY", "NO_PROXY", "GIT_PROXY_COMMAND"]
+CLASH_CONFIGS = [  # read-only
+    HOME / ".local/share/com.follow.clash/config.yaml",                              # FlClash
+    HOME / ".local/share/io.github.clash-verge-rev.clash-verge-rev/clash-verge.yaml",  # Clash Verge Rev
+    HOME / ".local/share/io.github.clash-verge-rev.clash-verge-rev/config.yaml",
+    HOME / ".config/mihomo/config.yaml", HOME / ".config/clash/config.yaml",
+    HOME / ".config/clash.meta/config.yaml",
+]
+TUN_IFACE = re.compile(r"^(tun|utun|Meta|mihomo|clash|wg|tailscale|zt|ppp|tap|nordlynx|proton|sing)", re.I)
+STD_RULE_PRIOS = {"0", "32766", "32767"}
+STATE_DIR = Path(os.environ.get("DIRECT_DOWNLOAD_STATE", HOME / ".cache/direct-download"))
+
+
+def log(msg, fh=None):
+    line = f"[direct-download {time.strftime('%H:%M:%S')}] {msg}"
+    print(line, file=sys.stderr, flush=True)
+    if fh:
+        fh.write(line + "\n")
+        fh.flush()
+
+
+def sh(cmd, env=None, timeout=60):
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, env=env, timeout=timeout)
+        return r.returncode, r.stdout, r.stderr
+    except (OSError, subprocess.TimeoutExpired) as e:
+        return 127, "", str(e)
+
+
+# ----------------------------------------------------------------------------------------- environment
+def proxy_ports_from_env(env):
+    """(host, port) of proxies named in the *caller's* env, plus Mihomo listener ports from config."""
+    eps = set()
+    for k in PROXY_VARS:
+        v = env.get(k, "")
+        if not v or k.lower() == "no_proxy" or "://" not in v:
+            continue
+        u = urllib.parse.urlparse(v)
+        if u.port:
+            eps.add(u.port)
+    return eps
+
+
+def read_clash_config():
+    """Minimal regex parse of the Mihomo config (no yaml dependency). Returns list of dicts."""
+    out = []
+    for p in CLASH_CONFIGS:
+        if not p.is_file():
+            continue
+        txt = p.read_text(errors="replace")
+        d = {"path": str(p)}
+        for key in ("mode", "mixed-port", "port", "socks-port", "redir-port", "tproxy-port",
+                    "external-controller", "find-process-mode"):
+            m = re.search(rf"^{re.escape(key)}:\s*\"?([^\"\n#]*)\"?", txt, re.M)
+            if m:
+                d[key] = m.group(1).strip()
+        m = re.search(r"^tun:\s*\n((?:[ \t]+.*\n?)*)", txt, re.M)
+        if m:
+            e = re.search(r"^\s+enable:\s*(\w+)", m.group(1), re.M)
+            d["tun.enable"] = e.group(1) if e else "?"
+        out.append(d)
+    return out
+
+
+def network_topology():
+    """Local-only view: interfaces, default route, policy rules. No external requests."""
+    ifaces = sorted(os.listdir("/sys/class/net")) if os.path.isdir("/sys/class/net") else []
+    up = []
+    for i in ifaces:
+        try:
+            if Path(f"/sys/class/net/{i}/operstate").read_text().strip() in ("up", "unknown"):
+                up.append(i)
+        except OSError:
+            pass
+    tun_ifaces = [i for i in up if TUN_IFACE.match(i)]
+    _, rt, _ = sh(["ip", "route", "show", "default"])
+    default_devs = re.findall(r"\bdev (\S+)", rt)
+    extra_rules = []
+    for fam in ("-4", "-6"):
+        _, rules, _ = sh(["ip", fam, "rule"])
+        for line in rules.splitlines():
+            prio = line.split(":")[0].strip()
+            if prio and prio not in STD_RULE_PRIOS:
+                extra_rules.append(f"{fam} {line.strip()}")
+    return {"interfaces_up": up, "tun_like_up": tun_ifaces, "default_route_devs": default_devs,
+            "extra_policy_rules": extra_rules}
+
+
+def tool_rc_findings():
+    """Proxy settings inside download tools' own config files (they would bypass env stripping)."""
+    f = []
+
+    def grep(path, pat, why):
+        p = Path(path)
+        if not p.is_file():
+            return
+        try:
+            for n, line in enumerate(p.read_text(errors="replace").splitlines(), 1):
+                s = line.strip()
+                if s and not s.startswith(("#", ";")) and re.search(pat, s, re.I):
+                    f.append({"file": str(p), "line": n, "text": re.sub(r"//[^@\s]*@", "//***@", s)[:120],
+                              "neutralised": why})
+        except OSError:
+            pass
+
+    grep(HOME / ".wgetrc", r"proxy", "yes (WGETRC replaced with use_proxy=off)")
+    grep("/etc/wgetrc", r"^(use_proxy|https?_proxy|ftp_proxy)", "yes (user WGETRC use_proxy=off overrides)")
+    grep(HOME / ".curlrc", r"proxy|socks", "partly (NO_PROXY=*; socket monitor catches leaks)")
+    grep(HOME / ".aria2/aria2.conf", r"proxy", "fetch: yes (--no-conf); run: NO (socket monitor)")
+    grep(HOME / ".config/aria2/aria2.conf", r"proxy", "fetch: yes (--no-conf); run: NO (socket monitor)")
+    grep(HOME / ".condarc", r"proxy", "NO - conda uses proxy_servers (socket monitor catches leaks)")
+    grep(HOME / ".config/pip/pip.conf", r"proxy", "NO - pip proxy (socket monitor catches leaks)")
+    grep(HOME / ".pip/pip.conf", r"proxy", "NO - pip proxy (socket monitor catches leaks)")
+    grep(HOME / ".ncbi/user-settings.mkfg", r"/http/proxy", "NO - set via vdb-config (monitor catches leaks)")
+    for scope in ("--global", "--system"):
+        rc, out, _ = sh(["git", "config", scope, "--get-regexp", r"(http|https)\..*proxy|core\.gitproxy"])
+        for line in out.splitlines():
+            f.append({"file": f"git config {scope}", "line": 0, "text": line[:120],
+                      "neutralised": "yes (GIT_CONFIG_* http.proxy='')"})
+    return f
+
+
+def direct_env(base, workdir):
+    """Clean environment for the child. The caller's os.environ is never touched."""
+    env = {k: v for k, v in base.items() if k not in PROXY_VARS}
+    env["NO_PROXY"] = env["no_proxy"] = "*"
+    rcdir = Path(workdir)
+    rcdir.mkdir(parents=True, exist_ok=True)
+    wgetrc = rcdir / "wgetrc"
+    wgetrc.write_text("use_proxy = off\n")
+    env["WGETRC"] = str(wgetrc)
+    n = int(env.get("GIT_CONFIG_COUNT", "0") or 0)
+    for i, (k, v) in enumerate([("http.proxy", ""), ("https.proxy", "")], start=n):
+        env[f"GIT_CONFIG_KEY_{i}"], env[f"GIT_CONFIG_VALUE_{i}"] = k, v
+    env["GIT_CONFIG_COUNT"] = str(n + 2)
+    env["DIRECT_DOWNLOAD_ACTIVE"] = "1"
+    return env
+
+
+def assess(args, quiet=False):
+    """Return (ok, report). ok=False means DIRECT cannot be guaranteed by this tool."""
+    topo = network_topology()
+    clash = read_clash_config()
+    rcf = tool_rc_findings()
+    ports = proxy_ports_from_env(os.environ)
+    for c in clash:
+        for k in ("mixed-port", "port", "socks-port"):
+            if c.get(k, "0").isdigit() and int(c[k]) > 0:
+                ports.add(int(c[k]))
+    ports |= set(args.proxy_port or [])
+    ports |= {7890} if not ports else set()
+    problems, notes = [], []
+    tun_cfg = [c["path"] for c in clash if c.get("tun.enable", "").lower() == "true"]
+    if topo["tun_like_up"]:
+        problems.append(f"TUN/VPN-like interface up: {topo['tun_like_up']}")
+    if tun_cfg:
+        problems.append(f"Mihomo TUN enabled in {tun_cfg}")
+    if topo["extra_policy_rules"]:
+        problems.append(f"non-default ip rules (TUN auto-route / VPN?): {topo['extra_policy_rules'][:4]}")
+    if any(TUN_IFACE.match(d) for d in topo["default_route_devs"]):
+        problems.append(f"default route goes through {topo['default_route_devs']}")
+    if not topo["default_route_devs"]:
+        problems.append("no default route")
+    for c in clash:
+        if c.get("mode", "").lower() == "global":
+            notes.append(f"Mihomo mode=global ({c['path']}): everything sent to the proxy port uses a proxy node; "
+                         "DIRECT here relies on NOT using the proxy port (verified by socket monitor)")
+        if not c.get("external-controller"):
+            notes.append("Mihomo external-controller disabled -> Connections API unavailable; "
+                         "verification uses kernel socket table (ss) instead")
+    rep = {"proxy_ports": sorted(ports), "topology": topo, "mihomo": clash, "tool_rc": rcf,
+           "problems": problems, "notes": notes,
+           "env_proxy_vars_in_caller": sorted(k for k in PROXY_VARS if k in os.environ)}
+    ok = not problems or getattr(args, "allow_tun", False)
+    if not quiet:
+        print(f"proxy ports watched : {rep['proxy_ports']}")
+        print(f"caller proxy vars   : {rep['env_proxy_vars_in_caller']} (left untouched; stripped in child)")
+        print(f"default route dev   : {topo['default_route_devs']}   interfaces up: {topo['interfaces_up']}")
+        print(f"TUN-like ifaces     : {topo['tun_like_up'] or 'none'}   extra ip rules: "
+              f"{len(topo['extra_policy_rules'])}")
+        for c in clash:
+            print("mihomo config       : " + ", ".join(f"{k}={v}" for k, v in c.items()
+                                                       if k not in ("external-controller",)))
+        for r in rcf:
+            print(f"tool rc proxy       : {r['file']}:{r['line']}  {r['text']}  -> neutralised: {r['neutralised']}")
+        if not rcf:
+            print("tool rc proxy       : none found (wgetrc/curlrc/aria2/git/conda/pip/ncbi)")
+        for n in notes:
+            print(f"note                : {n}")
+        for p in problems:
+            print(f"PROBLEM             : {p}")
+        print("RESULT              : " + ("DIRECT possible (TUN off, plain default route)" if not problems else
+              ("problems overridden by --allow-tun" if ok else
+               "DIRECT NOT guaranteed - refusing (needs a Mihomo DIRECT rule; see README 'TUN mode')")))
+        print("scope               : 'DIRECT' = not via Mihomo proxy nodes AND egress interface shown above; "
+              "a VPN on the upstream router cannot be seen from this host")
+    return ok, rep
+
+
+# ----------------------------------------------------------------------------------------- monitor
+def proc_tree(root_pid, sid):
+    """pids in root's session or descending from root (catches launcher -> downloader chains)."""
+    parent, sess = {}, {}
+    for d in os.listdir("/proc"):
+        if not d.isdigit():
+            continue
+        try:
+            st = Path(f"/proc/{d}/stat").read_text()
+            fields = st[st.rfind(")") + 2:].split()
+            parent[int(d)], sess[int(d)] = int(fields[1]), int(fields[3])
+        except (OSError, IndexError, ValueError):
+            pass
+    keep = {p for p, s in sess.items() if s == sid}
+    changed = True
+    keep.add(root_pid)
+    while changed:
+        changed = False
+        for p, pp in parent.items():
+            if pp in keep and p not in keep:
+                keep.add(p)
+                changed = True
+    return keep
+
+
+SS_LINE = re.compile(r"^(\S+)\s+\d+\s+\d+\s+(\S+)\s+(\S+)(?:\s+users:\((.*)\))?")
+
+
+def ss_snapshot():
+    """List of sockets: state, local, peer, pids, bytes_received, bytes_acked."""
+    rc, out, _ = sh(["ss", "-tinpHn"], timeout=20)
+    socks, cur = [], None
+    for line in out.splitlines():
+        if not line[:1].isspace():
+            m = SS_LINE.match(line)
+            cur = None
+            if m:
+                cur = {"state": m.group(1), "local": m.group(2), "peer": m.group(3),
+                       "pids": [int(x) for x in re.findall(r"pid=(\d+)", m.group(4) or "")],
+                       "procs": sorted(set(re.findall(r'\("([^"]+)"', m.group(4) or ""))),
+                       "rx": 0, "tx": 0}
+                socks.append(cur)
+        elif cur is not None:
+            r = re.search(r"bytes_received:(\d+)", line)
+            a = re.search(r"bytes_acked:(\d+)", line)
+            cur["rx"] = int(r.group(1)) if r else 0
+            cur["tx"] = int(a.group(1)) if a else 0
+    return socks
+
+
+def split_ep(ep):
+    host, _, port = ep.rpartition(":")
+    host = host.strip("[]")
+    if host.startswith("::ffff:"):
+        host = host[7:]
+    return host, int(port) if port.isdigit() else 0
+
+
+def is_local(host):
+    try:
+        ip = ipaddress.ip_address(host.split("%")[0])
+        return ip.is_loopback or ip.is_private or ip.is_link_local
+    except ValueError:
+        return False
+
+
+_route_cache = {}
+
+
+def egress_dev(host):
+    if host not in _route_cache:
+        _, out, _ = sh(["ip", "route", "get", host], timeout=5)
+        m = re.search(r"\bdev (\S+)", out)
+        _route_cache[host] = m.group(1) if m else "?"
+    return _route_cache[host]
+
+
+class Monitor:
+    def __init__(self, proxy_ports, logfh, strict=True):
+        self.ports = set(proxy_ports)
+        self.logfh = logfh
+        self.strict = strict
+        self.conns = {}      # key -> dict
+        self.leaks = {}
+        self.proxy_port_bytes = {}   # server-side sockets on proxy port (all apps): key -> rx+tx
+        self.proxy_baseline = None
+        self.samples = 0
+
+    def sample(self, pids):
+        snap = ss_snapshot()
+        self.samples += 1
+        ptot = {}
+        for s in snap:
+            lh, lp = split_ep(s["local"])
+            ph, pp = split_ep(s["peer"])
+            if lp in self.ports and is_local(lh):          # proxy server side -> traffic counter
+                ptot[(s["local"], s["peer"])] = s["rx"] + s["tx"]
+            if not set(s["pids"]) & pids:
+                continue
+            key = (s["local"], s["peer"])
+            c = self.conns.setdefault(key, {"peer": s["peer"], "procs": s["procs"], "rx": 0, "tx": 0})
+            c["rx"], c["tx"] = max(c["rx"], s["rx"]), max(c["tx"], s["tx"])
+            if pp in self.ports and is_local(ph):
+                c["verdict"] = "PROXY"
+                if key not in self.leaks:
+                    self.leaks[key] = c
+                    log(f"LEAK: {s['procs']} connected to local proxy port {s['peer']}", self.logfh)
+            elif is_local(ph):
+                c["verdict"] = "LOCAL"
+            else:
+                dev = egress_dev(ph)
+                c["dev"] = dev
+                c["verdict"] = "DIRECT" if not TUN_IFACE.match(dev) else "TUN"
+                if c["verdict"] == "TUN" and key not in self.leaks:
+                    self.leaks[key] = c
+                    log(f"LEAK: {s['procs']} -> {ph} egress via {dev}", self.logfh)
+        if self.proxy_baseline is None:
+            self.proxy_baseline = dict(ptot)
+        for k, v in ptot.items():
+            self.proxy_port_bytes[k] = max(self.proxy_port_bytes.get(k, 0), v)
+
+    def proxy_delta(self):
+        base = self.proxy_baseline or {}
+        return sum(v - base.get(k, 0) for k, v in self.proxy_port_bytes.items())
+
+    def summary(self):
+        by = {}
+        for c in self.conns.values():
+            by.setdefault(c.get("verdict", "?"), []).append(c)
+        direct_rx = sum(c["rx"] for c in by.get("DIRECT", []))
+        return {"samples": self.samples, "sockets_seen": len(self.conns),
+                "direct_sockets": len(by.get("DIRECT", [])), "direct_bytes_received": direct_rx,
+                "proxy_sockets": len(by.get("PROXY", [])), "tun_sockets": len(by.get("TUN", [])),
+                "egress_devs": sorted({c.get("dev") for c in by.get("DIRECT", [])}),
+                "remotes": sorted({c["peer"] for c in by.get("DIRECT", [])})[:50],
+                "proxy_port_bytes_all_apps_during_job": self.proxy_delta()}
+
+
+def run_monitored(cmd, env, proxy_ports, logfh, interval=0.5, strict=True, cwd=None, out=None):
+    mon = Monitor(proxy_ports, logfh, strict)
+    mon.sample(set())  # baseline proxy counter
+    try:
+        p = subprocess.Popen(cmd, env=env, cwd=cwd, start_new_session=True,
+                             stdout=out, stderr=subprocess.STDOUT if out else None)
+    except OSError as e:
+        log(f"cannot start {cmd[0]}: {e}", logfh)
+        return 127, mon
+    killed = False
+
+    def fwd(sig, _frm):
+        try:
+            os.killpg(p.pid, sig)
+        except ProcessLookupError:
+            pass
+    old = {s: signal.signal(s, fwd) for s in (signal.SIGINT, signal.SIGTERM)}
+    try:
+        while p.poll() is None:
+            mon.sample(proc_tree(p.pid, p.pid))
+            if mon.leaks and strict and not killed:
+                log("strict mode: proxy/TUN connection detected -> stopping the job", logfh)
+                os.killpg(p.pid, signal.SIGTERM)
+                killed = True
+            time.sleep(interval)
+    finally:
+        for s, h in old.items():
+            signal.signal(s, h)
+    mon.sample(set())
+    rc = p.wait()
+    return (3 if killed else rc), mon
+
+
+def print_monitor(mon, logfh=None):
+    s = mon.summary()
+    log(f"monitor: {s['samples']} samples, {s['sockets_seen']} sockets of the job; DIRECT={s['direct_sockets']} "
+        f"({human(s['direct_bytes_received'])} received, egress {s['egress_devs']}), "
+        f"PROXY={s['proxy_sockets']}, TUN={s['tun_sockets']}; "
+        f"proxy-port traffic of ALL apps meanwhile: {human(s['proxy_port_bytes_all_apps_during_job'])}", logfh)
+    if s["sockets_seen"] == 0:
+        log("monitor saw no TCP socket of the job (too short, UDP/QUIC, or failed early) -> DIRECT not proven",
+            logfh)
+    return s
+
+
+def human(n):
+    n = float(n or 0)
+    for u in ("B", "KB", "MB", "GB", "TB"):
+        if n < 1024 or u == "TB":
+            return f"{n:.1f} {u}" if u != "B" else f"{int(n)} B"
+        n /= 1024
+
+
+# ----------------------------------------------------------------------------------------- size probe
+def probe(url, env, timeout=30):
+    """HEAD over a direct connection with curl. Returns dict(size, ranges, status, final_url)."""
+    rc, out, err = sh(["curl", "-sSIL", "--noproxy", "*", "--connect-timeout", "15", "--max-time", str(timeout),
+                       "-o", "/dev/stdout", url], env=env, timeout=timeout + 5)
+    info = {"url": url, "size": None, "ranges": None, "status": None, "error": None}
+    if rc != 0:
+        info["error"] = (err.strip() or f"curl rc={rc}")[:200]
+        return info
+    blocks = [b for b in re.split(r"\r?\n\r?\n", out) if b.strip()]
+    last = blocks[-1] if blocks else ""
+    m = re.search(r"^HTTP/\S+\s+(\d+)", last, re.M)
+    info["status"] = int(m.group(1)) if m else None
+    m = re.search(r"^content-length:\s*(\d+)", last, re.M | re.I)
+    info["size"] = int(m.group(1)) if m else None
+    m = re.search(r"^accept-ranges:\s*(\S+)", last, re.M | re.I)
+    info["ranges"] = (m.group(1).lower() != "none") if m else (True if url.startswith("ftp") else None)
+    if info["status"] and info["status"] >= 400:
+        info["error"] = f"HTTP {info['status']}"
+    return info
+
+
+def tcp_reachable(url, timeout=10):
+    u = urllib.parse.urlparse(url)
+    port = u.port or {"https": 443, "http": 80, "ftp": 21}.get(u.scheme, 443)
+    try:
+        with socket.create_connection((u.hostname, port), timeout=timeout):
+            return True, ""
+    except OSError as e:
+        return False, str(e)
+
+
+# ----------------------------------------------------------------------------------------- verification
+def file_hash(path, algo):
+    h = hashlib.new(algo)
+    with open(path, "rb") as fh:
+        for chunk in iter(lambda: fh.read(8 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def verify(path, item, gzip_test=True):
+    """Returns (status, detail). Success only with real evidence."""
+    p = Path(path)
+    if not p.is_file():
+        return "MISSING", "file not found"
+    if Path(str(p) + ".aria2").exists():
+        return "INCOMPLETE", "aria2 control file present (partial download)"
+    size = p.stat().st_size
+    for algo in ("sha256", "md5"):
+        want = (item.get(algo) or "").lower()
+        if want:
+            got = file_hash(p, algo)
+            return ("VERIFIED_CHECKSUM", f"{algo} ok") if got == want else \
+                ("FAILED", f"{algo} mismatch: got {got} want {want}")
+    exp = item.get("size")
+    ev = []
+    if exp is not None:
+        if int(exp) != size:
+            return "FAILED", f"size {size} != expected {exp}"
+        ev.append(f"size {size} = server/manifest")
+    if gzip_test and p.suffix in (".gz", ".bgz", ".bz2", ".xz", ".zst"):
+        tool = {".gz": ["gzip", "-t"], ".bgz": ["gzip", "-t"], ".bz2": ["bzip2", "-t"],
+                ".xz": ["xz", "-t"], ".zst": ["zstd", "-tq"]}[p.suffix]
+        if shutil.which(tool[0]):
+            rc, _, err = sh(tool + [str(p)], timeout=None)
+            if rc != 0:
+                return "FAILED", f"{tool[0]} -t failed: {err.strip()[:150]}"
+            ev.append(f"{tool[0]} -t ok")
+    if ev:
+        return "VERIFIED_SIZE", "; ".join(ev)
+    return "UNVERIFIED", "no checksum and no server size: integrity unknown"
+
+
+# ----------------------------------------------------------------------------------------- commands
+def cmd_check(args):
+    ok, rep = assess(args)
+    if args.json:
+        print(json.dumps(rep, indent=2, ensure_ascii=False))
+    return 0 if ok else 2
+
+
+def cmd_size(args):
+    env = direct_env(os.environ, STATE_DIR / "rc")
+    tot = 0
+    for u in args.urls:
+        i = probe(u, env)
+        tot += i["size"] or 0
+        print(f"{human(i['size']) if i['size'] is not None else 'unknown':>10}  ranges={i['ranges']}  "
+              f"{'ERR ' + i['error'] if i['error'] else ''}  {u}")
+    if len(args.urls) > 1:
+        print(f"{human(tot):>10}  total (known sizes)")
+    return 0
+
+
+def job_dir(base):
+    d = Path(base) / ".direct-download"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def cmd_run(args):
+    if not args.cmd:
+        sys.exit("usage: direct-download run [opts] -- CMD ARGS...")
+    cmd = args.cmd[1:] if args.cmd[0] == "--" else args.cmd
+    ok, rep = assess(args, quiet=not args.verbose)
+    jd = job_dir(args.log_dir or ".")
+    stamp = time.strftime("%Y%m%d-%H%M%S")
+    logfh = open(jd / f"run-{stamp}.log", "a")
+    if not ok:
+        for p in rep["problems"]:
+            log(f"PROBLEM: {p}", logfh)
+        log("refusing: DIRECT cannot be guaranteed (use `direct-download check`; --allow-tun to override)", logfh)
+        return 2
+    env = direct_env(os.environ, jd / "rc")
+    log(f"running DIRECT (proxy vars stripped, NO_PROXY=*): {' '.join(cmd)}", logfh)
+    t0 = time.time()
+    rc, mon = run_monitored(cmd, env, rep["proxy_ports"], logfh, interval=args.interval,
+                            strict=not args.no_strict)
+    s = print_monitor(mon, logfh)
+    res = {"cmd": cmd, "rc": rc, "seconds": round(time.time() - t0, 1), "monitor": s,
+           "direct_proven": s["direct_sockets"] > 0 and s["proxy_sockets"] == 0 and s["tun_sockets"] == 0}
+    (jd / f"run-{stamp}.json").write_text(json.dumps(res, indent=2, ensure_ascii=False))
+    log(f"exit {rc}; report {jd / f'run-{stamp}.json'}", logfh)
+    return rc
+
+
+def read_manifest(path):
+    """TSV: url [out] [md5|sha256] [size]  (header optional; columns by name if header present)."""
+    items = []
+    lines = [l.rstrip("\n") for l in open(path) if l.strip() and not l.startswith("#")]
+    header = None
+    if lines and lines[0].lower().startswith("url"):
+        header = [h.strip().lower() for h in lines[0].split("\t")]
+        lines = lines[1:]
+    for l in lines:
+        cols = l.split("\t")
+        if header:
+            d = {h: (cols[i].strip() if i < len(cols) else "") for i, h in enumerate(header)}
+        else:
+            d = {"url": cols[0].strip()}
+            for c in cols[1:]:
+                c = c.strip()
+                if re.fullmatch(r"[0-9a-fA-F]{64}", c):
+                    d["sha256"] = c
+                elif re.fullmatch(r"[0-9a-fA-F]{32}", c):
+                    d["md5"] = c
+                elif c.isdigit():
+                    d["size"] = c
+                elif c:
+                    d["out"] = c
+        if d.get("size"):
+            d["size"] = int(d["size"])
+        else:
+            d.pop("size", None)
+        items.append(d)
+    return items
+
+
+def cmd_fetch(args):
+    if not shutil.which("aria2c"):
+        sys.exit("aria2c not found; use `direct-download run -- curl -C - -O URL` instead")
+    items = read_manifest(args.input) if args.input else []
+    for u in args.urls:
+        items.append({"url": u, "md5": args.md5, "sha256": args.sha256})
+    if not items:
+        sys.exit("no URLs (give URLs or -i manifest.tsv)")
+    outdir = Path(args.outdir).resolve()
+    outdir.mkdir(parents=True, exist_ok=True)
+    jd = job_dir(outdir)
+    stamp = time.strftime("%Y%m%d-%H%M%S")
+    logfh = open(jd / f"fetch-{stamp}.log", "a")
+    ok, rep = assess(args, quiet=True)
+    if not ok:
+        for p in rep["problems"]:
+            log(f"PROBLEM: {p}", logfh)
+        log("refusing: DIRECT cannot be guaranteed", logfh)
+        return 2
+    env = direct_env(os.environ, jd / "rc")
+
+    # 1. preflight: direct reachability of each host (no proxy fallback, ever)
+    for host_url in {urllib.parse.urlparse(i["url"])._replace(path="", query="").geturl(): i["url"]
+                     for i in items}.values():
+        r, err = tcp_reachable(host_url)
+        if not r:
+            log(f"host not reachable DIRECTLY ({err}): {host_url} -> stopping (no proxy fallback)", logfh)
+            return 5
+    # 2. metadata: size / resume support, skip completed
+    todo = []
+    for it in items:
+        it["out"] = it.get("out") or Path(urllib.parse.unquote(urllib.parse.urlparse(it["url"]).path)).name
+        if not it["out"]:
+            log(f"cannot derive file name for {it['url']}; give `out` in the manifest", logfh)
+            return 1
+        pr = probe(it["url"], env) if not args.no_head else {}
+        if pr.get("error"):
+            log(f"HEAD failed ({pr['error']}) for {it['url']}", logfh)
+        if it.get("size") is None and pr.get("size") is not None:
+            it["size"] = pr["size"]
+        it["resume_supported"] = pr.get("ranges")
+        dest = outdir / it["out"]
+        if dest.exists() and not Path(str(dest) + ".aria2").exists():
+            st, det = verify(dest, it, not args.no_gzip_test)
+            if st.startswith("VERIFIED"):
+                it["status"], it["detail"] = "SKIPPED_" + st, det
+                log(f"already complete ({det}): {it['out']}", logfh)
+                continue
+            if st == "FAILED" or (st == "UNVERIFIED" and not args.keep_existing):
+                bad = dest.with_name(dest.name + f".bad-{stamp}")
+                dest.rename(bad)
+                log(f"existing {it['out']} not verifiable/complete ({det}); moved to {bad.name} (not deleted)", logfh)
+            else:
+                it["status"], it["detail"] = "SKIPPED_EXISTING_UNVERIFIED", det
+                continue
+        if dest.exists() and it.get("resume_supported") is False:
+            log(f"server does not support ranges for {it['out']}: partial file will be restarted, not resumed", logfh)
+        todo.append(it)
+    known = sum(i.get("size") or 0 for i in todo)
+    log(f"{len(todo)} to download ({human(known)} known size), {len(items) - len(todo)} skipped", logfh)
+
+    # 3. download with aria2c (ignores aria2.conf -> no hidden proxy), monitored
+    rc = 0
+    if todo:
+        inp = jd / f"aria2-input-{stamp}.txt"
+        with open(inp, "w") as fh:
+            for it in todo:
+                fh.write(it["url"] + "\n" + f"  out={it['out']}\n")
+                if it.get("sha256"):
+                    fh.write(f"  checksum=sha-256={it['sha256']}\n")
+                elif it.get("md5"):
+                    fh.write(f"  checksum=md5={it['md5']}\n")
+        cmd = ["aria2c", "--no-conf=true", "--all-proxy=", "-i", str(inp), "-d", str(outdir),
+               "-c", "--auto-file-renaming=false", "--allow-overwrite=false", "--file-allocation=none",
+               f"-j{args.jobs}", f"-x{args.connections}", f"-s{args.connections}", "--min-split-size=20M",
+               f"--max-tries={args.retries}", f"--retry-wait={args.retry_wait}", f"--timeout={args.timeout}",
+               f"--connect-timeout={args.timeout}", "--lowest-speed-limit=1K",
+               "--summary-interval=30", "--console-log-level=notice", "--check-integrity=true",
+               f"--log={jd / f'aria2-{stamp}.log'}", "--log-level=notice"]
+        if args.limit:
+            cmd.append(f"--max-overall-download-limit={args.limit}")
+        log("aria2c: " + " ".join(cmd[1:]), logfh)
+        rc, mon = run_monitored(cmd, env, rep["proxy_ports"], logfh, interval=args.interval,
+                                strict=not args.no_strict, cwd=str(outdir))
+        mons = print_monitor(mon, logfh)
+    else:
+        mons = None
+    # 4. verify
+    nbad = nunv = 0
+    for it in todo:
+        st, det = verify(outdir / it["out"], it, not args.no_gzip_test)
+        it["status"], it["detail"] = st, det
+        nbad += st in ("FAILED", "MISSING", "INCOMPLETE")
+        nunv += st == "UNVERIFIED"
+    direct_ok = mons is None or (mons["proxy_sockets"] == 0 and mons["tun_sockets"] == 0
+                                 and mons["direct_sockets"] > 0)
+    rep_path = jd / f"report-{stamp}"
+    res = {"version": VERSION, "outdir": str(outdir), "aria2_rc": rc, "direct_proven": direct_ok,
+           "monitor": mons, "items": items}
+    rep_path.with_suffix(".json").write_text(json.dumps(res, indent=2, ensure_ascii=False))
+    with open(rep_path.with_suffix(".tsv"), "w") as fh:
+        fh.write("status\tfile\tsize\tdetail\turl\n")
+        for it in items:
+            f = outdir / it["out"]
+            fh.write(f"{it.get('status')}\t{it['out']}\t{f.stat().st_size if f.exists() else ''}\t"
+                     f"{it.get('detail', '')}\t{it['url']}\n")
+    for it in items:
+        log(f"{it.get('status'):<28} {it['out']}  ({it.get('detail', '')})", logfh)
+    log(f"report: {rep_path}.tsv / .json; DIRECT proven: {direct_ok}", logfh)
+    if rc == 3 or not direct_ok:
+        return 3
+    if nbad or rc:
+        return rc or 1
+    if nunv and not args.allow_unverified:
+        log("some files UNVERIFIED (no checksum / server size) -> exit 4; add md5/sha256 or --allow-unverified",
+            logfh)
+        return 4
+    return 0
+
+
+SELFTEST_URL = "https://ftp.ncbi.nlm.nih.gov/README.ftp"
+
+
+def cmd_selftest(args):
+    url = args.url or SELFTEST_URL
+    ok, rep = assess(args, quiet=False)
+    if not ok:
+        return 2
+    td = Path(tempfile.mkdtemp(prefix="dd-selftest-", dir=STATE_DIR if STATE_DIR.exists() else None))
+    env = direct_env(os.environ, td / "rc")
+    leak_env = dict(os.environ)
+    py = ("import sys,urllib.request,time;r=urllib.request.urlopen(sys.argv[1],timeout=60);"
+          "d=r.read(4096);time.sleep(1.5);d+=r.read();open(sys.argv[2],'wb').write(d)")
+    # each test holds the socket >=1 s (--limit-rate) so the sampler sees it
+    tests = {
+        "curl": ["curl", "-sS", "-L", "--limit-rate", "2K", "-o", str(td / "c"), url],
+        "wget": ["wget", "-q", "--limit-rate=2k", "-O", str(td / "w"), url],
+        "aria2c": ["aria2c", "-q", "--no-conf=true", "--max-download-limit=2K", "-d", str(td), "-o", "a", url],
+        "python": [sys.executable, "-c", py, url, str(td / "p")],
+    }
+    print(f"\nselftest URL: {url}  (small file, rate-limited so sockets are observable)")
+    allok = True
+    for name, cmd in tests.items():
+        if not shutil.which(cmd[0]):
+            print(f"  {name:<7} SKIP (not installed)")
+            continue
+        rc, mon = run_monitored(cmd, env, rep["proxy_ports"], None, interval=0.2, strict=True,
+                                out=subprocess.DEVNULL)
+        s = mon.summary()
+        good = rc == 0 and s["direct_sockets"] > 0 and s["proxy_sockets"] == 0 and s["tun_sockets"] == 0
+        allok &= good
+        print(f"  {name:<7} {'PASS' if good else 'FAIL'} rc={rc} DIRECT sockets={s['direct_sockets']} "
+              f"egress={s['egress_devs']} PROXY sockets={s['proxy_sockets']} remotes={s['remotes'][:2]}")
+    if args.control:
+        # negative control: same curl with the caller's normal proxy env -> must be detected as PROXY
+        rc, mon = run_monitored(tests["curl"], leak_env, rep["proxy_ports"], None, interval=0.2,
+                                strict=False, out=subprocess.DEVNULL)
+        s = mon.summary()
+        det = s["proxy_sockets"] > 0
+        allok &= det
+        print(f"  control (curl WITH proxy env, expected PROXY): {'DETECTED' if det else 'NOT DETECTED'} "
+              f"PROXY sockets={s['proxy_sockets']} DIRECT sockets={s['direct_sockets']}")
+    shutil.rmtree(td, ignore_errors=True)
+    print("SELFTEST " + ("PASSED" if allok else "FAILED"))
+    return 0 if allok else 1
+
+
+def main():
+    ap = argparse.ArgumentParser(prog="direct-download", description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--version", action="version", version=VERSION)
+    sub = ap.add_subparsers(dest="sub", required=True)
+
+    def common(p):
+        p.add_argument("--proxy-port", type=int, action="append", help="extra local proxy port to watch")
+        p.add_argument("--allow-tun", action="store_true",
+                       help="continue although TUN/policy routing is active (only if a Mihomo DIRECT rule "
+                            "covers this job; the monitor still flags tun egress)")
+        p.add_argument("--interval", type=float, default=0.5, help="socket sampling interval s [0.5]")
+        p.add_argument("--no-strict", action="store_true", help="only warn on proxy leak instead of killing")
+
+    p = sub.add_parser("check", help="audit environment (local only)")
+    common(p)
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(f=cmd_check)
+
+    p = sub.add_parser("size", help="HEAD-probe sizes directly")
+    p.add_argument("urls", nargs="+")
+    p.set_defaults(f=cmd_size)
+
+    p = sub.add_parser("run", help="run any command DIRECT")
+    common(p)
+    p.add_argument("--log-dir", help="where .direct-download/ logs go [cwd]")
+    p.add_argument("-v", "--verbose", action="store_true", help="print the environment check")
+    p.add_argument("cmd", nargs=argparse.REMAINDER)
+    p.set_defaults(f=cmd_run)
+
+    p = sub.add_parser("fetch", help="managed aria2c download DIRECT")
+    common(p)
+    p.add_argument("urls", nargs="*")
+    p.add_argument("-i", "--input", help="TSV manifest: url [out] [md5|sha256] [size] (header optional)")
+    p.add_argument("-o", "--outdir", default=".")
+    p.add_argument("--md5"), p.add_argument("--sha256")
+    p.add_argument("-j", "--jobs", type=int, default=2, help="parallel files [2]")
+    p.add_argument("-x", "--connections", type=int, default=4, help="connections per file [4]")
+    p.add_argument("--limit", help="overall bandwidth limit, e.g. 20M")
+    p.add_argument("--retries", type=int, default=10)
+    p.add_argument("--retry-wait", type=int, default=30)
+    p.add_argument("--timeout", type=int, default=60)
+    p.add_argument("--no-head", action="store_true", help="skip HEAD size probe")
+    p.add_argument("--no-gzip-test", action="store_true", help="skip gzip/bzip2/xz -t on compressed files")
+    p.add_argument("--keep-existing", action="store_true",
+                   help="treat an existing unverifiable file as done instead of moving it aside")
+    p.add_argument("--allow-unverified", action="store_true", help="exit 0 even if integrity is unknown")
+    p.set_defaults(f=cmd_fetch)
+
+    p = sub.add_parser("selftest", help="real small-file DIRECT test with curl/wget/aria2c/python")
+    common(p)
+    p.add_argument("--url")
+    p.add_argument("--control", action="store_true", default=True,
+                   help="also run a negative control through the proxy to prove detection works [on]")
+    p.add_argument("--no-control", dest="control", action="store_false")
+    p.set_defaults(f=cmd_selftest)
+
+    a = ap.parse_args()
+    STATE_DIR.mkdir(parents=True, exist_ok=True)
+    sys.exit(a.f(a))
+
+
+if __name__ == "__main__":
+    main()
